@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- Responsive + iOS-safe (prevents input zoom) -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <title>Inventory</title>
   <style>
+    /* same Liquid Glass mobile-friendly styles from our last version */
     :root{
       --fs-xs: clamp(0.75rem, 1.2vw, 0.9rem);
       --fs-sm: clamp(0.9rem, 1.4vw, 1.05rem);
@@ -21,140 +21,61 @@
       --container-max: 72rem;
       --toolbar-max: 44rem;
       --pad-x: max(4vw, 1rem);
-      --pad-bottom: 10rem;  /* room for floating toolbar */
+      --pad-bottom: 10rem;
     }
     *,*::before,*::after{ box-sizing:border-box }
     html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
-    body{
-      min-height:100dvh; margin:0;
-      font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-      background:var(--bg); color:var(--text);
-    }
+    body{ min-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text) }
 
-    .container{
-      position: relative; z-index: 1;
-      width:min(100%, 28rem);
-      margin:0 auto;
-      padding: calc(env(safe-area-inset-top) + var(--space-3))
-               var(--pad-x)
-               calc(env(safe-area-inset-bottom) + var(--pad-bottom));
-      display:flex; flex-direction:column; gap: var(--space-3);
-    }
-    @media (min-width: 48rem){
-      .container{ width:min(100%, var(--container-max)) }
-    }
+    .container{ position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto; padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--pad-x) calc(env(safe-area-inset-bottom) + var(--pad-bottom)); display:flex; flex-direction:column; gap:var(--space-3) }
+    @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
 
-    header{ display:flex; align-items:center; gap: var(--space-2) }
-    header h1{ margin:0; font-size: var(--fs-lg); font-weight:800 }
+    header{ display:flex; align-items:center; gap:var(--space-2) }
+    header h1{ margin:0; font-size:var(--fs-lg); font-weight:800 }
     .spacer{ flex:1 }
 
     .lang{ display:flex; gap:.5rem }
-    .lang button{
-      padding:.45rem .9rem; border-radius:9999px; border:1px solid var(--border);
-      background:#fafafa; color:#111; font-weight:700; font-size: var(--fs-sm); cursor:pointer;
-    }
+    .lang button{ padding:.45rem .9rem; border-radius:9999px; border:1px solid var(--border); background:#fafafa; color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer }
     .lang button.active{ background:var(--accent); color:#fff; border-color:var(--accent) }
 
-    .tabs{
-      display:flex; gap:.5rem; padding:.4rem; overflow:auto;
-      border:1px solid var(--border); border-radius:9999px; background:#f8f8fb;
-      -webkit-overflow-scrolling:touch;
-    }
-    .tabs button{
-      flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem;
-      border:none; border-radius:9999px; background:transparent; cursor:pointer;
-      font-weight:800; color:#3a3a3c; font-size: var(--fs-sm);
-    }
+    .tabs{ display:flex; gap:.5rem; padding:.4rem; overflow:auto; border:1px solid var(--border); border-radius:9999px; background:#f8f8fb; -webkit-overflow-scrolling:touch }
+    .tabs button{ flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem; border:none; border-radius:9999px; background:transparent; cursor:pointer; font-weight:800; color:#3a3a3c; font-size:var(--fs-sm) }
     .tabs button.active{ background:#fff; color:var(--accent); box-shadow:var(--shadow) }
 
-    /* Liquid Glass bottom toolbar */
-    .toolbar{
-      position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
-      transform: translateX(-50%);
-      z-index: 1000;
-
-      width: min(100% - 2rem, var(--toolbar-max));
-      height: auto;
-      display:inline-flex; align-items:center; gap:.5rem;
-      padding:.65rem; border-radius:1rem;
-
-      background: rgba(255,255,255,0.72);
-      border: 1px solid rgba(255,255,255,0.45);
-      backdrop-filter: saturate(200%) blur(24px);
-      -webkit-backdrop-filter: saturate(200%) blur(24px);
-      box-shadow: 0 10px 30px rgba(0,0,0,.12);
-
-      pointer-events: auto;
-      contain: layout paint;
-    }
+    .toolbar{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 0.75rem); transform:translateX(-50%); z-index:1000; width:min(100% - 2rem, var(--toolbar-max)); height:auto; display:inline-flex; align-items:center; gap:.5rem; padding:.65rem; border-radius:1rem; background:rgba(255,255,255,0.72); border:1px solid rgba(255,255,255,0.45); backdrop-filter:saturate(200%) blur(24px); -webkit-backdrop-filter:saturate(200%) blur(24px); box-shadow:0 10px 30px rgba(0,0,0,.12); pointer-events:auto; contain:layout paint }
     .toolbar.hidden{ display:none }
-
-    .btn{
-      appearance:none; cursor:pointer; font-weight:800;
-      font-size: var(--fs-sm);
-      padding:.8rem 1rem; border-radius:.9rem; flex:1;
-      border:1px solid rgba(255,255,255,.55);
-      background: rgba(255,255,255,0.55); color:#111;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.08);
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .btn.primary{
-      color:#fff; border-color: transparent;
-      background: linear-gradient(145deg,#0a84ff,#4da3ff);
-      box-shadow: 0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2);
-    }
+    .btn{ appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm); padding:.8rem 1rem; border-radius:.9rem; flex:1; border:1px solid rgba(255,255,255,.55); background:rgba(255,255,255,0.55); color:#111; box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.08); -webkit-tap-highlight-color:transparent; touch-action:manipulation }
+    .btn.primary{ color:#fff; border-color:transparent; background:linear-gradient(145deg,#0a84ff,#4da3ff); box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2) }
     .btn.icon{ flex:0 0 auto; width:2.75rem; min-width:2.75rem; padding:.65rem 0; text-align:center }
 
-    .card{
-      background:var(--card); border:1px solid var(--border); border-radius: var(--radius);
-      box-shadow:var(--shadow); padding: var(--space-3);
-      display:flex; flex-direction:column; gap: var(--space-3);
-    }
-    .card h3{ margin:0; font-size: var(--fs-md) }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
+    .card h3{ margin:0; font-size:var(--fs-md) }
 
-    .row{ display:flex; flex-wrap:wrap; gap: var(--space-3) }
-    .row > *{ flex: 1 1 14rem }
+    .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
+    .row > *{ flex:1 1 14rem }
 
-    label{ font-size: var(--fs-xs); color:var(--muted) }
-    input,select,textarea{
-      width:100%; padding:.85rem .95rem; font-size:16px;
-      background:#fff; color:#111; border:1px solid var(--border); border-radius:.9rem; outline:none;
-    }
+    label{ font-size:var(--fs-xs); color:var(--muted) }
+    input,select,textarea{ width:100%; padding:.85rem .95rem; font-size:16px; background:#fff; color:#111; border:1px solid var(--border); border-radius:.9rem; outline:none }
     input:focus,select:focus,textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 .2rem var(--accent-weak) }
 
     .lines{ display:flex; flex-direction:column; gap:.75rem }
     .line{ display:flex; flex-direction:column; gap:.75rem; padding:.75rem; border:1px dashed var(--border); border-radius:.9rem; background:#fff }
     .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
-    .line .grid > *{ flex: 1 1 10rem }
+    .line .grid > *{ flex:1 1 10rem }
     .actions{ display:flex; justify-content:flex-end }
 
     .list{ display:flex; flex-direction:column; gap:.6rem }
-    .rowitem{
-      display:flex; justify-content:space-between; align-items:center; gap:.75rem;
-      padding:.75rem .95rem; border:1px solid var(--border); border-radius:.9rem; background:#fff;
-      font-size: var(--fs-sm);
-    }
-    .rowitem .meta{ color:var(--muted); font-size: var(--fs-xs) }
+    .rowitem{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.75rem .95rem; border:1px solid var(--border); border-radius:.9rem; background:#fff; font-size:var(--fs-sm) }
+    .rowitem .meta{ color:var(--muted); font-size:var(--fs-xs) }
 
-    .grid-dash{ display:flex; flex-direction:column; gap: var(--space-3) }
-    @media (min-width: 80rem){
-      .grid-dash{ flex-direction:row }
-      .grid-dash > :first-child{ flex:2 1 0 }
-      .grid-dash > :last-child{  flex:1 1 0 }
-    }
+    .grid-dash{ display:flex; flex-direction:column; gap:var(--space-3) }
+    @media (min-width: 80rem){ .grid-dash{ flex-direction:row } .grid-dash > :first-child{ flex:2 1 0 } .grid-dash > :last-child{ flex:1 1 0 } }
 
     .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
     .kpi{ flex:1 1 9rem; padding:.8rem; border-radius:.9rem; border:1px solid var(--border); background:#fff; box-shadow:var(--shadow) }
     .kpi .v{ font-size:1.25rem; font-weight:800 }
 
-    .toast{
-      position:fixed; left:50%; bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
-      transform:translateX(-50%); background:#111; color:#fff;
-      padding:.6rem .95rem; border-radius:.9rem; display:none; z-index:1500; font-size: var(--fs-sm)
-    }
+    .toast{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.5rem); transform:translateX(-50%); background:#111; color:#fff; padding:.6rem .95rem; border-radius:.9rem; display:none; z-index:1500; font-size:var(--fs-sm) }
     .toast.show{ display:block }
     .hidden{ display:none !important }
   </style>
@@ -190,7 +111,7 @@
           <div class="list" id="topContractors"></div>
         </div>
 
-        <!-- Purchasing Summary moved to Dashboard -->
+        <!-- Purchasing Summary -->
         <div class="card">
           <h3 id="t_pur_summary">Summary</h3>
           <div class="kpis" id="purKpis">
@@ -211,7 +132,7 @@
           <div class="list" id="recentMoves"></div>
         </div>
 
-        <!-- Purchasing History moved to Dashboard (no filters, all records) -->
+        <!-- Purchasing History (all records) -->
         <div class="card">
           <h3 id="t_pur_history">History</h3>
           <div class="list" id="purHistory"></div>
@@ -282,7 +203,7 @@
       <div class="lines" id="adjLines"></div>
     </div>
 
-    <!-- PURCHASING (form only; summary/history now on Dashboard) -->
+    <!-- PURCHASING (form only) -->
     <div class="card" id="panel-purchase" style="display:none">
       <h3 id="t_pur_title">Purchasing Request</h3>
       <div class="row" style="margin-top:.25rem">
@@ -319,7 +240,7 @@
     </div>
   </div>
 
-  <!-- Floating Liquid Glass toolbar -->
+  <!-- Floating toolbar -->
   <div class="toolbar" id="toolbar" aria-live="polite" role="region">
     <button class="btn icon" id="addLineBtn" type="button" title="Add line">＋</button>
     <button class="btn" id="resetBtn" type="button">Reset</button>
@@ -330,13 +251,44 @@
 
   <script>
   (function(){
-    // ===== helpers =====
+    /* ===== API CONFIG: paste your Web App URL here ===== */
+    const API_URL = "https://script.google.com/macros/s/AKfycbxorXbbVhEW-xW1UPUxhBOJFfc02c2FmEnDbWWZSEEEp-L5OrK3uBF1nSFyuV-Ah58K/exec";
+
+    /* ==== API helpers ==== 
+       We use text/plain to avoid CORS preflight (OPTIONS).
+       GET for reads, POST for writes (big payloads). */
+
+    function apiGet(fn, payload, cb){
+      const q = new URLSearchParams();
+      q.set('fn', fn);
+      if (payload && Object.keys(payload).length) q.set('payload', JSON.stringify(payload));
+      fetch(API_URL + "?" + q.toString(), { method: 'GET' })
+        .then(r => r.text())
+        .then(t => safeJson(t))
+        .then(data => cb && cb(data))
+        .catch(err => console.error('GET '+fn+' error', err));
+    }
+    function apiPost(fn, payload, cb){
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ fn: fn, payload: payload || {} })
+      })
+        .then(r => r.text())
+        .then(t => safeJson(t))
+        .then(data => cb && cb(data))
+        .catch(err => console.error('POST '+fn+' error', err));
+    }
+    function safeJson(t){ try{ return JSON.parse(t); }catch(e){ return {ok:false,error:'Bad JSON from server'}; } }
+
+    // ===== UI helpers =====
     function $(q){ return document.querySelector(q); }
     function $$(q){ return Array.prototype.slice.call(document.querySelectorAll(q)); }
     function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');}, 2000); }
     function esc(v){ return (v==null)?'':String(v).replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);}); }
+    function val(sel){ var el=$(sel); return el? (el.value||'').trim() : ''; }
 
-    // ===== i18n =====
+    // ===== i18n strings =====
     var STR = {
       en:{title:'Inventory',project:'Project / Location',contractor:'Contractor',requester:'Requester',note:'Note',item:'Item',qty:'Qty',addline:'Add line',outTitle:'Material OUT',outDate:'Date',inTitle:'Material IN',date:'Date received',adjTitle:'Adjust',purTitle:'Purchasing Request',purProject:'Project / Location',purNeedBy:'Need by (date)',purVendor:'Preferred vendor (optional)',purPriority:'Priority',purNote:'Request note',submitOut:'Submit OUT',submitIn:'Submit IN',submitAdj:'Submit ADJUST',submitPur:'Submit REQUEST',dashLow:'Low stock',dashTopCons:'Top contractors (usage)',dashTopItems:'Top items',dashRecent:'Recent movements',noLow:'No low stock 🎉',dashNoSubmit:'Nothing to submit on Dashboard',pickOrSearch:'Search or pick',pickOrAdd:'Pick or add',typeToSearch:'Type to search…',prev:'Prev: ',stock:'Stock: ',used:'Used',purSummary:'Summary',purHistory:'History'},
       th:{title:'สต็อกวัสดุ',project:'โครงการ / ตำแหน่ง',contractor:'ผู้รับเหมา',requester:'ผู้ขอเบิก',note:'หมายเหตุ',item:'รายการ',qty:'จำนวน',addline:'เพิ่มรายการ',outTitle:'เบิกออก',outDate:'วันที่',inTitle:'รับเข้า',date:'วันที่รับของ',adjTitle:'ปรับสต็อก',purTitle:'คำขอจัดซื้อ',purProject:'โครงการ / ตำแหน่ง',purNeedBy:'ต้องใช้ภายใน (วันที่)',purVendor:'ผู้ขายที่ต้องการ (ไม่บังคับ)',purPriority:'ความเร่งด่วน',purNote:'หมายเหตุ',submitOut:'บันทึกเบิกออก',submitIn:'บันทึกรับเข้า',submitAdj:'บันทึกปรับสต็อก',submitPur:'ส่งคำขอจัดซื้อ',dashLow:'สต็อกใกล้หมด',dashTopCons:'ผู้รับเหมาที่เบิกบ่อย',dashTopItems:'วัสดุยอดนิยม',dashRecent:'รายการล่าสุด',noLow:'ไม่มีรายการสต็อกใกล้หมด 🎉',dashNoSubmit:'หน้านี้ไม่มีรายการให้บันทึก',pickOrSearch:'ค้นหาหรือเลือก',pickOrAdd:'เลือกหรือเพิ่ม',typeToSearch:'พิมพ์เพื่อค้นหา…',prev:'คงเหลือก่อนหน้า: ',stock:'คงเหลือ: ',used:'ใช้ไป',purSummary:'สรุป',purHistory:'ประวัติ'}
@@ -372,23 +324,8 @@
       setText('#submitBtn',label);
     }
 
-    // ===== lookups =====
+    // lookups cache
     var MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
-    function GAS(){ return (window.google && google.script && google.script.run) ? google.script.run : null; }
-
-    function loadLookups(){
-      var run = GAS();
-      if (run){
-        run.withSuccessHandler(function(a){ MATERIALS=a||[]; hydrateMaterials(); }).listMaterials();
-        run.withSuccessHandler(function(a){ PROJECTS=a||[]; hydrateDatalist('#Projects',PROJECTS); }).listProjects();
-        run.withSuccessHandler(function(a){ CONTRACTORS=a||[]; hydrateDatalist('#Contractors',CONTRACTORS); }).listContractors();
-        run.withSuccessHandler(function(a){ REQUESTERS=a||[]; hydrateDatalist('#Requesters',REQUESTERS); }).listRequesters();
-      } else {
-        MATERIALS=['Cement 50kg','Tile 40x60','PVC 20mm'];
-        PROJECTS=['Site A','Site B']; CONTRACTORS=['ABC Build']; REQUESTERS=['Somchai'];
-        hydrateDatalist('#Projects',PROJECTS); hydrateDatalist('#Contractors',CONTRACTORS); hydrateDatalist('#Requesters',REQUESTERS); hydrateMaterials();
-      }
-    }
     function hydrateDatalist(sel, arr){
       var dl=$(sel); if(!dl) return; dl.innerHTML='';
       (arr||[]).forEach(function(v){ var o=document.createElement('option'); o.value=v; dl.appendChild(o); });
@@ -399,17 +336,13 @@
       (MATERIALS||[]).forEach(function(v){ var o=document.createElement('option'); o.value=v; dl.appendChild(o); });
     }
 
-    // ===== builders =====
+    // builders
     function makeItemInput(){ var i=document.createElement('input'); i.setAttribute('list','Materials'); i.placeholder=STR[LANG].typeToSearch; i.className='mat'; return i; }
     function makeQtyInput(ph){ var i=document.createElement('input'); i.type='number'; i.min='0'; i.step='any'; i.placeholder=ph||'0'; i.inputMode='decimal'; return i; }
     function makeRemoveBtn(){ var b=document.createElement('button'); b.type='button'; b.className='btn icon'; b.textContent='×'; b.addEventListener('click', function(e){ var p=findAncestor(e.target,'.line'); if(p) p.remove();}); return b; }
     function findAncestor(el, sel){ while(el && el!==document){ if(el.matches && el.matches(sel)) return el; el=el.parentNode; } return null; }
 
-    function fetchStock(name, cb){
-      var run=GAS();
-      if (run){ run.withSuccessHandler(cb).getCurrentStock(name); }
-      else { cb(Math.floor(Math.random()*100)); }
-    }
+    function fetchStock(name, cb){ apiGet('getCurrentStock', {material: name}, cb); }
 
     function outLine(){
       var card=document.createElement('div'); card.className='line';
@@ -461,7 +394,7 @@
       return out;
     }
 
-    // ===== tabs =====
+    // tabs
     function currentTab(){
       if ($('#panel-dashboard').style.display!=='none') return 'dashboard';
       if ($('#panel-out').style.display!=='none') return 'out';
@@ -485,13 +418,10 @@
       setText('#submitBtn',label);
     }
 
-    // ===== submit =====
-    function val(sel){ var el=$(sel); return el? (el.value||'').trim() : ''; }
+    // submit
     function submit(){
       var tab=currentTab();
       if (tab==='dashboard'){ toast(STR[LANG].dashNoSubmit); return; }
-
-      var run=GAS();
 
       if (tab==='purchase'){
         var pp = {
@@ -504,12 +434,10 @@
           lines:   collectLines('#purLines')
         };
         if (!pp.lines.length){ toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); return; }
-        if (run){
-          run.withSuccessHandler(function(res){
-            if(res && res.ok){ toast('Request sent • ' + (res.docNo||'')); hardReset('purchase'); loadDashboard(); }
-            else { toast((res && res.message) || 'Error'); }
-          }).withFailureHandler(function(err){ console.error(err); toast('Error'); }).submitPurchaseRequest(pp);
-        } else { toast('Sent (preview)'); hardReset('purchase'); }
+        apiPost('submitPurchaseRequest', pp, function(res){
+          if(res && res.ok){ toast('Request sent • ' + (res.docNo||'')); hardReset('purchase'); loadDashboard(); }
+          else { toast((res && res.message) || 'Error'); }
+        });
         return;
       }
 
@@ -524,12 +452,10 @@
       };
       if (!payload.lines.length){ toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); return; }
 
-      if (run){
-        run.withSuccessHandler(function(res){
-          if(res && res.ok){ toast((LANG==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||'')); hardReset(tab); loadDashboard(); }
-          else { toast((res && res.message) || 'Error'); }
-        }).withFailureHandler(function(err){ console.error(err); toast('Error'); }).submitMovementBulk(payload);
-      } else { toast('Saved (preview)'); hardReset(tab); }
+      apiPost('submitMovementBulk', payload, function(res){
+        if(res && res.ok){ toast((LANG==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||'')); hardReset(tab); loadDashboard(); }
+        else { toast((res && res.message) || 'Error'); }
+      });
     }
 
     function hardReset(which){
@@ -540,24 +466,14 @@
       window.scrollTo({top:0,behavior:'smooth'});
     }
 
-    // ===== dashboard =====
+    // dashboard
     function loadDashboard(){
-      var run=GAS();
-      if (!run){
-        fillLowStock([{name:'Cement 50kg', stock:2, min:10}]);
-        fillTopContractors([{contractor:'ABC Build', project:'Site A', qty:140}]);
-        fillTopItems([{name:'Cement 50kg', qty:300}]);
-        fillRecent([{ts:'2025-10-04 14:10', doc:'251004-1001', type:'OUT', item:'Cement 50kg', qty:5}]);
-        renderPurchaseSummary({requests:0, lines:0, urgent:0, vendors:0});
-        renderPurchaseHistory([]);
-        return;
-      }
-      run.withSuccessHandler(fillLowStock).dash_LowStock();
-      run.withSuccessHandler(fillTopContractors).dash_TopContractors();
-      run.withSuccessHandler(fillTopItems).dash_TopItems();
-      run.withSuccessHandler(fillRecent).dash_Recent();
-      run.withSuccessHandler(renderPurchaseSummary).pur_Summary();
-      run.withSuccessHandler(renderPurchaseHistory).pur_History();
+      apiGet('dash_LowStock', {}, fillLowStock);
+      apiGet('dash_TopContractors', {}, fillTopContractors);
+      apiGet('dash_TopItems', {}, fillTopItems);
+      apiGet('dash_Recent', {}, fillRecent);
+      apiGet('pur_Summary', {}, renderPurchaseSummary);
+      apiGet('pur_History', {}, renderPurchaseHistory);
     }
     function fillLowStock(list){
       var box = $('#lowStockList'); box.innerHTML='';
@@ -593,8 +509,6 @@
         box.appendChild(row);
       });
     }
-
-    // Purchasing Summary + History (on Dashboard)
     function renderPurchaseSummary(s){
       setText('#kpiReq', (s && s.requests) ? s.requests : 0);
       setText('#kpiLines', (s && s.lines) ? s.lines : 0);
@@ -617,17 +531,20 @@
       });
     }
 
-    // ===== events =====
+    // init events
     document.addEventListener('DOMContentLoaded', function(){
+      // language
       $('#lang-en').addEventListener('click', function(){ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
       $('#lang-th').addEventListener('click', function(){ LANG='th'; $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang(); });
 
+      // tabs
       $('#tab-dashboard').addEventListener('click', function(){ showTab('dashboard'); loadDashboard(); });
       $('#tab-out').addEventListener('click', function(){ showTab('out'); });
       $('#tab-in').addEventListener('click', function(){ showTab('in'); });
       $('#tab-adjust').addEventListener('click', function(){ showTab('adjust'); });
       $('#tab-purchase').addEventListener('click', function(){ showTab('purchase'); });
 
+      // toolbar
       $('#addLineBtn').addEventListener('click', function(){
         var tab=currentTab();
         if (tab==='out') $('#outLines').appendChild(outLine());
@@ -639,9 +556,12 @@
       $('#resetBtn').addEventListener('click', function(){ hardReset(currentTab()); });
       $('#submitBtn').addEventListener('click', submit);
 
-      document.body.appendChild(materialsDL);
+      // load lookups from API
+      apiGet('listMaterials', {}, function(a){ MATERIALS=a||[]; document.body.appendChild(materialsDL); hydrateMaterials(); });
+      apiGet('listProjects', {}, function(a){ PROJECTS=a||[]; hydrateDatalist('#Projects',PROJECTS); });
+      apiGet('listContractors', {}, function(a){ CONTRACTORS=a||[]; hydrateDatalist('#Contractors',CONTRACTORS); });
+      apiGet('listRequesters', {}, function(a){ REQUESTERS=a||[]; hydrateDatalist('#Requesters',REQUESTERS); });
 
-      loadLookups();
       hardReset();
       applyLang();
       showTab('dashboard');

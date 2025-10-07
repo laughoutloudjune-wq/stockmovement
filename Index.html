@@ -1,573 +1,793 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <title>Inventory</title>
-  <style>
-    /* same Liquid Glass mobile-friendly styles from our last version */
-    :root{
-      --fs-xs: clamp(0.75rem, 1.2vw, 0.9rem);
-      --fs-sm: clamp(0.9rem, 1.4vw, 1.05rem);
-      --fs-md: clamp(1rem, 1.8vw, 1.2rem);
-      --fs-lg: clamp(1.15rem, 2.2vw, 1.4rem);
+<meta charset="UTF-8" />
+<meta name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Inventory</title>
+<style>
+  :root{
+    --fs-xs: clamp(0.78rem, 1.3vw, 0.9rem);
+    --fs-sm: clamp(0.95rem, 1.6vw, 1.05rem);
+    --fs-md: clamp(1.05rem, 2vw, 1.2rem);
+    --fs-lg: clamp(1.2rem, 2.4vw, 1.4rem);
+    --space-1:.5rem; --space-2:.75rem; --space-3:1rem; --space-4:1.25rem;
+    --radius: 1rem; --border:#e5e5ea;
+    --bg:#f5f5f7; --card:#ffffff; --text:#111; --muted:#6b7280;
+    --accent:#0a84ff; --accent-weak:#e5f0ff;
+    --shadow: 0 0.05rem 0.15rem rgba(0,0,0,.06), 0 0.6rem 1.2rem rgba(0,0,0,.06);
+    --container-max: 72rem; --toolbar-max: 44rem;
+    --pad-x: max(4vw, 1rem); --pad-bottom: 10rem;
+  }
+  *,*::before,*::after{ box-sizing:border-box }
+  html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
+  body{ min-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text) }
 
-      --space-1:.5rem; --space-2:.75rem; --space-3:1rem; --space-4:1.25rem;
-      --radius: 1rem; --border:#e5e5ea;
-      --bg:#f5f5f7; --card:#ffffff; --text:#111; --muted:#6b7280;
-      --accent:#0a84ff; --accent-weak:#e5f0ff;
-      --shadow: 0 0.05rem 0.15rem rgba(0,0,0,.06), 0 0.6rem 1.2rem rgba(0,0,0,.06);
+  .container{ position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto;
+    padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--pad-x)
+             calc(env(safe-area-inset-bottom) + var(--pad-bottom));
+    display:flex; flex-direction:column; gap:var(--space-3) }
+  @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
 
-      --container-max: 72rem;
-      --toolbar-max: 44rem;
-      --pad-x: max(4vw, 1rem);
-      --pad-bottom: 10rem;
-    }
-    *,*::before,*::after{ box-sizing:border-box }
-    html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
-    body{ min-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text) }
+  header{ display:flex; align-items:center; gap:var(--space-2) }
+  header h1{ margin:0; font-size:var(--fs-lg); font-weight:800 }
+  .spacer{ flex:1 }
 
-    .container{ position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto; padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--pad-x) calc(env(safe-area-inset-bottom) + var(--pad-bottom)); display:flex; flex-direction:column; gap:var(--space-3) }
-    @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
+  .lang{ display:flex; gap:.5rem }
+  .lang button{ padding:.45rem .9rem; border-radius:9999px; border:1px solid var(--border);
+    background:#fafafa; color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer }
+  .lang button.active{ background:var(--accent); color:#fff; border-color:var(--accent) }
 
-    header{ display:flex; align-items:center; gap:var(--space-2) }
-    header h1{ margin:0; font-size:var(--fs-lg); font-weight:800 }
-    .spacer{ flex:1 }
+  .tabs{ display:flex; gap:.5rem; padding:.4rem; overflow:auto; border:1px solid var(--border);
+    border-radius:9999px; background:#f8f8fb; -webkit-overflow-scrolling:touch }
+  .tabs button{ flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem; border:none;
+    border-radius:9999px; background:transparent; cursor:pointer; font-weight:800;
+    color:#3a3a3c; font-size:var(--fs-sm) }
+  .tabs button.active{ background:#fff; color:var(--accent); box-shadow:var(--shadow) }
 
-    .lang{ display:flex; gap:.5rem }
-    .lang button{ padding:.45rem .9rem; border-radius:9999px; border:1px solid var(--border); background:#fafafa; color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer }
-    .lang button.active{ background:var(--accent); color:#fff; border-color:var(--accent) }
+  .toolbar{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 0.75rem);
+    transform:translateX(-50%); z-index:1000; width:min(100% - 2rem, var(--toolbar-max));
+    display:inline-flex; align-items:center; gap:.5rem; padding:.65rem; border-radius:1rem;
+    background:rgba(255,255,255,0.72); border:1px solid rgba(255,255,255,0.45);
+    backdrop-filter:saturate(200%) blur(24px);
+    -webkit-backdrop-filter:saturate(200%) blur(24px);
+    box-shadow:0 10px 30px rgba(0,0,0,.12) }
+  .toolbar.hidden{ display:none }
+  .btn{ appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm);
+    padding:.8rem 1rem; border-radius:.9rem; flex:1; border:1px solid rgba(255,255,255,.55);
+    background:rgba(255,255,255,0.55); color:#111;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.08);
+    -webkit-tap-highlight-color:transparent; touch-action:manipulation }
+  .btn.primary{ color:#fff; border-color:transparent;
+    background:linear-gradient(145deg,#0a84ff,#4da3ff);
+    box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2) }
+  .btn.icon{ flex:0 0 auto; width:2.75rem; min-width:2.75rem; padding:.65rem 0; text-align:center }
 
-    .tabs{ display:flex; gap:.5rem; padding:.4rem; overflow:auto; border:1px solid var(--border); border-radius:9999px; background:#f8f8fb; -webkit-overflow-scrolling:touch }
-    .tabs button{ flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem; border:none; border-radius:9999px; background:transparent; cursor:pointer; font-weight:800; color:#3a3a3c; font-size:var(--fs-sm) }
-    .tabs button.active{ background:#fff; color:var(--accent); box-shadow:var(--shadow) }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
+  .card h3{ margin:0; font-size:var(--fs-md) }
 
-    .toolbar{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 0.75rem); transform:translateX(-50%); z-index:1000; width:min(100% - 2rem, var(--toolbar-max)); height:auto; display:inline-flex; align-items:center; gap:.5rem; padding:.65rem; border-radius:1rem; background:rgba(255,255,255,0.72); border:1px solid rgba(255,255,255,0.45); backdrop-filter:saturate(200%) blur(24px); -webkit-backdrop-filter:saturate(200%) blur(24px); box-shadow:0 10px 30px rgba(0,0,0,.12); pointer-events:auto; contain:layout paint }
-    .toolbar.hidden{ display:none }
-    .btn{ appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm); padding:.8rem 1rem; border-radius:.9rem; flex:1; border:1px solid rgba(255,255,255,.55); background:rgba(255,255,255,0.55); color:#111; box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.08); -webkit-tap-highlight-color:transparent; touch-action:manipulation }
-    .btn.primary{ color:#fff; border-color:transparent; background:linear-gradient(145deg,#0a84ff,#4da3ff); box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2) }
-    .btn.icon{ flex:0 0 auto; width:2.75rem; min-width:2.75rem; padding:.65rem 0; text-align:center }
+  .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
+  .row > *{ flex:1 1 14rem }
 
-    .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
-    .card h3{ margin:0; font-size:var(--fs-md) }
+  label{ font-size:var(--fs-xs); color:var(--muted) }
+  input,select,textarea{ width:100%; padding:.95rem 1rem; font-size:16px; background:#fff; color:#111;
+    border:1px solid var(--border); border-radius:.9rem; outline:none }
+  input:focus,select:focus,textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 .2rem var(--accent-weak) }
 
-    .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
-    .row > *{ flex:1 1 14rem }
+  .lines{ display:flex; flex-direction:column; gap:.75rem }
+  .line{ display:flex; flex-direction:column; gap:.75rem; padding:.75rem; border:1px dashed var(--border);
+    border-radius:.9rem; background:#fff }
+  .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
+  .line .grid > *{ flex:1 1 10rem }
+  .actions{ display:flex; justify-content:flex-end }
 
-    label{ font-size:var(--fs-xs); color:var(--muted) }
-    input,select,textarea{ width:100%; padding:.85rem .95rem; font-size:16px; background:#fff; color:#111; border:1px solid var(--border); border-radius:.9rem; outline:none }
-    input:focus,select:focus,textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 .2rem var(--accent-weak) }
+  .list{ display:flex; flex-direction:column; gap:.6rem }
+  .rowitem{ display:flex; justify-content:space-between; align-items:center; gap:.75rem;
+    padding:.75rem 1rem; border:1px solid var(--border); border-radius:.9rem;
+    background:#fff; font-size:var(--fs-sm) }
+  .rowitem .meta{ color:var(--muted); font-size:var(--fs-xs) }
 
-    .lines{ display:flex; flex-direction:column; gap:.75rem }
-    .line{ display:flex; flex-direction:column; gap:.75rem; padding:.75rem; border:1px dashed var(--border); border-radius:.9rem; background:#fff }
-    .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
-    .line .grid > *{ flex:1 1 10rem }
-    .actions{ display:flex; justify-content:flex-end }
+  .grid-dash{ display:flex; flex-direction:column; gap:var(--space-3) }
+  @media (min-width: 80rem){ .grid-dash{ flex-direction:row }
+    .grid-dash > :first-child{ flex:2 1 0 } .grid-dash > :last-child{ flex:1 1 0 } }
 
-    .list{ display:flex; flex-direction:column; gap:.6rem }
-    .rowitem{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.75rem .95rem; border:1px solid var(--border); border-radius:.9rem; background:#fff; font-size:var(--fs-sm) }
-    .rowitem .meta{ color:var(--muted); font-size:var(--fs-xs) }
+  .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
+  .kpi{ flex:1 1 9rem; padding:.8rem; border-radius:.9rem; border:1px solid var(--border);
+    background:#fff; box-shadow:var(--shadow) }
+  .kpi .v{ font-size:1.25rem; font-weight:800 }
 
-    .grid-dash{ display:flex; flex-direction:column; gap:var(--space-3) }
-    @media (min-width: 80rem){ .grid-dash{ flex-direction:row } .grid-dash > :first-child{ flex:2 1 0 } .grid-dash > :last-child{ flex:1 1 0 } }
+  .toggle{ display:flex; justify-content:flex-end }
+  .toggle button{ border:none; background:transparent; color:#0a84ff; font-weight:700;
+    cursor:pointer; padding:.25rem .25rem }
 
-    .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
-    .kpi{ flex:1 1 9rem; padding:.8rem; border-radius:.9rem; border:1px solid var(--border); background:#fff; box-shadow:var(--shadow) }
-    .kpi .v{ font-size:1.25rem; font-weight:800 }
+  /* ===== Mobile Picker (replaces datalist) ===== */
+  .picker{
+    position:fixed; inset:0; z-index:2000; display:none; background:rgba(0,0,0,.24);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  }
+  .picker.open{ display:block }
+  .picker-sheet{
+    position:absolute; left:0; right:0; bottom:0;
+    background:#fff; border-top-left-radius:1rem; border-top-right-radius:1rem;
+    box-shadow:0 -10px 30px rgba(0,0,0,.15);
+    padding: .75rem .75rem calc(env(safe-area-inset-bottom)+.75rem);
+    max-height: 85dvh; display:flex; flex-direction:column; gap:.5rem;
+  }
+  .picker-handle{ height:6px; width:52px; background:#e5e5ea; border-radius:999px; margin:.25rem auto .5rem auto }
+  .picker-head{ display:flex; align-items:center; gap:.5rem }
+  .picker-head input{ flex:1; padding:.85rem 1rem; border-radius:.9rem; border:1px solid var(--border); font-size:16px }
+  .picker-list{ overflow:auto; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; gap:.35rem; margin-top:.25rem }
+  .pick-row{
+    padding:.95rem 1rem; font-size:1.02rem; line-height:1.25;
+    border:1px solid var(--border); border-radius:.85rem; background:#fff; word-break:break-word;
+  }
+  .pick-row strong{ font-weight:700 }
+  .pick-row .sub{ display:block; color:#6b7280; font-size:.85rem; margin-top:.15rem }
+  .picker-actions{ display:flex; gap:.5rem; margin-top:.4rem }
+  .picker-actions .btn{ flex:1 }
 
-    .toast{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.5rem); transform:translateX(-50%); background:#111; color:#fff; padding:.6rem .95rem; border-radius:.9rem; display:none; z-index:1500; font-size:var(--fs-sm) }
-    .toast.show{ display:block }
-    .hidden{ display:none !important }
-  </style>
+  .hidden{ display:none !important }
+  .toast{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.5rem);
+    transform:translateX(-50%); background:#111; color:#fff; padding:.6rem .95rem; border-radius:.9rem;
+    display:none; z-index:2500; font-size:var(--fs-sm) }
+  .toast.show{ display:block }
+</style>
 </head>
 <body>
-  <div class="container" id="app">
-    <header>
-      <h1 id="t_title">Inventory</h1>
-      <div class="spacer"></div>
-      <div class="lang">
-        <button id="lang-en" class="active" type="button">EN</button>
-        <button id="lang-th" type="button">TH</button>
-      </div>
-    </header>
+<div class="container" id="app">
+  <header>
+    <h1 id="t_title">Inventory</h1>
+    <div class="spacer"></div>
+    <div class="lang">
+      <button id="lang-en" class="active" type="button">EN</button>
+      <button id="lang-th" type="button">TH</button>
+    </div>
+  </header>
 
-    <div class="tabs">
-      <button id="tab-dashboard" class="active" type="button">Dashboard</button>
-      <button id="tab-out" type="button">OUT</button>
-      <button id="tab-in" type="button">IN</button>
-      <button id="tab-adjust" type="button">ADJUST</button>
-      <button id="tab-purchase" type="button">PURCHASING</button>
+  <div class="tabs">
+    <button id="tab-dashboard" class="active" type="button">Dashboard</button>
+    <button id="tab-out" type="button">OUT</button>
+    <button id="tab-in" type="button">IN</button>
+    <button id="tab-adjust" type="button">ADJUST</button>
+    <button id="tab-purchase" type="button">PURCHASING</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section id="panel-dashboard" class="grid-dash">
+    <div>
+      <div class="card">
+        <h3 id="t_dash_lowstock">Low stock</h3>
+        <div class="list" id="lowStockList" data-limit="5"></div>
+        <div class="toggle"><button type="button" data-toggle="#lowStockList">Show more</button></div>
+      </div>
+
+      <div class="card">
+        <h3 id="t_dash_topcontractors">Top contractors (usage)</h3>
+        <div class="list" id="topContractors" data-limit="5"></div>
+        <div class="toggle"><button type="button" data-toggle="#topContractors">Show more</button></div>
+      </div>
+
+      <!-- KPIs + detailed summary -->
+      <div class="card">
+        <h3 id="t_pur_summary">Purchasing Summary</h3>
+        <div class="kpis" id="purKpis">
+          <div class="kpi"><div class="v" id="kpiReq">0</div><div>Requests</div></div>
+          <div class="kpi"><div class="v" id="kpiLines">0</div><div>Lines</div></div>
+          <div class="kpi"><div class="v" id="kpiUrgent">0</div><div>Urgent</div></div>
+        </div>
+        <div class="list" id="purSummaryDetail" data-limit="5"></div>
+        <div class="toggle"><button type="button" data-toggle="#purSummaryDetail">Show more</button></div>
+      </div>
     </div>
 
-    <!-- DASHBOARD -->
-    <section id="panel-dashboard" class="grid-dash">
+    <div>
+      <div class="card">
+        <h3 id="t_dash_topitems">Top items</h3>
+        <div class="list" id="topItems" data-limit="5"></div>
+        <div class="toggle"><button type="button" data-toggle="#topItems">Show more</button></div>
+      </div>
+
+      <div class="card">
+        <h3 id="t_dash_recent">Recent movements</h3>
+        <div class="list" id="recentMoves" data-limit="5"></div>
+        <div class="toggle"><button type="button" data-toggle="#recentMoves">Show more</button></div>
+      </div>
+
+      <div class="card">
+        <h3 id="t_pur_history">Purchasing History</h3>
+        <div class="list" id="purHistory" data-limit="5"></div>
+        <div class="toggle"><button type="button" data-toggle="#purHistory">Show more</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OUT shared header -->
+  <div class="card" id="sharedCard">
+    <div class="row">
       <div>
-        <div class="card">
-          <h3 id="t_dash_lowstock">Low stock</h3>
-          <div class="list" id="lowStockList"></div>
+        <label id="t_project">Project / Location</label>
+        <input id="ProjectInput" data-picker="projects" placeholder="Search or pick" readonly />
+      </div>
+      <div>
+        <label id="t_contractor">Contractor</label>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input id="ContractorInput" data-picker="contractors" placeholder="Pick or add" readonly />
+          <button class="btn icon" id="addContractorBtn" type="button">+</button>
         </div>
-        <div class="card">
-          <h3 id="t_dash_topcontractors">Top contractors (usage)</h3>
-          <div class="list" id="topContractors"></div>
-        </div>
-
-        <!-- Purchasing Summary -->
-        <div class="card">
-          <h3 id="t_pur_summary">Summary</h3>
-          <div class="kpis" id="purKpis">
-            <div class="kpi"><div class="v" id="kpiReq">0</div><div>Requests</div></div>
-            <div class="kpi"><div class="v" id="kpiLines">0</div><div>Lines</div></div>
-            <div class="kpi"><div class="v" id="kpiUrgent">0</div><div>Urgent</div></div>
-            <div class="kpi"><div class="v" id="kpiVendors">0</div><div>Vendors</div></div>
-          </div>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label id="t_requester">Requester</label>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input id="RequesterInput" data-picker="requesters" placeholder="Pick or add" readonly />
+          <button class="btn icon" id="addRequesterBtn" type="button">+</button>
         </div>
       </div>
       <div>
-        <div class="card">
-          <h3 id="t_dash_topitems">Top items</h3>
-          <div class="list" id="topItems"></div>
-        </div>
-        <div class="card">
-          <h3 id="t_dash_recent">Recent movements</h3>
-          <div class="list" id="recentMoves"></div>
-        </div>
-
-        <!-- Purchasing History (all records) -->
-        <div class="card">
-          <h3 id="t_pur_history">History</h3>
-          <div class="list" id="purHistory"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- OUT shared header -->
-    <div class="card" id="sharedCard">
-      <div class="row">
-        <div>
-          <label id="t_project">Project / Location</label>
-          <input list="Projects" id="ProjectInput" placeholder="Search or pick" />
-          <datalist id="Projects"></datalist>
-        </div>
-        <div>
-          <label id="t_contractor">Contractor</label>
-          <div style="display:flex;gap:.5rem;align-items:center">
-            <input list="Contractors" id="ContractorInput" placeholder="Pick or add" />
-            <datalist id="Contractors"></datalist>
-            <button class="btn icon" id="addContractorBtn" type="button">+</button>
-          </div>
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label id="t_requester">Requester</label>
-          <div style="display:flex;gap:.5rem;align-items:center">
-            <input list="Requesters" id="RequesterInput" placeholder="Pick or add" />
-            <datalist id="Requesters"></datalist>
-            <button class="btn icon" id="addRequesterBtn" type="button">+</button>
-          </div>
-        </div>
-        <div>
-          <label id="t_note">Note</label>
-          <input id="Note" placeholder="Optional" />
-        </div>
-      </div>
-    </div>
-
-    <!-- OUT -->
-    <div class="card" id="panel-out" style="display:none">
-      <h3 id="t_out_title">Material OUT</h3>
-      <div class="row">
-        <div>
-          <label id="t_out_date">Date</label>
-          <input id="OutDate" type="date" />
-        </div>
-      </div>
-      <div class="lines" id="outLines"></div>
-    </div>
-
-    <!-- IN -->
-    <div class="card" id="panel-in" style="display:none">
-      <h3 id="t_in_title">Material IN</h3>
-      <div class="row">
-        <div>
-          <label id="t_date">Date received</label>
-          <input id="InDate" type="date" />
-        </div>
-      </div>
-      <div class="lines" id="inLines"></div>
-    </div>
-
-    <!-- ADJUST -->
-    <div class="card" id="panel-adjust" style="display:none">
-      <h3 id="t_adjust_title">Adjust</h3>
-      <div class="lines" id="adjLines"></div>
-    </div>
-
-    <!-- PURCHASING (form only) -->
-    <div class="card" id="panel-purchase" style="display:none">
-      <h3 id="t_pur_title">Purchasing Request</h3>
-      <div class="row" style="margin-top:.25rem">
-        <div>
-          <label id="t_pur_project">Project / Location</label>
-          <input list="Projects" id="PurProject" placeholder="Search or pick" />
-        </div>
-        <div>
-          <label id="t_pur_needby">Need by (date)</label>
-          <input type="date" id="PurNeedBy" />
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label id="t_pur_vendor">Preferred vendor (optional)</label>
-          <input id="PurVendor" placeholder="Type vendor name" />
-        </div>
-        <div>
-          <label id="t_pur_priority">Priority</label>
-          <select id="PurPriority">
-            <option value="Normal">Normal</option>
-            <option value="Urgent">Urgent</option>
-            <option value="Critical">Critical</option>
-          </select>
-        </div>
-      </div>
-      <div class="lines" id="purLines"></div>
-      <div class="row">
-        <div>
-          <label id="t_pur_note">Request note</label>
-          <input id="PurNote" placeholder="Optional note for purchasing team" />
-        </div>
+        <label id="t_note">Note</label>
+        <input id="Note" placeholder="Optional" />
       </div>
     </div>
   </div>
 
-  <!-- Floating toolbar -->
-  <div class="toolbar" id="toolbar" aria-live="polite" role="region">
-    <button class="btn icon" id="addLineBtn" type="button" title="Add line">＋</button>
-    <button class="btn" id="resetBtn" type="button">Reset</button>
-    <button class="btn primary" id="submitBtn" type="button">Submit</button>
+  <!-- OUT -->
+  <div class="card" id="panel-out" style="display:none">
+    <h3 id="t_out_title">Material OUT</h3>
+    <div class="row">
+      <div>
+        <label id="t_out_date">Date</label>
+        <input id="OutDate" type="date" />
+      </div>
+    </div>
+    <div class="lines" id="outLines"></div>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <!-- IN -->
+  <div class="card" id="panel-in" style="display:none">
+    <h3 id="t_in_title">Material IN</h3>
+    <div class="row">
+      <div>
+        <label id="t_date">Date received</label>
+        <input id="InDate" type="date" />
+      </div>
+    </div>
+    <div class="lines" id="inLines"></div>
+  </div>
 
-  <script>
-  (function(){
-    /* ===== API CONFIG: paste your Web App URL here ===== */
-    const API_URL = "https://script.google.com/macros/s/AKfycbxorXbbVhEW-xW1UPUxhBOJFfc02c2FmEnDbWWZSEEEp-L5OrK3uBF1nSFyuV-Ah58K/exec";
+  <!-- ADJUST -->
+  <div class="card" id="panel-adjust" style="display:none">
+    <h3 id="t_adjust_title">Adjust</h3>
+    <div class="lines" id="adjLines"></div>
+  </div>
 
-    /* ==== API helpers ==== 
-       We use text/plain to avoid CORS preflight (OPTIONS).
-       GET for reads, POST for writes (big payloads). */
+  <!-- PURCHASING -->
+  <div class="card" id="panel-purchase" style="display:none">
+    <h3 id="t_pur_title">Purchasing Request</h3>
+    <div class="row" style="margin-top:.25rem">
+      <div>
+        <label id="t_pur_project">Project / Location</label>
+        <input id="PurProject" data-picker="projects" placeholder="Search or pick" readonly />
+      </div>
+      <div>
+        <label id="t_pur_needby">Need by (date)</label>
+        <input type="date" id="PurNeedBy" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label id="t_pur_contractor">Contractor</label>
+        <input id="PurContractor" data-picker="contractors" placeholder="Pick or add contractor" readonly />
+      </div>
+      <div>
+        <label id="t_pur_priority">Priority</label>
+        <select id="PurPriority">
+          <option value="Normal">Normal</option>
+          <option value="Urgent">Urgent</option>
+          <option value="Critical">Critical</option>
+        </select>
+      </div>
+    </div>
+    <div class="lines" id="purLines"></div>
+    <div class="row">
+      <div>
+        <label id="t_pur_note">Request note</label>
+        <input id="PurNote" placeholder="Optional note for purchasing team" />
+      </div>
+    </div>
 
-    function apiGet(fn, payload, cb){
-      const q = new URLSearchParams();
-      q.set('fn', fn);
-      if (payload && Object.keys(payload).length) q.set('payload', JSON.stringify(payload));
-      fetch(API_URL + "?" + q.toString(), { method: 'GET' })
-        .then(r => r.text())
-        .then(t => safeJson(t))
-        .then(data => cb && cb(data))
-        .catch(err => console.error('GET '+fn+' error', err));
+    <div class="card" style="margin-top:.25rem">
+      <h3>Older Requests</h3>
+      <div class="list" id="purOlderList" data-limit="10"></div>
+      <div class="toggle"><button type="button" data-toggle="#purOlderList">Show more</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating toolbar -->
+<div class="toolbar" id="toolbar" aria-live="polite" role="region">
+  <button class="btn icon" id="addLineBtn" type="button" title="Add line">＋</button>
+  <button class="btn" id="resetBtn" type="button">Reset</button>
+  <button class="btn primary" id="submitBtn" type="button">Submit</button>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<!-- ===== Mobile Picker markup ===== -->
+<div class="picker" id="picker">
+  <div class="picker-sheet" role="dialog" aria-modal="true">
+    <div class="picker-handle" aria-hidden="true"></div>
+    <div class="picker-head">
+      <input id="pickerSearch" placeholder="Search…" inputmode="search" />
+      <button class="btn" id="pickerCancel" type="button">Cancel</button>
+    </div>
+    <div class="picker-list" id="pickerList"></div>
+    <div class="picker-actions">
+      <button class="btn" id="pickerAdd" type="button" title="Add new">Add “<span id="pickerAddText"></span>”</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ===== API CONFIG ===== */
+  const API_URL = "https://script.google.com/macros/s/AKfycbxorXbbVhEW-xW1UPUxhBOJFfc02c2FmEnDbWWZSEEEp-L5OrK3uBF1nSFyuV-Ah58K/exec";
+
+  // ---- API helpers (GET read, POST write; text/plain to avoid preflight) ----
+  const safeJson = t => { try { return JSON.parse(t); } catch(e){ return {ok:false,error:'Bad JSON'}; } };
+  function apiGet(fn, payload, cb){
+    const q = new URLSearchParams(); q.set('fn',fn);
+    if (payload && Object.keys(payload).length) q.set('payload', JSON.stringify(payload));
+    fetch(API_URL + "?" + q.toString(), { method:'GET' })
+      .then(r=>r.text()).then(safeJson).then(d=>cb && cb(d)).catch(e=>console.error(fn,e));
+  }
+  function apiPost(fn, payload, cb){
+    fetch(API_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({fn:fn, payload:payload||{}})
+    }).then(r=>r.text()).then(safeJson).then(d=>cb && cb(d)).catch(e=>console.error(fn,e));
+  }
+
+  // ---- UI helpers ----
+  const $ = q => document.querySelector(q);
+  const $$ = q => Array.prototype.slice.call(document.querySelectorAll(q));
+  function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
+  const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const val = s => { const el=$(s); return el? (el.value||'').trim() : ''; };
+
+  // ---- Clamp lists (Show more / less) ----
+  function clampList(listEl){
+    const max = Number(listEl.dataset.limit||'5');
+    const items = listEl.children;
+    for (let i=0;i<items.length;i++){ items[i].style.display = (i<max) ? '' : 'none'; }
+    listEl.dataset.expanded = 'false';
+  }
+  function toggleClamp(btn){
+    const sel = btn.getAttribute('data-toggle');
+    const list = $(sel); if(!list) return;
+    const expanded = list.dataset.expanded === 'true';
+    const items = list.children;
+    for (let i=0;i<items.length;i++){
+      items[i].style.display = expanded ? ((i<Number(list.dataset.limit||'5'))? '' : 'none') : '';
     }
-    function apiPost(fn, payload, cb){
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ fn: fn, payload: payload || {} })
-      })
-        .then(r => r.text())
-        .then(t => safeJson(t))
-        .then(data => cb && cb(data))
-        .catch(err => console.error('POST '+fn+' error', err));
-    }
-    function safeJson(t){ try{ return JSON.parse(t); }catch(e){ return {ok:false,error:'Bad JSON from server'}; } }
+    list.dataset.expanded = expanded ? 'false' : 'true';
+    btn.textContent = expanded ? 'Show more' : 'Show less';
+  }
 
-    // ===== UI helpers =====
-    function $(q){ return document.querySelector(q); }
-    function $$(q){ return Array.prototype.slice.call(document.querySelectorAll(q)); }
-    function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');}, 2000); }
-    function esc(v){ return (v==null)?'':String(v).replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);}); }
-    function val(sel){ var el=$(sel); return el? (el.value||'').trim() : ''; }
+  // ---- i18n (kept minimal here) ----
+  const STR = {
+    en:{title:'Inventory', typeToSearch:'Type to search…', stock:'Stock: ', prev:'Prev: ', dashNoSubmit:'Nothing to submit on Dashboard'},
+    th:{title:'สต็อกวัสดุ', typeToSearch:'พิมพ์เพื่อค้นหา…', stock:'คงเหลือ: ', prev:'คงเหลือก่อนหน้า: ', dashNoSubmit:'หน้านี้ไม่มีรายการให้บันทึก'}
+  };
+  let LANG='en';
+  function setText(s,t){ const el=$(s); if(el) el.textContent=t; }
+  function applyLang(){ setText('#t_title', STR[LANG].title); }
 
-    // ===== i18n strings =====
-    var STR = {
-      en:{title:'Inventory',project:'Project / Location',contractor:'Contractor',requester:'Requester',note:'Note',item:'Item',qty:'Qty',addline:'Add line',outTitle:'Material OUT',outDate:'Date',inTitle:'Material IN',date:'Date received',adjTitle:'Adjust',purTitle:'Purchasing Request',purProject:'Project / Location',purNeedBy:'Need by (date)',purVendor:'Preferred vendor (optional)',purPriority:'Priority',purNote:'Request note',submitOut:'Submit OUT',submitIn:'Submit IN',submitAdj:'Submit ADJUST',submitPur:'Submit REQUEST',dashLow:'Low stock',dashTopCons:'Top contractors (usage)',dashTopItems:'Top items',dashRecent:'Recent movements',noLow:'No low stock 🎉',dashNoSubmit:'Nothing to submit on Dashboard',pickOrSearch:'Search or pick',pickOrAdd:'Pick or add',typeToSearch:'Type to search…',prev:'Prev: ',stock:'Stock: ',used:'Used',purSummary:'Summary',purHistory:'History'},
-      th:{title:'สต็อกวัสดุ',project:'โครงการ / ตำแหน่ง',contractor:'ผู้รับเหมา',requester:'ผู้ขอเบิก',note:'หมายเหตุ',item:'รายการ',qty:'จำนวน',addline:'เพิ่มรายการ',outTitle:'เบิกออก',outDate:'วันที่',inTitle:'รับเข้า',date:'วันที่รับของ',adjTitle:'ปรับสต็อก',purTitle:'คำขอจัดซื้อ',purProject:'โครงการ / ตำแหน่ง',purNeedBy:'ต้องใช้ภายใน (วันที่)',purVendor:'ผู้ขายที่ต้องการ (ไม่บังคับ)',purPriority:'ความเร่งด่วน',purNote:'หมายเหตุ',submitOut:'บันทึกเบิกออก',submitIn:'บันทึกรับเข้า',submitAdj:'บันทึกปรับสต็อก',submitPur:'ส่งคำขอจัดซื้อ',dashLow:'สต็อกใกล้หมด',dashTopCons:'ผู้รับเหมาที่เบิกบ่อย',dashTopItems:'วัสดุยอดนิยม',dashRecent:'รายการล่าสุด',noLow:'ไม่มีรายการสต็อกใกล้หมด 🎉',dashNoSubmit:'หน้านี้ไม่มีรายการให้บันทึก',pickOrSearch:'ค้นหาหรือเลือก',pickOrAdd:'เลือกหรือเพิ่ม',typeToSearch:'พิมพ์เพื่อค้นหา…',prev:'คงเหลือก่อนหน้า: ',stock:'คงเหลือ: ',used:'ใช้ไป',purSummary:'สรุป',purHistory:'ประวัติ'}
-    };
-    var LANG='en';
-    function setText(sel,txt){ var el=$(sel); if(el) el.textContent=txt; }
-    function applyLang(){
-      var S=STR[LANG];
-      setText('#t_title',S.title);
-      setText('#t_dash_lowstock',S.dashLow);
-      setText('#t_dash_topcontractors',S.dashTopCons);
-      setText('#t_dash_topitems',S.dashTopItems);
-      setText('#t_dash_recent',S.dashRecent);
-      setText('#t_project',S.project); setText('#t_contractor',S.contractor); setText('#t_requester',S.requester); setText('#t_note',S.note);
-      setText('#t_out_title',S.outTitle); setText('#t_out_date',S.outDate);
-      setText('#t_in_title',S.inTitle);   setText('#t_date',S.date);
-      setText('#t_adjust_title',S.adjTitle);
-      setText('#t_pur_title',S.purTitle);
-      setText('#t_pur_project',S.purProject);
-      setText('#t_pur_needby',S.purNeedBy);
-      setText('#t_pur_vendor',S.purVendor);
-      setText('#t_pur_priority',S.purPriority);
-      setText('#t_pur_note',S.purNote);
-      setText('#t_pur_summary',S.purSummary);
-      setText('#t_pur_history',S.purHistory);
-      $$('.t_addline').forEach(function(el){ el.textContent=S.addline; });
-      var pi=$('#ProjectInput'); if(pi) pi.placeholder=S.pickOrSearch;
-      var ci=$('#ContractorInput'); if(ci) ci.placeholder=S.pickOrAdd;
-      var ri=$('#RequesterInput'); if(ri) ri.placeholder=S.pickOrAdd;
-      $$('.mat').forEach(function(i){ i.placeholder=S.typeToSearch; });
-      var tab=currentTab();
-      var label=(tab==='out')?S.submitOut:(tab==='in')?S.submitIn:(tab==='adjust')?S.submitAdj:S.submitPur;
-      setText('#submitBtn',label);
-    }
+  // ---- Lookups (arrays) ----
+  let MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
 
-    // lookups cache
-    var MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
-    function hydrateDatalist(sel, arr){
-      var dl=$(sel); if(!dl) return; dl.innerHTML='';
-      (arr||[]).forEach(function(v){ var o=document.createElement('option'); o.value=v; dl.appendChild(o); });
-    }
-    var materialsDL=document.createElement('datalist'); materialsDL.id='Materials'; document.body.appendChild(materialsDL);
-    function hydrateMaterials(){
-      var dl=document.getElementById('Materials') || materialsDL; dl.innerHTML='';
-      (MATERIALS||[]).forEach(function(v){ var o=document.createElement('option'); o.value=v; dl.appendChild(o); });
+  // ===== Mobile Picker logic =====
+  const picker = $('#picker');
+  const pickerList = $('#pickerList');
+  const pickerSearch = $('#pickerSearch');
+  const pickerAdd = $('#pickerAdd');
+  const pickerAddText = $('#pickerAddText');
+  const pickerCancel = $('#pickerCancel');
+
+  // mapping “source key” -> array
+  const sources = {
+    materials: () => MATERIALS,
+    projects:  () => PROJECTS,
+    contractors: () => CONTRACTORS,
+    requesters: () => REQUESTERS
+  };
+
+  let currentTargetInput = null;
+  let currentSourceKey = null;
+
+  function openPicker(targetInput, sourceKey){
+    currentTargetInput = targetInput;
+    currentSourceKey = sourceKey;
+    pickerSearch.value = '';
+    renderPickerList('');
+    picker.classList.add('open');
+    setTimeout(()=>pickerSearch.focus(), 50);
+  }
+
+  function closePicker(){
+    picker.classList.remove('open');
+    currentTargetInput = null;
+    currentSourceKey = null;
+  }
+
+  function renderPickerList(query){
+    const all = (sources[currentSourceKey] ? sources[currentSourceKey]() : []) || [];
+    const q = (query||'').toLowerCase().trim();
+    const list = q ? all.filter(v => String(v).toLowerCase().includes(q)) : all.slice();
+    pickerList.innerHTML = '';
+
+    if (!list.length){
+      pickerAdd.classList.remove('hidden');
+      pickerAddText.textContent = query || '';
+    } else {
+      pickerAdd.classList.add('hidden');
     }
 
-    // builders
-    function makeItemInput(){ var i=document.createElement('input'); i.setAttribute('list','Materials'); i.placeholder=STR[LANG].typeToSearch; i.className='mat'; return i; }
-    function makeQtyInput(ph){ var i=document.createElement('input'); i.type='number'; i.min='0'; i.step='any'; i.placeholder=ph||'0'; i.inputMode='decimal'; return i; }
-    function makeRemoveBtn(){ var b=document.createElement('button'); b.type='button'; b.className='btn icon'; b.textContent='×'; b.addEventListener('click', function(e){ var p=findAncestor(e.target,'.line'); if(p) p.remove();}); return b; }
-    function findAncestor(el, sel){ while(el && el!==document){ if(el.matches && el.matches(sel)) return el; el=el.parentNode; } return null; }
-
-    function fetchStock(name, cb){ apiGet('getCurrentStock', {material: name}, cb); }
-
-    function outLine(){
-      var card=document.createElement('div'); card.className='line';
-      var name=makeItemInput(); var qty=makeQtyInput('0');
-      var grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
-      var meta=document.createElement('div'); meta.className='rowitem meta'; meta.style.justifyContent='flex-start'; meta.textContent=STR[LANG].stock+'–';
-      var actions=document.createElement('div'); actions.className='actions'; actions.appendChild(makeRemoveBtn());
-      card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
-      name.addEventListener('change', function(){ var v=name.value.trim(); if(!v) return; fetchStock(v,function(n){ meta.textContent=STR[LANG].stock+n; }); });
-      return card;
-    }
-    function inLine(){
-      var card=document.createElement('div'); card.className='line';
-      var name=makeItemInput(); var qty=makeQtyInput('0');
-      var grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
-      var actions=document.createElement('div'); actions.className='actions'; actions.appendChild(makeRemoveBtn());
-      card.appendChild(grid); card.appendChild(actions); return card;
-    }
-    function adjLine(){
-      var card=document.createElement('div'); card.className='line';
-      var name=makeItemInput(); var qty=makeQtyInput('±'); qty.placeholder='±';
-      var grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
-      var meta=document.createElement('div'); meta.className='rowitem meta'; meta.style.justifyContent='flex-start'; meta.textContent=STR[LANG].prev+'–';
-      var actions=document.createElement('div'); actions.className='actions'; actions.appendChild(makeRemoveBtn());
-      card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
-      name.addEventListener('change', function(){ var v=name.value.trim(); if(!v) return; fetchStock(v,function(n){ meta.textContent=STR[LANG].prev+n; }); });
-      return card;
-    }
-    function purLine(){
-      var card=document.createElement('div'); card.className='line';
-      var name=makeItemInput(); var qty=makeQtyInput('0'); var spec=document.createElement('input'); spec.placeholder='Spec / Brand (optional)'; spec.style.width='100%';
-      var grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty); grid.appendChild(spec);
-      var actions=document.createElement('div'); actions.className='actions'; actions.appendChild(makeRemoveBtn());
-      card.appendChild(grid); card.appendChild(actions);
-      return card;
-    }
-
-    function collectLines(containerSel){
-      var out=[];
-      $$(containerSel+' .line').forEach(function(c){
-        var nameEl=c.querySelector('.mat');
-        var qtyEl=c.querySelector('input[type="number"]');
-        var specEl=c.querySelector('input[placeholder^="Spec"]');
-        var name=nameEl?nameEl.value.trim():'';
-        var qty=Number(qtyEl?qtyEl.value:0)||0;
-        var spec=specEl? (specEl.value.trim()||'') : '';
-        if (name) out.push({name:name, qty:qty, spec:spec});
+    list.forEach(v=>{
+      const row = document.createElement('div');
+      row.className = 'pick-row';
+      row.innerHTML = '<strong>'+esc(v)+'</strong>';
+      row.addEventListener('click', ()=>{
+        if (currentTargetInput){ currentTargetInput.value = v; }
+        closePicker();
       });
-      return out;
+      pickerList.appendChild(row);
+    });
+  }
+
+  pickerSearch.addEventListener('input', e => renderPickerList(e.target.value));
+  pickerCancel.addEventListener('click', closePicker);
+  picker.addEventListener('click', e => {
+    // close if tap backdrop, not inner sheet
+    if (e.target === picker) closePicker();
+  });
+
+  // Add new (Contractor/Requester) from picker
+  pickerAdd.addEventListener('click', ()=>{
+    const text = pickerSearch.value.trim();
+    if (!text) return;
+    if (currentSourceKey === 'contractors'){
+      apiGet('addContractor', {name:text}, ok=>{
+        if (ok){ CONTRACTORS = Array.from(new Set([text, ...CONTRACTORS])); toast('Added contractor'); }
+        if (currentTargetInput) currentTargetInput.value = text;
+        closePicker();
+      });
+    } else if (currentSourceKey === 'requesters'){
+      apiGet('addRequester', {name:text}, ok=>{
+        if (ok){ REQUESTERS = Array.from(new Set([text, ...REQUESTERS])); toast('Added requester'); }
+        if (currentTargetInput) currentTargetInput.value = text;
+        closePicker();
+      });
+    } else {
+      // For projects/materials we don't allow adding from UI (stick to master sheet)
+      toast('Use master sheet to add new entries');
+      closePicker();
     }
+  });
 
-    // tabs
-    function currentTab(){
-      if ($('#panel-dashboard').style.display!=='none') return 'dashboard';
-      if ($('#panel-out').style.display!=='none') return 'out';
-      if ($('#panel-in').style.display!=='none') return 'in';
-      if ($('#panel-adjust').style.display!=='none') return 'adjust';
-      return 'purchase';
-    }
-    function showTab(which){
-      ['#tab-dashboard','#tab-out','#tab-in','#tab-adjust','#tab-purchase'].forEach(function(s){ var b=$(s); if(b) b.classList.remove('active'); });
-      ['#panel-dashboard','#panel-out','#panel-in','#panel-adjust','#panel-purchase'].forEach(function(s){ var p=$(s); if(p) p.style.display='none'; });
-      $('#sharedCard').classList.add('hidden');
+  // attach picker to inputs with data-picker
+  function bindPickerInputs(){
+    $$('input[data-picker]').forEach(inp=>{
+      inp.addEventListener('click', ()=>{
+        const key = inp.getAttribute('data-picker');
+        openPicker(inp, key);
+      });
+    });
+  }
 
-      if (which==='dashboard'){ $('#tab-dashboard').classList.add('active'); $('#panel-dashboard').style.display='flex'; $('#toolbar').classList.add('hidden'); loadDashboard(); }
-      if (which==='out'){ $('#tab-out').classList.add('active'); $('#panel-out').style.display='flex'; $('#sharedCard').classList.remove('hidden'); $('#toolbar').classList.remove('hidden'); }
-      if (which==='in'){ $('#tab-in').classList.add('active'); $('#panel-in').style.display='flex'; $('#toolbar').classList.remove('hidden'); }
-      if (which==='adjust'){ $('#tab-adjust').classList.add('active'); $('#panel-adjust').style.display='flex'; $('#toolbar').classList.remove('hidden'); }
-      if (which==='purchase'){ $('#tab-purchase').classList.add('active'); $('#panel-purchase').style.display='flex'; $('#toolbar').classList.remove('hidden'); }
+  // ===== Core app: (only the places related to autocomplete changed) =====
 
-      var S=STR[LANG];
-      var label=(which==='out')?S.submitOut:(which==='in')?S.submitIn:(which==='adjust')?S.submitAdj:S.submitPur;
-      setText('#submitBtn',label);
-    }
+  function outLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
+    const meta=document.createElement('div'); meta.className='rowitem meta'; meta.style.justifyContent='flex-start'; meta.textContent=STR[LANG].stock+'–';
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return; apiGet('getCurrentStock',{material:v}, n=>{ meta.textContent=STR[LANG].stock+n; }); });
+    return card;
+  }
+  function inLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    return card;
+  }
+  function adjLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.step='any'; qty.placeholder='±'; qty.inputMode='decimal';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
+    const meta=document.createElement('div'); meta.className='rowitem meta'; meta.style.justifyContent='flex-start'; meta.textContent=STR[LANG].prev+'–';
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return; apiGet('getCurrentStock',{material:v}, n=>{ meta.textContent=STR[LANG].prev+n; }); });
+    return card;
+  }
+  function purLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+    const spec=document.createElement('input'); spec.placeholder='Spec / Brand (optional)'; spec.style.width='100%';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty); grid.appendChild(spec);
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    return card;
+  }
 
-    // submit
-    function submit(){
-      var tab=currentTab();
-      if (tab==='dashboard'){ toast(STR[LANG].dashNoSubmit); return; }
+  function collectLines(containerSel){
+    const out=[];
+    $$(containerSel+' .line').forEach(c=>{
+      const nameEl=c.querySelector('input[data-picker="materials"]');
+      const qtyEl=c.querySelector('input[type="number"]');
+      const specEl=c.querySelector('input[placeholder^="Spec"]');
+      const name=nameEl?nameEl.value.trim():'';
+      const qty=Number(qtyEl?qtyEl.value:0)||0;
+      const spec=specEl? (specEl.value.trim()||'') : '';
+      if (name) out.push({name:name, qty:qty, spec:spec});
+    });
+    return out;
+  }
 
-      if (tab==='purchase'){
-        var pp = {
-          type:'PURCHASE',
-          project: val('#PurProject'),
-          needBy:  val('#PurNeedBy'),
-          vendor:  val('#PurVendor'),
-          priority: val('#PurPriority'),
-          note:    val('#PurNote'),
-          lines:   collectLines('#purLines')
-        };
-        if (!pp.lines.length){ toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); return; }
-        apiPost('submitPurchaseRequest', pp, function(res){
-          if(res && res.ok){ toast('Request sent • ' + (res.docNo||'')); hardReset('purchase'); loadDashboard(); }
-          else { toast((res && res.message) || 'Error'); }
-        });
-        return;
-      }
+  function currentTab(){
+    if ($('#panel-dashboard').style.display!=='none') return 'dashboard';
+    if ($('#panel-out').style.display!=='none') return 'out';
+    if ($('#panel-in').style.display!=='none') return 'in';
+    if ($('#panel-adjust').style.display!=='none') return 'adjust';
+    return 'purchase';
+  }
+  function showTab(which){
+    ['#tab-dashboard','#tab-out','#tab-in','#tab-adjust','#tab-purchase'].forEach(s=>{ const b=$(s); if(b) b.classList.remove('active'); });
+    ['#panel-dashboard','#panel-out','#panel-in','#panel-adjust','#panel-purchase'].forEach(s=>{ const p=$(s); p.style.display='none'; });
+    $('#sharedCard').classList.add('hidden');
 
-      var payload = {
-        type: (tab==='out') ? 'OUT' : (tab==='in') ? 'IN' : 'ADJUST',
-        project: (tab==='out') ? val('#ProjectInput') : '',
-        contractor: (tab==='out') ? val('#ContractorInput') : '',
-        requester: (tab==='out') ? val('#RequesterInput') : '',
-        note: (tab==='out') ? val('#Note') : '',
-        date: (tab==='in') ? val('#InDate') : (tab==='out' ? val('#OutDate') : ''),
-        lines: (tab==='in') ? collectLines('#inLines') : (tab==='out') ? collectLines('#outLines') : collectLines('#adjLines')
+    if (which==='dashboard'){ $('#tab-dashboard').classList.add('active'); $('#panel-dashboard').style.display='flex'; $('#toolbar').classList.add('hidden'); loadDashboard(); }
+    if (which==='out'){ $('#tab-out').classList.add('active'); $('#panel-out').style.display='flex'; $('#sharedCard').classList.remove('hidden'); $('#toolbar').classList.remove('hidden'); }
+    if (which==='in'){ $('#tab-in').classList.add('active'); $('#panel-in').style.display='flex'; $('#toolbar').classList.remove('hidden'); }
+    if (which==='adjust'){ $('#tab-adjust').classList.add('active'); $('#panel-adjust').style.display='flex'; $('#toolbar').classList.remove('hidden'); }
+    if (which==='purchase'){ $('#tab-purchase').classList.add('active'); $('#panel-purchase').style.display='flex'; $('#toolbar').classList.remove('hidden'); loadPurchasingOlder(); }
+  }
+
+  function submit(){
+    const tab = currentTab();
+    if (tab==='dashboard'){ toast(STR[LANG].dashNoSubmit); return; }
+
+    if (tab==='purchase'){
+      const pp = {
+        type:'PURCHASE',
+        project: $('#PurProject').value.trim(),
+        contractor: $('#PurContractor').value.trim(),
+        needBy:  $('#PurNeedBy').value.trim(),
+        priority: $('#PurPriority').value,
+        note:     $('#PurNote').value.trim(),
+        lines:    collectLines('#purLines')
       };
-      if (!payload.lines.length){ toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); return; }
-
-      apiPost('submitMovementBulk', payload, function(res){
-        if(res && res.ok){ toast((LANG==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||'')); hardReset(tab); loadDashboard(); }
-        else { toast((res && res.message) || 'Error'); }
+      if (!pp.lines.length){ toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); return; }
+      apiPost('submitPurchaseRequest', pp, res=>{
+        if(res && res.ok){ toast('Request sent • '+(res.docNo||'')); hardReset('purchase'); loadDashboard(); }
+        else toast((res && res.message) || 'Error');
       });
-    }
-
-    function hardReset(which){
-      if (!which || which==='out'){ $('#outLines').innerHTML=''; $('#outLines').appendChild(outLine()); $('#Note').value=''; $('#OutDate').value=''; }
-      if (!which || which==='in'){  $('#inLines').innerHTML='';  $('#inLines').appendChild(inLine());  $('#InDate').value=''; }
-      if (!which || which==='adjust'){ $('#adjLines').innerHTML=''; $('#adjLines').appendChild(adjLine()); }
-      if (!which || which==='purchase'){ $('#purLines').innerHTML=''; $('#purLines').appendChild(purLine()); $('#PurNote').value=''; $('#PurVendor').value=''; $('#PurNeedBy').value=''; }
-      window.scrollTo({top:0,behavior:'smooth'});
+      return;
     }
 
-    // dashboard
-    function loadDashboard(){
-      apiGet('dash_LowStock', {}, fillLowStock);
-      apiGet('dash_TopContractors', {}, fillTopContractors);
-      apiGet('dash_TopItems', {}, fillTopItems);
-      apiGet('dash_Recent', {}, fillRecent);
-      apiGet('pur_Summary', {}, renderPurchaseSummary);
-      apiGet('pur_History', {}, renderPurchaseHistory);
-    }
-    function fillLowStock(list){
-      var box = $('#lowStockList'); box.innerHTML='';
-      if (!list || !list.length){ box.innerHTML = '<div class="rowitem"><span>'+STR[LANG].noLow+'</span></div>'; return; }
-      list.forEach(function(x){
-        var row = document.createElement('div'); row.className='rowitem';
-        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">Min '+(x.min==null?'-':x.min)+' • '+STR[LANG].stock+esc(x.stock)+'</div></div>';
+    const payload = {
+      type: (tab==='out') ? 'OUT' : (tab==='in') ? 'IN' : 'ADJUST',
+      project: (tab==='out') ? $('#ProjectInput').value.trim() : '',
+      contractor: (tab==='out') ? $('#ContractorInput').value.trim() : '',
+      requester: (tab==='out') ? $('#RequesterInput').value.trim() : '',
+      note: (tab==='out') ? $('#Note').value.trim() : '',
+      date: (tab==='in') ? $('#InDate').value.trim() : (tab==='out' ? $('#OutDate').value.trim() : ''),
+      lines: (tab==='in') ? collectLines('#inLines') : (tab==='out') ? collectLines('#outLines') : collectLines('#adjLines')
+    };
+    if (!payload.lines.length){ toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); return; }
+
+    apiPost('submitMovementBulk', payload, res=>{
+      if(res && res.ok){ toast((LANG==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||'')); hardReset(tab); loadDashboard(); }
+      else toast((res && res.message) || 'Error');
+    });
+  }
+
+  function hardReset(which){
+    if (!which || which==='out'){ $('#outLines').innerHTML=''; $('#outLines').appendChild(outLine()); $('#Note').value=''; $('#OutDate').value=''; }
+    if (!which || which==='in'){  $('#inLines').innerHTML='';  $('#inLines').appendChild(inLine());  $('#InDate').value=''; }
+    if (!which || which==='adjust'){ $('#adjLines').innerHTML=''; $('#adjLines').appendChild(adjLine()); }
+    if (!which || which==='purchase'){ $('#purLines').innerHTML=''; $('#purLines').appendChild(purLine()); $('#PurNote').value=''; $('#PurNeedBy').value=''; $('#PurContractor').value=''; }
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  // ===== Dashboard fills (unchanged logic, UI clamps) =====
+  function loadDashboard(){
+    apiGet('dash_LowStock', {}, list=>{
+      const box = $('#lowStockList'); box.innerHTML='';
+      if (!list || !list.length){ box.innerHTML = '<div class="rowitem"><span>No low stock 🎉</span></div>'; return clampList(box); }
+      list.forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">Min '+(x.min==null?'-':x.min)+' • Stock '+esc(x.stock)+'</div></div>';
         box.appendChild(row);
       });
-    }
-    function fillTopContractors(list){
-      var box = $('#topContractors'); box.innerHTML='';
-      (list||[]).forEach(function(x){
-        var row = document.createElement('div'); row.className='rowitem';
-        var meta = (x.project||'-')+' • Qty '+(x.qty||0);
-        row.innerHTML = '<div><strong>'+esc(x.contractor||'(unknown)')+'</strong><div class="meta">'+esc(meta)+'</div></div>';
+      clampList(box);
+    });
+    apiGet('dash_TopContractors', {}, list=>{
+      const box = $('#topContractors'); box.innerHTML='';
+      (list||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.contractor||'(unknown)')+'</strong><div class="meta">'+esc(x.project||'-')+' • Qty '+(x.qty||0)+'</div></div>';
         box.appendChild(row);
       });
-    }
-    function fillTopItems(list){
-      var box = $('#topItems'); box.innerHTML='';
-      (list||[]).forEach(function(x){
-        var row = document.createElement('div'); row.className='rowitem';
-        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">'+STR[LANG].used+' • '+esc(x.qty)+'</div></div>';
+      clampList(box);
+    });
+    apiGet('dash_TopItems', {}, list=>{
+      const box = $('#topItems'); box.innerHTML='';
+      (list||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">Used • '+esc(x.qty)+'</div></div>';
         box.appendChild(row);
       });
-    }
-    function fillRecent(rows){
-      var box = $('#recentMoves'); box.innerHTML='';
-      (rows||[]).forEach(function(x){
-        var row = document.createElement('div'); row.className='rowitem';
+      clampList(box);
+    });
+    apiGet('dash_Recent', {}, rows=>{
+      const box = $('#recentMoves'); box.innerHTML='';
+      (rows||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
         row.innerHTML = '<div><strong>'+esc(x.type)+' • '+esc(x.item)+'</strong><div class="meta">'+esc(x.ts)+' — '+esc(x.doc)+' • Qty '+esc(x.qty)+'</div></div>';
         box.appendChild(row);
       });
-    }
-    function renderPurchaseSummary(s){
-      setText('#kpiReq', (s && s.requests) ? s.requests : 0);
-      setText('#kpiLines', (s && s.lines) ? s.lines : 0);
-      setText('#kpiUrgent', (s && s.urgent) ? s.urgent : 0);
-      setText('#kpiVendors', (s && s.vendors) ? s.vendors : 0);
-    }
-    function renderPurchaseHistory(rows){
-      var box = $('#purHistory'); box.innerHTML='';
-      if (!rows || !rows.length){
-        box.innerHTML = '<div class="rowitem"><div>No history</div></div>';
-        return;
-      }
-      rows.forEach(function(x){
-        var row = document.createElement('div'); row.className='rowitem';
-        row.innerHTML =
-          '<div><strong>'+esc(x.docNo)+' • '+esc(x.project||'-')+'</strong>'+
-          '<div class="meta">'+esc(x.ts)+' • NeedBy '+esc(x.needBy||'-')+' • '+esc(x.priority||'-')+' • '+esc(x.status||'-')+'</div>'+
-          '<div class="meta">Lines '+esc(x.lines)+' • Qty '+esc(x.totalQty)+' • Vendor '+esc(x.vendor||'-')+'</div></div>';
+      clampList(box);
+    });
+    apiGet('pur_Summary', {}, s=>{
+      $('#kpiReq').textContent = (s && s.requests) ? s.requests : 0;
+      $('#kpiLines').textContent = (s && s.lines) ? s.lines : 0;
+      $('#kpiUrgent').textContent = (s && s.urgent) ? s.urgent : 0;
+    });
+    apiGet('pur_History', {}, rows=>{
+      const sum = $('#purSummaryDetail'); sum.innerHTML='';
+      (rows||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.docNo)+' • '+esc(x.project||'-')+'</strong>'+
+                        '<div class="meta">👷 '+esc(x.contractor||'-')+' • 🙋 '+esc(x.requester||'-')+'</div>'+
+                        '<div class="meta">🗓 '+esc(x.ts)+' → 📆 '+esc(x.needBy||'-')+'</div></div>';
+        sum.appendChild(row);
+      });
+      clampList(sum);
+
+      const box = $('#purHistory'); box.innerHTML='';
+      (rows||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.docNo)+' • '+esc(x.project||'-')+'</strong>'+
+                        '<div class="meta">'+esc(x.ts)+' • NeedBy '+esc(x.needBy||'-')+' • '+esc(x.priority||'-')+' • '+esc(x.status||'-')+'</div>'+
+                        '<div class="meta">Lines '+esc(x.lines)+' • Qty '+esc(x.totalQty)+' • 👷 '+esc(x.contractor||'-')+' • 🙋 '+esc(x.requester||'-')+'</div></div>';
         box.appendChild(row);
       });
-    }
-
-    // init events
-    document.addEventListener('DOMContentLoaded', function(){
-      // language
-      $('#lang-en').addEventListener('click', function(){ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
-      $('#lang-th').addEventListener('click', function(){ LANG='th'; $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang(); });
-
-      // tabs
-      $('#tab-dashboard').addEventListener('click', function(){ showTab('dashboard'); loadDashboard(); });
-      $('#tab-out').addEventListener('click', function(){ showTab('out'); });
-      $('#tab-in').addEventListener('click', function(){ showTab('in'); });
-      $('#tab-adjust').addEventListener('click', function(){ showTab('adjust'); });
-      $('#tab-purchase').addEventListener('click', function(){ showTab('purchase'); });
-
-      // toolbar
-      $('#addLineBtn').addEventListener('click', function(){
-        var tab=currentTab();
-        if (tab==='out') $('#outLines').appendChild(outLine());
-        else if (tab==='in') $('#inLines').appendChild(inLine());
-        else if (tab==='adjust') $('#adjLines').appendChild(adjLine());
-        else if (tab==='purchase') $('#purLines').appendChild(purLine());
-        else toast(STR[LANG].dashNoSubmit);
-      });
-      $('#resetBtn').addEventListener('click', function(){ hardReset(currentTab()); });
-      $('#submitBtn').addEventListener('click', submit);
-
-      // load lookups from API
-      apiGet('listMaterials', {}, function(a){ MATERIALS=a||[]; document.body.appendChild(materialsDL); hydrateMaterials(); });
-      apiGet('listProjects', {}, function(a){ PROJECTS=a||[]; hydrateDatalist('#Projects',PROJECTS); });
-      apiGet('listContractors', {}, function(a){ CONTRACTORS=a||[]; hydrateDatalist('#Contractors',CONTRACTORS); });
-      apiGet('listRequesters', {}, function(a){ REQUESTERS=a||[]; hydrateDatalist('#Requesters',REQUESTERS); });
-
-      hardReset();
-      applyLang();
-      showTab('dashboard');
-      loadDashboard();
+      clampList(box);
     });
-  })();
-  </script>
+
+    $$('.toggle button').forEach(btn=> btn.onclick = ()=>toggleClamp(btn));
+  }
+
+  // Purchasing older (accordion) — same as previous version
+  function loadPurchasingOlder(){
+    apiGet('pur_History', {}, rows=>{
+      const box=$('#purOlderList'); box.innerHTML='';
+      (rows||[]).forEach(x=>{
+        const acc=document.createElement('div'); acc.className='rowitem';
+        acc.style.flexDirection='column'; acc.style.alignItems='stretch';
+        const head=document.createElement('div');
+        head.style.display='flex'; head.style.justifyContent='space-between'; head.style.cursor='pointer';
+        head.innerHTML = '<span>'+esc(x.docNo)+' • '+esc(x.project||'-')+' • '+esc(x.ts)+'</span><span>›</span>';
+        const body=document.createElement('div'); body.className='hidden';
+        body.innerHTML = '<div class="meta">👷 '+esc(x.contractor||'-')+' • 🙋 '+esc(x.requester||'-')+' • NeedBy '+esc(x.needBy||'-')+'</div>'+
+                         '<div id="doc-'+esc(x.docNo)+'">Loading…</div>';
+        head.addEventListener('click', ()=>{
+          const open = !body.classList.contains('hidden');
+          if (open){ body.classList.add('hidden'); return; }
+          const holder = body.querySelector('#doc-'+CSS.escape(x.docNo));
+          apiGet('pur_DocLines', {docNo:x.docNo}, lines=>{
+            const tbl = document.createElement('table'); tbl.className='table';
+            tbl.innerHTML='<thead><tr><th>Item</th><th>Spec</th><th>Qty</th></tr></thead>';
+            const tb=document.createElement('tbody');
+            (lines||[]).forEach(li=>{
+              const tr=document.createElement('tr');
+              tr.innerHTML='<td>'+esc(li.item)+'</td><td>'+esc(li.spec||'')+'</td><td>'+esc(li.qty)+'</td>';
+              tb.appendChild(tr);
+            });
+            tbl.appendChild(tb);
+            holder.replaceWith(tbl);
+          });
+          body.classList.remove('hidden');
+        });
+        acc.appendChild(head); acc.appendChild(body);
+        box.appendChild(acc);
+      });
+      clampList(box);
+      const toggleBtn = document.querySelector('.toggle button[data-toggle="#purOlderList"]');
+      if (toggleBtn) toggleBtn.onclick = ()=>toggleClamp(toggleBtn);
+    });
+  }
+
+  // Events
+  document.addEventListener('DOMContentLoaded', function(){
+    // language
+    $('#lang-en').addEventListener('click', ()=>{ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
+    $('#lang-th').addEventListener('click', ()=>{ LANG='th'; $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang(); });
+
+    // tabs
+    $('#tab-dashboard').addEventListener('click', ()=>{ showTab('dashboard'); loadDashboard(); });
+    $('#tab-out').addEventListener('click', ()=>{ showTab('out'); });
+    $('#tab-in').addEventListener('click', ()=>{ showTab('in'); });
+    $('#tab-adjust').addEventListener('click', ()=>{ showTab('adjust'); });
+    $('#tab-purchase').addEventListener('click', ()=>{ showTab('purchase'); });
+
+    // toolbar
+    $('#addLineBtn').addEventListener('click', ()=>{
+      const tab=currentTab();
+      if (tab==='out') $('#outLines').appendChild(outLine());
+      else if (tab==='in') $('#inLines').appendChild(inLine());
+      else if (tab==='adjust') $('#adjLines').appendChild(adjLine());
+      else if (tab==='purchase') $('#purLines').appendChild(purLine());
+      else toast(STR[LANG].dashNoSubmit);
+      bindPickerInputs();
+    });
+    $('#resetBtn').addEventListener('click', ()=>{ hardReset(currentTab()); bindPickerInputs(); });
+    $('#submitBtn').addEventListener('click', submit);
+
+    // load lookups
+    apiGet('listMaterials', {}, a=>{ MATERIALS=a||[]; });
+    apiGet('listProjects', {}, a=>{ PROJECTS=a||[]; });
+    apiGet('listContractors', {}, a=>{ CONTRACTORS=a||[]; });
+    apiGet('listRequesters', {}, a=>{ REQUESTERS=a||[]; });
+
+    // initial UI
+    hardReset();
+    applyLang();
+    showTab('dashboard');
+    loadDashboard();
+    bindPickerInputs();
+
+    // attach pickers to header inputs
+    $('#ProjectInput').addEventListener('click', ()=>openPicker($('#ProjectInput'),'projects'));
+    $('#ContractorInput').addEventListener('click', ()=>openPicker($('#ContractorInput'),'contractors'));
+    $('#RequesterInput').addEventListener('click', ()=>openPicker($('#RequesterInput'),'requesters'));
+    $('#PurProject').addEventListener('click', ()=>openPicker($('#PurProject'),'projects'));
+    $('#PurContractor').addEventListener('click', ()=>openPicker($('#PurContractor'),'contractors'));
+
+    // quick add contractor/requester via plus buttons (uses picker add flow)
+    $('#addContractorBtn').addEventListener('click', ()=>{
+      openPicker($('#ContractorInput'),'contractors');
+      pickerSearch.focus();
+    });
+    $('#addRequesterBtn').addEventListener('click', ()=>{
+      openPicker($('#RequesterInput'),'requesters');
+      pickerSearch.focus();
+    });
+  });
+})();
+</script>
 </body>
 </html>

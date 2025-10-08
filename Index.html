@@ -314,7 +314,7 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<!-- ===== Mobile Picker markup ===== -->
+<!-- ===== Mobile Picker ===== -->
 <div class="picker" id="picker">
   <div class="picker-sheet" role="dialog" aria-modal="true">
     <div class="picker-handle" aria-hidden="true"></div>
@@ -334,7 +334,6 @@
   /* ===== API CONFIG ===== */
   const API_URL = "https://script.google.com/macros/s/AKfycbxorXbbVhEW-xW1UPUxhBOJFfc02c2FmEnDbWWZSEEEp-L5OrK3uBF1nSFyuV-Ah58K/exec";
 
-  // ---- API helpers (GET read, POST write; text/plain to avoid preflight) ----
   const safeJson = t => { try { return JSON.parse(t); } catch(e){ return {ok:false,error:'Bad JSON'}; } };
   function apiGet(fn, payload, cb){
     const q = new URLSearchParams(); q.set('fn',fn);
@@ -349,14 +348,13 @@
     }).then(r=>r.text()).then(safeJson).then(d=>cb && cb(d)).catch(e=>console.error(fn,e));
   }
 
-  // ---- UI helpers ----
   const $ = q => document.querySelector(q);
   const $$ = q => Array.prototype.slice.call(document.querySelectorAll(q));
   function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
   const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const val = s => { const el=$(s); return el? (el.value||'').trim() : ''; };
 
-  // ---- Clamp lists (Show more / less) ----
+  // Clamp lists
   function clampList(listEl){
     const max = Number(listEl.dataset.limit||'5');
     const items = listEl.children;
@@ -375,7 +373,7 @@
     btn.textContent = expanded ? 'Show more' : 'Show less';
   }
 
-  // ---- i18n (kept minimal here) ----
+  // i18n minimal
   const STR = {
     en:{title:'Inventory', typeToSearch:'Type to search…', stock:'Stock: ', prev:'Prev: ', dashNoSubmit:'Nothing to submit on Dashboard'},
     th:{title:'สต็อกวัสดุ', typeToSearch:'พิมพ์เพื่อค้นหา…', stock:'คงเหลือ: ', prev:'คงเหลือก่อนหน้า: ', dashNoSubmit:'หน้านี้ไม่มีรายการให้บันทึก'}
@@ -384,10 +382,10 @@
   function setText(s,t){ const el=$(s); if(el) el.textContent=t; }
   function applyLang(){ setText('#t_title', STR[LANG].title); }
 
-  // ---- Lookups (arrays) ----
+  // Lookups
   let MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
 
-  // ===== Mobile Picker logic =====
+  // ===== Mobile Picker =====
   const picker = $('#picker');
   const pickerList = $('#pickerList');
   const pickerSearch = $('#pickerSearch');
@@ -395,7 +393,6 @@
   const pickerAddText = $('#pickerAddText');
   const pickerCancel = $('#pickerCancel');
 
-  // mapping “source key” -> array
   const sources = {
     materials: () => MATERIALS,
     projects:  () => PROJECTS,
@@ -414,13 +411,11 @@
     picker.classList.add('open');
     setTimeout(()=>pickerSearch.focus(), 50);
   }
-
   function closePicker(){
     picker.classList.remove('open');
     currentTargetInput = null;
     currentSourceKey = null;
   }
-
   function renderPickerList(query){
     const all = (sources[currentSourceKey] ? sources[currentSourceKey]() : []) || [];
     const q = (query||'').toLowerCase().trim();
@@ -439,44 +434,35 @@
       row.className = 'pick-row';
       row.innerHTML = '<strong>'+esc(v)+'</strong>';
       row.addEventListener('click', ()=>{
-        if (currentTargetInput){ currentTargetInput.value = v; }
+        if (currentTargetInput){ currentTargetInput.value = v; currentTargetInput.dispatchEvent(new Event('change')); }
         closePicker();
       });
       pickerList.appendChild(row);
     });
   }
-
   pickerSearch.addEventListener('input', e => renderPickerList(e.target.value));
   pickerCancel.addEventListener('click', closePicker);
-  picker.addEventListener('click', e => {
-    // close if tap backdrop, not inner sheet
-    if (e.target === picker) closePicker();
-  });
-
-  // Add new (Contractor/Requester) from picker
+  picker.addEventListener('click', e => { if (e.target === picker) closePicker(); });
   pickerAdd.addEventListener('click', ()=>{
     const text = pickerSearch.value.trim();
     if (!text) return;
     if (currentSourceKey === 'contractors'){
       apiGet('addContractor', {name:text}, ok=>{
         if (ok){ CONTRACTORS = Array.from(new Set([text, ...CONTRACTORS])); toast('Added contractor'); }
-        if (currentTargetInput) currentTargetInput.value = text;
+        if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
         closePicker();
       });
     } else if (currentSourceKey === 'requesters'){
       apiGet('addRequester', {name:text}, ok=>{
         if (ok){ REQUESTERS = Array.from(new Set([text, ...REQUESTERS])); toast('Added requester'); }
-        if (currentTargetInput) currentTargetInput.value = text;
+        if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
         closePicker();
       });
     } else {
-      // For projects/materials we don't allow adding from UI (stick to master sheet)
       toast('Use master sheet to add new entries');
       closePicker();
     }
   });
-
-  // attach picker to inputs with data-picker
   function bindPickerInputs(){
     $$('input[data-picker]').forEach(inp=>{
       inp.addEventListener('click', ()=>{
@@ -486,8 +472,7 @@
     });
   }
 
-  // ===== Core app: (only the places related to autocomplete changed) =====
-
+  // ===== Lines builders =====
   function outLine(){
     const card=document.createElement('div'); card.className='line';
     const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
@@ -499,7 +484,12 @@
     actions.appendChild(rm);
     card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
     name.addEventListener('click', ()=>openPicker(name,'materials'));
-    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return; apiGet('getCurrentStock',{material:v}, n=>{ meta.textContent=STR[LANG].stock+n; }); });
+    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return;
+      apiGet('getCurrentStock',{material:v}, res=>{
+        const n = (res && res.ok) ? res.stock : null;
+        meta.textContent = STR[LANG].stock + (n==null?'-':n);
+      });
+    });
     return card;
   }
   function inLine(){
@@ -525,7 +515,12 @@
     actions.appendChild(rm);
     card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
     name.addEventListener('click', ()=>openPicker(name,'materials'));
-    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return; apiGet('getCurrentStock',{material:v}, n=>{ meta.textContent=STR[LANG].prev+n; }); });
+    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return;
+      apiGet('getCurrentStock',{material:v}, res=>{
+        const n = (res && res.ok) ? res.stock : null;
+        meta.textContent = STR[LANG].prev + (n==null?'-':n);
+      });
+    });
     return card;
   }
   function purLine(){
@@ -622,7 +617,6 @@
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
-  // ===== Dashboard fills (unchanged logic, UI clamps) =====
   function loadDashboard(){
     apiGet('dash_LowStock', {}, list=>{
       const box = $('#lowStockList'); box.innerHTML='';
@@ -691,7 +685,6 @@
     $$('.toggle button').forEach(btn=> btn.onclick = ()=>toggleClamp(btn));
   }
 
-  // Purchasing older (accordion) — same as previous version
   function loadPurchasingOlder(){
     apiGet('pur_History', {}, rows=>{
       const box=$('#purOlderList'); box.innerHTML='';
@@ -757,34 +750,32 @@
     $('#resetBtn').addEventListener('click', ()=>{ hardReset(currentTab()); bindPickerInputs(); });
     $('#submitBtn').addEventListener('click', submit);
 
-    // load lookups
+    // lookups
     apiGet('listMaterials', {}, a=>{ MATERIALS=a||[]; });
     apiGet('listProjects', {}, a=>{ PROJECTS=a||[]; });
     apiGet('listContractors', {}, a=>{ CONTRACTORS=a||[]; });
     apiGet('listRequesters', {}, a=>{ REQUESTERS=a||[]; });
 
-    // initial UI
+    // initial
     hardReset();
     applyLang();
     showTab('dashboard');
     loadDashboard();
     bindPickerInputs();
 
-    // attach pickers to header inputs
+    // attach pickers for header fields
     $('#ProjectInput').addEventListener('click', ()=>openPicker($('#ProjectInput'),'projects'));
     $('#ContractorInput').addEventListener('click', ()=>openPicker($('#ContractorInput'),'contractors'));
     $('#RequesterInput').addEventListener('click', ()=>openPicker($('#RequesterInput'),'requesters'));
     $('#PurProject').addEventListener('click', ()=>openPicker($('#PurProject'),'projects'));
     $('#PurContractor').addEventListener('click', ()=>openPicker($('#PurContractor'),'contractors'));
 
-    // quick add contractor/requester via plus buttons (uses picker add flow)
+    // quick-add buttons
     $('#addContractorBtn').addEventListener('click', ()=>{
-      openPicker($('#ContractorInput'),'contractors');
-      pickerSearch.focus();
+      openPicker($('#ContractorInput'),'contractors'); pickerSearch.focus();
     });
     $('#addRequesterBtn').addEventListener('click', ()=>{
-      openPicker($('#RequesterInput'),'requesters');
-      pickerSearch.focus();
+      openPicker($('#RequesterInput'),'requesters'); pickerSearch.focus();
     });
   });
 })();

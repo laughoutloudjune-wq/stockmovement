@@ -104,7 +104,8 @@
     box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2)
   }
   .btn.icon{ flex:0 0 auto; width:2.75rem; min-width:2.75rem; padding:.65rem 0; text-align:center }
-  .btn.small{ padding:.55rem .7rem; font-weight:700 }
+  .btn.small {padding: .4rem .7rem;font-size: var(--fs-xs);font-weight: 700;}
+
 
   .card{ padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
   .card h3{ margin:0; font-size:var(--fs-md) }
@@ -372,8 +373,8 @@
 
 <!-- Floating toolbar (glass) -->
 <div class="toolbar glass" id="toolbar" aria-live="polite" role="region">
-  <!-- Swapped: Add first; Reset smaller -->
-  <button class="btn icon" id="addLineBtn" type="button" title="เพิ่มรายการ">＋</button>
+  <!-- Add = normal, Reset = small, Submit = normal -->
+  <button class="btn" id="addLineBtn" type="button" title="เพิ่มรายการ">＋ เพิ่ม</button>
   <button class="btn small" id="resetBtn" type="button">ล้าง</button>
   <button class="btn primary" id="submitBtn" type="button">บันทึก</button>
 </div>

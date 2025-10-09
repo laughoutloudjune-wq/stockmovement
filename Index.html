@@ -1,210 +1,204 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<title>ระบบสต็อกวัสดุ</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>ระบบสต็อกวัสดุ</title>
 
-<!-- FAVICONS (place these files next to index.html) -->
-<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="favicon.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <!-- FAVICONS (put favicon.png and apple-touch-icon.png next to this file) -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="favicon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
-<style>
-  :root{
-    --fs-xs: clamp(0.78rem, 1.3vw, 0.9rem);
-    --fs-sm: clamp(0.95rem, 1.6vw, 1.05rem);
-    --fs-md: clamp(1.05rem, 2vw, 1.2rem);
-    --fs-lg: clamp(1.2rem, 2.4vw, 1.4rem);
-    --space-1:.5rem; --space-2:.75rem; --space-3:1rem; --space-4:1.25rem;
-    --radius: 1rem; --border: rgba(255,255,255,.35);
-    --bg:#eef1f6; --card: rgba(255,255,255,0.6); --text:#0b0b0d; --muted:#6b7280;
-    --accent:#0a84ff; --accent-weak:#e5f0ff;
-    --shadow: 0 10px 30px rgba(0,0,0,.08);
-    --container-max: 72rem; --toolbar-max: 44rem;
-    --pad-x: max(4vw, 1rem); --pad-bottom: 9rem;
-  }
-  *,*::before,*::after{ box-sizing:border-box }
-  html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
-  body{
-    min-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-    background: linear-gradient(180deg,#eaf0ff 0%, #f7f9ff 100%);
-    color:var(--text)
-  }
+  <style>
+    :root{
+      --fs-xs: clamp(0.78rem, 1.3vw, 0.9rem);
+      --fs-sm: clamp(0.95rem, 1.6vw, 1.05rem);
+      --fs-md: clamp(1.05rem, 2vw, 1.2rem);
+      --fs-lg: clamp(1.2rem, 2.4vw, 1.4rem);
+      --space-1:.5rem; --space-2:.75rem; --space-3:1rem; --space-4:1.25rem;
+      --radius: 1rem; --border: rgba(255,255,255,.35);
+      --bg:#eef1f6; --card: rgba(255,255,255,0.6); --text:#0b0b0d;
+      --accent:#0a84ff; --accent-weak:#e5f0ff;
+      --shadow: 0 10px 30px rgba(0,0,0,.08);
+      --container-max: 72rem; --toolbar-max: 44rem;
+      --pad-x: max(4vw, 1rem); --pad-bottom: 9.5rem;
+    }
+    *,*::before,*::after{ box-sizing:border-box }
+    html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
+    body{
+      min-height:100dvh; margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background: linear-gradient(180deg,#eaf0ff 0%, #f7f9ff 100%);
+      color:var(--text)
+    }
 
-  /* Container */
-  .container{
-    position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto;
-    padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--pad-x)
-             calc(env(safe-area-inset-bottom) + var(--pad-bottom));
-    display:flex; flex-direction:column; gap:var(--space-3)
-  }
-  @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
+    .container{
+      position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto;
+      padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--pad-x)
+               calc(env(safe-area-inset-bottom) + var(--pad-bottom));
+      display:flex; flex-direction:column; gap:var(--space-3)
+    }
+    @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
 
-  /* Frosted glass helper */
-  .glass{
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    backdrop-filter: saturate(160%) blur(12px);
-    -webkit-backdrop-filter: saturate(160%) blur(12px);
-  }
+    .glass{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: saturate(160%) blur(12px);
+      -webkit-backdrop-filter: saturate(160%) blur(12px);
+    }
 
-  header{ display:flex; align-items:center; gap:var(--space-2) }
-  header h1{ margin:0; font-size:var(--fs-lg); font-weight:800 }
-  .spacer{ flex:1 }
+    header{ display:flex; align-items:center; gap:var(--space-2) }
+    header h1{ margin:0; font-size:var(--fs-lg); font-weight:800 }
+    .spacer{ flex:1 }
 
-  .lang{ display:flex; gap:.5rem }
-  .lang button{ padding:.45rem .9rem; border-radius:9999px; border:1px solid rgba(255,255,255,.5);
-    background:rgba(255,255,255,.6); color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  }
-  .lang button.active{
-    background:linear-gradient(145deg,#0a84ff,#4da3ff);
-    color:#fff; border-color:transparent;
-    box-shadow: 0 6px 14px rgba(10,132,255,.25), inset 0 0 0 1px rgba(255,255,255,.2)
-  }
+    .lang{ display:flex; gap:.5rem }
+    .lang button{
+      padding:.45rem .9rem; border-radius:9999px; border:1px solid rgba(255,255,255,.5);
+      background:rgba(255,255,255,.6); color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .lang button.active{
+      background:linear-gradient(145deg,#0a84ff,#4da3ff);
+      color:#fff; border-color:transparent;
+      box-shadow: 0 6px 14px rgba(10,132,255,.25), inset 0 0 0 1px rgba(255,255,255,.2)
+    }
 
-  .tabs{
-    display:flex; gap:.5rem; padding:.4rem; overflow:auto;
-    border-radius:9999px;
-    background:rgba(255,255,255,0.55);
-    border:1px solid rgba(255,255,255,.45);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    -webkit-overflow-scrolling:touch
-  }
-  .tabs button{
-    flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem; border:none;
-    border-radius:9999px; background:transparent; cursor:pointer; font-weight:800;
-    color:#1e1e20; font-size:var(--fs-sm)
-  }
-  .tabs button.active{ background:#fff; color:#0a84ff; box-shadow:var(--shadow) }
+    .tabs{
+      display:flex; gap:.5rem; padding:.4rem; overflow:auto;
+      border-radius:9999px;
+      background:rgba(255,255,255,0.55);
+      border:1px solid rgba(255,255,255,.45);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      -webkit-overflow-scrolling:touch
+    }
+    .tabs button{
+      flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem; border:none;
+      border-radius:9999px; background:transparent; cursor:pointer; font-weight:800;
+      color:#1e1e20; font-size:var(--fs-sm)
+    }
+    .tabs button.active{ background:#fff; color:#0a84ff; box-shadow:var(--shadow) }
 
-  /* Toolbar (floating) */
-  .toolbar{
-    position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 0.75rem);
-    transform:translateX(-50%); z-index:1000; width:min(100% - 2rem, var(--toolbar-max));
-    display:inline-flex; align-items:center; gap:.5rem; padding:.65rem;
-  }
-  .toolbar.glass{ border-radius:1rem }
-  .toolbar.hidden{ display:none }
+    .toolbar{
+      position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 0.75rem);
+      transform:translateX(-50%); z-index:1000; width:min(100% - 2rem, var(--toolbar-max));
+      display:flex; align-items:center; gap:.5rem; padding:.65rem;
+    }
+    .toolbar.glass{ border-radius:1rem }
 
-  .btn{
-    appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm);
-    padding:.8rem 1rem; border-radius:.9rem; border:1px solid rgba(255,255,255,.45);
-    background:rgba(255,255,255,0.55); color:#111;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.08);
-    -webkit-tap-highlight-color:transparent; touch-action:manipulation
-  }
-  .btn.primary{
-    color:#fff; border-color:transparent;
-    background:linear-gradient(145deg,#0a84ff,#4da3ff);
-    box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2)
-  }
-  .btn.icon{ flex:0 0 auto; width:2.75rem; min-width:2.75rem; padding:.65rem 0; text-align:center }
-  .btn.small {padding: .4rem .7rem;font-size: var(--fs-xs);font-weight: 700;}
+    .btn{
+      appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm);
+      padding:.85rem 1rem; border-radius:.9rem; border:1px solid rgba(255,255,255,.45);
+      background:rgba(255,255,255,0.55); color:#111;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.08);
+      -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+      flex:1 1 0; /* WIDE by default (Add + Submit) */
+    }
+    .btn.primary{
+      color:#fff; border-color:transparent;
+      background:linear-gradient(145deg,#0a84ff,#4da3ff);
+      box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2)
+    }
+    .btn.small{
+      flex:0 0 auto; /* SMALL only for Reset */
+      padding:.45rem .75rem; font-size:var(--fs-xs); font-weight:700;
+      background:rgba(255,255,255,0.5);
+    }
 
+    .card{ padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
+    .card h3{ margin:0; font-size:var(--fs-md) }
 
-  .card{ padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
-  .card h3{ margin:0; font-size:var(--fs-md) }
+    .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
+    .row > *{ flex:1 1 14rem }
 
-  .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
-  .row > *{ flex:1 1 14rem }
+    label{ font-size:var(--fs-xs); color:#3f4753 }
+    input,select,textarea{
+      width:100%; padding:.95rem 1rem; font-size:16px; background:rgba(255,255,255,.85);
+      color:#111; border:1px solid rgba(255,255,255,.55); border-radius:.9rem; outline:none;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    input:focus,select:focus,textarea:focus{ border-color:#0a84ff; box-shadow:0 0 0 .2rem var(--accent-weak) }
 
-  label{ font-size:var(--fs-xs); color:#3f4753 }
-  input,select,textarea{
-    width:100%; padding:.95rem 1rem; font-size:16px; background:rgba(255,255,255,.85);
-    color:#111; border:1px solid rgba(255,255,255,.55); border-radius:.9rem; outline:none;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  }
-  input:focus,select:focus,textarea:focus{ border-color:#0a84ff; box-shadow:0 0 0 .2rem var(--accent-weak) }
+    .lines{ display:flex; flex-direction:column; gap:.75rem }
+    .line{
+      display:flex; flex-direction:column; gap:.65rem; padding:.75rem;
+      border:1px dashed rgba(255,255,255,.55); border-radius:.9rem; background:rgba(255,255,255,.55);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
+    .line .grid > *{ flex:1 1 10rem }
+    .actions{ display:flex; justify-content:flex-end }
 
-  .lines{ display:flex; flex-direction:column; gap:.75rem }
-  .line{
-    display:flex; flex-direction:column; gap:.65rem; padding:.75rem;
-    border:1px dashed rgba(255,255,255,.55); border-radius:.9rem; background:rgba(255,255,255,.55);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  }
-  .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
-  .line .grid > *{ flex:1 1 10rem }
-  .actions{ display:flex; justify-content:flex-end }
+    .list{ display:flex; flex-direction:column; gap:.6rem }
+    .rowitem{
+      display:flex; justify-content:space-between; align-items:center; gap:.75rem;
+      padding:.75rem 1rem; border:1px solid rgba(255,255,255,.5); border-radius:.9rem;
+      background:rgba(255,255,255,.6); font-size:var(--fs-sm);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .rowitem .meta{ color:#556070; font-size:var(--fs-xs) }
 
-  .list{ display:flex; flex-direction:column; gap:.6rem }
-  .rowitem{
-    display:flex; justify-content:space-between; align-items:center; gap:.75rem;
-    padding:.75rem 1rem; border:1px solid rgba(255,255,255,.5); border-radius:.9rem;
-    background:rgba(255,255,255,.6); font-size:var(--fs-sm);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  }
-  .rowitem .meta{ color:#556070; font-size:var(--fs-xs) }
+    .grid-dash{ display:flex; flex-direction:column; gap:var(--space-3) }
+    @media (min-width: 80rem){ .grid-dash{ flex-direction:row }
+      .grid-dash > :first-child{ flex:2 1 0 } .grid-dash > :last-child{ flex:1 1 0 } }
 
-  .grid-dash{ display:flex; flex-direction:column; gap:var(--space-3) }
-  @media (min-width: 80rem){ .grid-dash{ flex-direction:row }
-    .grid-dash > :first-child{ flex:2 1 0 } .grid-dash > :last-child{ flex:1 1 0 } }
+    .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
+    .kpi{
+      flex:1 1 9rem; padding:.8rem; border-radius:.9rem; border:1px solid rgba(255,255,255,.45);
+      background:rgba(255,255,255,.55); box-shadow:var(--shadow); backdrop-filter: blur(8px)
+    }
+    .kpi .v{ font-size:1.25rem; font-weight:800 }
 
-  .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
-  .kpi{
-    flex:1 1 9rem; padding:.8rem; border-radius:.9rem; border:1px solid rgba(255,255,255,.45);
-    background:rgba(255,255,255,.55); box-shadow:var(--shadow); backdrop-filter: blur(8px)
-  }
-  .kpi .v{ font-size:1.25rem; font-weight:800 }
+    .toggle{ display:flex; justify-content:flex-end }
+    .toggle button{ border:none; background:transparent; color:#0a84ff; font-weight:700; cursor:pointer; padding:.25rem .25rem }
 
-  .toggle{ display:flex; justify-content:flex-end }
-  .toggle button{ border:none; background:transparent; color:#0a84ff; font-weight:700; cursor:pointer; padding:.25rem .25rem }
+    /* Stock badge */
+    .badge{
+      display:inline-flex; align-items:center; justify-content:center;
+      min-width:1.9rem; height:1.9rem; padding:0 .4rem; border-radius:9999px; font-size:.9rem; font-weight:800;
+      color:#fff; background:#7b8794;
+    }
+    .badge.red{ background:#ef4444 }
+    .badge.yellow{ background:#f59e0b }
+    .badge.green{ background:#10b981 }
 
-  /* Stock badge */
-  .badge{
-    display:inline-flex; align-items:center; justify-content:center;
-    min-width:1.9rem; height:1.9rem; padding:0 .4rem; border-radius:9999px; font-size:.9rem; font-weight:800;
-    color:#fff; background:#7b8794;
-  }
-  .badge.red{ background:#ef4444 }     /* 0 or below min */
-  .badge.yellow{ background:#f59e0b }  /* ≤ 2×min */
-  .badge.green{ background:#10b981 }   /* ok */
+    /* Picker Overlay */
+    #pickerOverlay{
+      position:fixed; inset:0; z-index:2000; display:none;
+      align-items:center; justify-content:center;
+      background:rgba(15,18,23,0.35);
+      backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    }
+    #pickerOverlay.open{ display:flex }
+    #pickerBox{
+      background:rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.45);
+      border-radius:16px; box-shadow:0 20px 50px rgba(0,0,0,.18);
+      display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden;
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid rgba(255,255,255,.4); background:rgba(255,255,255,.55) }
+    .picker-header input{
+      flex:1; padding:.9rem 1rem; font-size:16px; border:1px solid rgba(255,255,255,.65); border-radius:.9rem; outline:none;
+      background:rgba(255,255,255,.9)
+    }
+    .picker-list{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.5rem; background:rgba(255,255,255,.4) }
+    .pick-row{
+      padding:.95rem 1rem; font-size:1.02rem; line-height:1.25; border:1px solid rgba(255,255,255,.55); border-radius:.85rem; background:rgba(255,255,255,.9);
+      word-break:break-word; backdrop-filter: blur(6px)
+    }
+    .picker-actions{ border-top:1px solid rgba(255,255,255,.4); padding:.6rem .75rem; background:rgba(255,255,255,.55); display:flex; gap:.5rem }
+    @media (min-width: 769px){ #pickerBox{ width:520px; height:70vh } }
 
-  /* ===== Picker Overlay (mobile fullscreen; desktop modal) ===== */
-  #pickerOverlay{
-    position:fixed; inset:0; z-index:2000; display:none;
-    align-items:center; justify-content:center;
-    background:rgba(15,18,23,0.35);
-    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
-  }
-  #pickerOverlay.open{ display:flex }
-
-  #pickerBox{
-    background:rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.45);
-    border-radius:16px; box-shadow:0 20px 50px rgba(0,0,0,.18);
-    display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden;
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  }
-  .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid rgba(255,255,255,.4); background:rgba(255,255,255,.55) }
-  .picker-header input{
-    flex:1; padding:.9rem 1rem; font-size:16px; border:1px solid rgba(255,255,255,.65); border-radius:.9rem; outline:none;
-    background:rgba(255,255,255,.9)
-  }
-  .picker-list{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.5rem; background:rgba(255,255,255,.4) }
-  .pick-row{
-    padding:.95rem 1rem; font-size:1.02rem; line-height:1.25; border:1px solid rgba(255,255,255,.55); border-radius:.85rem; background:rgba(255,255,255,.9);
-    word-break:break-word;
-    backdrop-filter: blur(6px)
-  }
-  .picker-actions{ border-top:1px solid rgba(255,255,255,.4); padding:.6rem .75rem; background:rgba(255,255,255,.55); display:flex; gap:.5rem }
-
-  /* Desktop modal sizing */
-  @media (min-width: 769px){
-    #pickerBox{ width:520px; height:70vh }
-  }
-
-  .hidden{ display:none !important }
-  .toast{
-    position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.5rem);
-    transform:translateX(-50%); background:#111; color:#fff; padding:.7rem 1rem; border-radius:.9rem;
-    display:none; z-index:2500; font-size:var(--fs-sm); box-shadow:0 12px 30px rgba(0,0,0,.16)
-  }
-  .toast.show{ display:block }
-</style>
+    .toast{
+      position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.5rem);
+      transform:translateX(-50%); background:#111; color:#fff; padding:.7rem 1rem; border-radius:.9rem;
+      display:none; z-index:2500; font-size:var(--fs-sm); box-shadow:0 12px 30px rgba(0,0,0,.16)
+    }
+    .toast.show{ display:block }
+  </style>
 </head>
 <body>
 <div class="container" id="app">
@@ -279,7 +273,7 @@
         <label id="t_contractor">ผู้รับเหมา</label>
         <div style="display:flex;gap:.5rem;align-items:center">
           <input id="ContractorInput" data-picker="contractors" placeholder="เลือกหรือเพิ่มใหม่" readonly />
-          <button class="btn icon" id="addContractorBtn" type="button">+</button>
+          <button class="btn" style="flex:0 0 auto; min-width:2.5rem" id="addContractorBtn" type="button">+</button>
         </div>
       </div>
     </div>
@@ -288,7 +282,7 @@
         <label id="t_requester">ผู้ขอเบิก</label>
         <div style="display:flex;gap:.5rem;align-items:center">
           <input id="RequesterInput" data-picker="requesters" placeholder="เลือกหรือเพิ่มใหม่" readonly />
-          <button class="btn icon" id="addRequesterBtn" type="button">+</button>
+          <button class="btn" style="flex:0 0 auto; min-width:2.5rem" id="addRequesterBtn" type="button">+</button>
         </div>
       </div>
       <div>
@@ -371,9 +365,8 @@
   </div>
 </div>
 
-<!-- Floating toolbar (glass) -->
+<!-- Floating toolbar (glass) — WIDE (Add + Submit), Reset small -->
 <div class="toolbar glass" id="toolbar" aria-live="polite" role="region">
-  <!-- Add = normal, Reset = small, Submit = normal -->
   <button class="btn" id="addLineBtn" type="button" title="เพิ่มรายการ">＋ เพิ่ม</button>
   <button class="btn small" id="resetBtn" type="button">ล้าง</button>
   <button class="btn primary" id="submitBtn" type="button">บันทึก</button>
@@ -381,7 +374,7 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<!-- ===== Picker Overlay (mobile fullscreen; desktop modal) ===== -->
+<!-- Picker Overlay -->
 <div id="pickerOverlay" aria-hidden="true">
   <div id="pickerBox" role="dialog" aria-modal="true">
     <div class="picker-header">
@@ -397,7 +390,7 @@
 
 <script>
 (function(){
-  /* ===== API CONFIG (wired to your URL) ===== */
+  /* ===== API CONFIG (your Apps Script web app) ===== */
   const API_URL = "https://script.google.com/macros/s/AKfycbwEJDNfo63e0LjEZa-bhXmX3aY2PUs96bUBGz186T-pVlphV4NGNYxGT2tcx1DWgbDI/exec";
 
   const safeJson = t => { try { return JSON.parse(t); } catch(e){ return {ok:false,error:'Bad JSON'}; } };
@@ -416,11 +409,10 @@
 
   const $ = q => document.querySelector(q);
   const $$ = q => Array.prototype.slice.call(document.querySelectorAll(q));
-  function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 4500); } // longer duration
+  function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 4500); }
   const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const todayStr = () => new Date().toISOString().split('T')[0];
 
-  // Clamp lists (Show more / less)
   function clampList(listEl){
     const max = Number(listEl.dataset.limit||'5');
     const items = listEl.children;
@@ -439,7 +431,7 @@
     btn.textContent = expanded ? (LANG==='th'?'ดูเพิ่มเติม':'Show more') : (LANG==='th'?'ย่อ':'Show less');
   }
 
-  // i18n
+  // i18n (Thai default)
   const STR = {
     th:{
       title:'ระบบสต็อกวัสดุ',
@@ -447,7 +439,7 @@
       searchPh:'พิมพ์เพื่อค้นหา…', pick:'ค้นหาหรือเลือก', pickAdd:'เลือกหรือเพิ่มใหม่',
       proj:'โครงการ / สถานที่', contractor:'ผู้รับเหมา', requester:'ผู้ขอเบิก', note:'หมายเหตุ',
       outTitle:'จ่ายออก', outDate:'วันที่', inTitle:'รับเข้า', inDate:'วันที่รับ', adjTitle:'ปรับปรุงสต็อก',
-      btnAdd:'＋', btnReset:'ล้าง', btnSubmit:'บันทึก',
+      btnAdd:'＋ เพิ่ม', btnReset:'ล้าง', btnSubmit:'บันทึก',
       dashLow:'สต็อกใกล้หมด', dashTopContract:'ผู้รับเหมาที่ใช้บ่อย', dashTopItems:'วัสดุยอดใช้', dashRecent:'ความเคลื่อนไหวล่าสุด',
       purTitle:'ขอจัดซื้อ', purProj:'โครงการ / สถานที่', purNeedBy:'ต้องการภายใน (วัน)', purContractor:'ผู้รับเหมา',
       purPriority:'ความเร่งด่วน', purNote:'หมายเหตุคำขอ', purOlder:'คำขอเดิม',
@@ -459,7 +451,7 @@
       searchPh:'Type to search…', pick:'Search or pick', pickAdd:'Pick or add',
       proj:'Project / Location', contractor:'Contractor', requester:'Requester', note:'Note',
       outTitle:'Material OUT', outDate:'Date', inTitle:'Material IN', inDate:'Date received', adjTitle:'Adjust',
-      btnAdd:'＋', btnReset:'Reset', btnSubmit:'Submit',
+      btnAdd:'＋ Add', btnReset:'Reset', btnSubmit:'Submit',
       dashLow:'Low stock', dashTopContract:'Top contractors (usage)', dashTopItems:'Top items', dashRecent:'Recent movements',
       purTitle:'Purchasing Request', purProj:'Project / Location', purNeedBy:'Need by (date)', purContractor:'Contractor',
       purPriority:'Priority', purNote:'Request note', purOlder:'Older Requests',
@@ -467,59 +459,42 @@
       stock:'Stock: ', prev:'Prev: ', dashNoSubmit:'Nothing to submit on Dashboard',
     }
   };
-  let LANG='th'; // default Thai
+  let LANG='th';
 
   function applyLang(){
     const S = STR[LANG];
     $('#t_title').textContent = S.title;
-    // Tabs
     $('#tab-dashboard').textContent = S.tabs.dash;
     $('#tab-out').textContent = S.tabs.out;
     $('#tab-in').textContent = S.tabs.in;
     $('#tab-adjust').textContent = S.tabs.adj;
     $('#tab-purchase').textContent = S.tabs.pur;
-    // Head labels
     $('label#t_project').textContent = S.proj;
     $('label#t_contractor').textContent = S.contractor;
     $('label#t_requester').textContent = S.requester;
     $('label#t_note').textContent = S.note;
-    // Placeholders
     $('#ProjectInput').placeholder = S.pick;
     $('#ContractorInput').placeholder = S.pickAdd;
     $('#RequesterInput').placeholder = S.pickAdd;
-
-    // Panel titles + dates
     $('#t_out_title').textContent = S.outTitle;
     $('#t_out_date').textContent = S.outDate;
     $('#t_in_title').textContent = S.inTitle;
     $('#t_date').textContent = S.inDate;
     $('#t_adjust_title').textContent = S.adjTitle;
-
-    // Dashboard titles
     $('#t_dash_lowstock').textContent = S.dashLow;
     $('#t_dash_topcontractors').textContent = S.dashTopContract;
     $('#t_dash_topitems').textContent = S.dashTopItems;
     $('#t_dash_recent').textContent = S.dashRecent;
-
-    // Purchasing section
     $('#t_pur_title').textContent = S.purTitle;
     $('#t_pur_project').textContent = S.purProj;
     $('#t_pur_needby').textContent = S.purNeedBy;
     $('#t_pur_contractor').textContent = S.purContractor;
     $('#t_pur_priority').textContent = S.purPriority;
     $('#t_pur_note').textContent = S.purNote;
-
-    // Buttons
     $('#resetBtn').textContent = S.btnReset;
     $('#submitBtn').textContent = S.btnSubmit;
-
-    // Toggle buttons text reset
-    $$('.toggle button').forEach(b=>{
-      b.textContent = S.showMore;
-    });
-
-    // Update placeholders in lines (newly created ones read STR at creation time)
-    // not strictly required here
+    $('#addLineBtn').textContent = S.btnAdd;
+    $$('.toggle button').forEach(b=>{ b.textContent = S.showMore; });
   }
 
   // Lookups
@@ -638,15 +613,13 @@
     const badge=document.createElement('span'); badge.className='badge'; badge.textContent='-';
     meta.appendChild(label); meta.appendChild(badge);
     const actions=document.createElement('div'); actions.className='actions';
-    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn'; rm.style.flex='0 0 auto'; rm.textContent='×'; rm.onclick=()=>card.remove();
     actions.appendChild(rm);
     card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
     name.addEventListener('click', ()=>openPicker(name,'materials'));
     name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return;
       apiGet('getCurrentStock',{material:v}, res=>{
         const n = (res && res.ok) ? Number(res.stock) : null;
-        // try to fetch min from Materials if available in memory? backend sends only name list.
-        // We just color with min unknown => green if >0 else red.
         const bNew = stockBadge(n, null);
         meta.replaceChild(bNew, badge);
       });
@@ -659,7 +632,7 @@
     const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
     const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
     const actions=document.createElement('div'); actions.className='actions';
-    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn'; rm.style.flex='0 0 auto'; rm.textContent='×'; rm.onclick=()=>card.remove();
     actions.appendChild(rm);
     card.appendChild(grid); card.appendChild(actions);
     name.addEventListener('click', ()=>openPicker(name,'materials'));
@@ -675,7 +648,7 @@
     const badge=document.createElement('span'); badge.className='badge'; badge.textContent='-';
     meta.appendChild(label); meta.appendChild(badge);
     const actions=document.createElement('div'); actions.className='actions';
-    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn'; rm.style.flex='0 0 auto'; rm.textContent='×'; rm.onclick=()=>card.remove();
     actions.appendChild(rm);
     card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
     name.addEventListener('click', ()=>openPicker(name,'materials'));
@@ -695,7 +668,7 @@
     const spec=document.createElement('input'); spec.placeholder=(LANG==='th'?'สเปก / ยี่ห้อ (ถ้ามี)':'Spec / Brand (optional)'); spec.style.width='100%';
     const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty); grid.appendChild(spec);
     const actions=document.createElement('div'); actions.className='actions';
-    const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn'; rm.style.flex='0 0 auto'; rm.textContent='×'; rm.onclick=()=>card.remove();
     actions.appendChild(rm);
     card.appendChild(grid); card.appendChild(actions);
     name.addEventListener('click', ()=>openPicker(name,'materials'));
@@ -933,11 +906,11 @@
 
   // Events
   document.addEventListener('DOMContentLoaded', function(){
-    // language default = Thai
+    // default language = Thai
     $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active');
     applyLang();
 
-    // toggle language
+    // language switch
     $('#lang-en').addEventListener('click', ()=>{ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
     $('#lang-th').addEventListener('click', ()=>{ LANG='th'; $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang(); });
 
@@ -948,7 +921,7 @@
     $('#tab-adjust').addEventListener('click', ()=>{ showTab('adjust'); });
     $('#tab-purchase').addEventListener('click', ()=>{ showTab('purchase'); });
 
-    // toolbar: Add first, small Reset, primary Submit
+    // toolbar buttons
     $('#addLineBtn').addEventListener('click', ()=>{
       const tab=currentTab();
       if (tab==='out') $('#outLines').appendChild(outLine());
@@ -980,7 +953,7 @@
     $('#PurProject').addEventListener('click', ()=>openPicker($('#PurProject'),'projects'));
     $('#PurContractor').addEventListener('click', ()=>openPicker($('#PurContractor'),'contractors'));
 
-    // quick-add buttons
+    // quick-add
     $('#addContractorBtn').addEventListener('click', ()=>{
       openPicker($('#ContractorInput'),'contractors'); pickerSearch.focus();
     });

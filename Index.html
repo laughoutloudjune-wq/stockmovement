@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<title>Inventory</title>
+<title>ระบบสต็อกวัสดุ</title>
 
-<!-- FAVICONS -->
+<!-- FAVICONS (place these files next to index.html) -->
 <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -18,110 +18,178 @@
     --fs-md: clamp(1.05rem, 2vw, 1.2rem);
     --fs-lg: clamp(1.2rem, 2.4vw, 1.4rem);
     --space-1:.5rem; --space-2:.75rem; --space-3:1rem; --space-4:1.25rem;
-    --radius: 1rem; --border:#e5e5ea;
-    --bg:#f5f5f7; --card:#ffffff; --text:#111; --muted:#6b7280;
+    --radius: 1rem; --border: rgba(255,255,255,.35);
+    --bg:#eef1f6; --card: rgba(255,255,255,0.6); --text:#0b0b0d; --muted:#6b7280;
     --accent:#0a84ff; --accent-weak:#e5f0ff;
-    --shadow: 0 0.05rem 0.15rem rgba(0,0,0,.06), 0 0.6rem 1.2rem rgba(0,0,0,.06);
+    --shadow: 0 10px 30px rgba(0,0,0,.08);
     --container-max: 72rem; --toolbar-max: 44rem;
-    --pad-x: max(4vw, 1rem); --pad-bottom: 10rem;
+    --pad-x: max(4vw, 1rem); --pad-bottom: 9rem;
   }
   *,*::before,*::after{ box-sizing:border-box }
   html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
-  body{ min-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text) }
+  body{
+    min-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background: linear-gradient(180deg,#eaf0ff 0%, #f7f9ff 100%);
+    color:var(--text)
+  }
 
-  .container{ position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto;
+  /* Container */
+  .container{
+    position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto;
     padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--pad-x)
              calc(env(safe-area-inset-bottom) + var(--pad-bottom));
-    display:flex; flex-direction:column; gap:var(--space-3) }
+    display:flex; flex-direction:column; gap:var(--space-3)
+  }
   @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
+
+  /* Frosted glass helper */
+  .glass{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: saturate(160%) blur(12px);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+  }
 
   header{ display:flex; align-items:center; gap:var(--space-2) }
   header h1{ margin:0; font-size:var(--fs-lg); font-weight:800 }
   .spacer{ flex:1 }
 
   .lang{ display:flex; gap:.5rem }
-  .lang button{ padding:.45rem .9rem; border-radius:9999px; border:1px solid var(--border);
-    background:#fafafa; color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer }
-  .lang button.active{ background:var(--accent); color:#fff; border-color:var(--accent) }
+  .lang button{ padding:.45rem .9rem; border-radius:9999px; border:1px solid rgba(255,255,255,.5);
+    background:rgba(255,255,255,.6); color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .lang button.active{
+    background:linear-gradient(145deg,#0a84ff,#4da3ff);
+    color:#fff; border-color:transparent;
+    box-shadow: 0 6px 14px rgba(10,132,255,.25), inset 0 0 0 1px rgba(255,255,255,.2)
+  }
 
-  .tabs{ display:flex; gap:.5rem; padding:.4rem; overflow:auto; border:1px solid var(--border);
-    border-radius:9999px; background:#f8f8fb; -webkit-overflow-scrolling:touch }
-  .tabs button{ flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem; border:none;
+  .tabs{
+    display:flex; gap:.5rem; padding:.4rem; overflow:auto;
+    border-radius:9999px;
+    background:rgba(255,255,255,0.55);
+    border:1px solid rgba(255,255,255,.45);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    -webkit-overflow-scrolling:touch
+  }
+  .tabs button{
+    flex:0 0 auto; white-space:nowrap; padding:.6rem .9rem; border:none;
     border-radius:9999px; background:transparent; cursor:pointer; font-weight:800;
-    color:#3a3a3c; font-size:var(--fs-sm) }
+    color:#1e1e20; font-size:var(--fs-sm)
+  }
   .tabs button.active{ background:#fff; color:#0a84ff; box-shadow:var(--shadow) }
 
-  .toolbar{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 0.75rem);
+  /* Toolbar (floating) */
+  .toolbar{
+    position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 0.75rem);
     transform:translateX(-50%); z-index:1000; width:min(100% - 2rem, var(--toolbar-max));
-    display:inline-flex; align-items:center; gap:.5rem; padding:.65rem; border-radius:1rem;
-    background:rgba(255,255,255,0.72); border:1px solid rgba(255,255,255,0.45);
-    backdrop-filter:saturate(200%) blur(24px); -webkit-backdrop-filter:saturate(200%) blur(24px);
-    box-shadow:0 10px 30px rgba(0,0,0,.12) }
+    display:inline-flex; align-items:center; gap:.5rem; padding:.65rem;
+  }
+  .toolbar.glass{ border-radius:1rem }
   .toolbar.hidden{ display:none }
-  .btn{ appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm);
-    padding:.8rem 1rem; border-radius:.9rem; flex:1; border:1px solid rgba(255,255,255,.55);
+
+  .btn{
+    appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm);
+    padding:.8rem 1rem; border-radius:.9rem; border:1px solid rgba(255,255,255,.45);
     background:rgba(255,255,255,0.55); color:#111;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.08);
-    -webkit-tap-highlight-color:transparent; touch-action:manipulation }
-  .btn.primary{ color:#fff; border-color:transparent;
+    -webkit-tap-highlight-color:transparent; touch-action:manipulation
+  }
+  .btn.primary{
+    color:#fff; border-color:transparent;
     background:linear-gradient(145deg,#0a84ff,#4da3ff);
-    box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2) }
+    box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2)
+  }
   .btn.icon{ flex:0 0 auto; width:2.75rem; min-width:2.75rem; padding:.65rem 0; text-align:center }
+  .btn.small{ padding:.55rem .7rem; font-weight:700 }
 
-  .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
-    box-shadow:var(--shadow); padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
+  .card{ padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
   .card h3{ margin:0; font-size:var(--fs-md) }
 
   .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
   .row > *{ flex:1 1 14rem }
 
-  label{ font-size:var(--fs-xs); color:#6b7280 }
-  input,select,textarea{ width:100%; padding:.95rem 1rem; font-size:16px; background:#fff; color:#111;
-    border:1px solid var(--border); border-radius:.9rem; outline:none }
+  label{ font-size:var(--fs-xs); color:#3f4753 }
+  input,select,textarea{
+    width:100%; padding:.95rem 1rem; font-size:16px; background:rgba(255,255,255,.85);
+    color:#111; border:1px solid rgba(255,255,255,.55); border-radius:.9rem; outline:none;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
   input:focus,select:focus,textarea:focus{ border-color:#0a84ff; box-shadow:0 0 0 .2rem var(--accent-weak) }
 
   .lines{ display:flex; flex-direction:column; gap:.75rem }
-  .line{ display:flex; flex-direction:column; gap:.75rem; padding:.75rem; border:1px dashed var(--border);
-    border-radius:.9rem; background:#fff }
+  .line{
+    display:flex; flex-direction:column; gap:.65rem; padding:.75rem;
+    border:1px dashed rgba(255,255,255,.55); border-radius:.9rem; background:rgba(255,255,255,.55);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
   .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
   .line .grid > *{ flex:1 1 10rem }
   .actions{ display:flex; justify-content:flex-end }
 
   .list{ display:flex; flex-direction:column; gap:.6rem }
-  .rowitem{ display:flex; justify-content:space-between; align-items:center; gap:.75rem;
-    padding:.75rem 1rem; border:1px solid var(--border); border-radius:.9rem;
-    background:#fff; font-size:var(--fs-sm) }
-  .rowitem .meta{ color:#6b7280; font-size:var(--fs-xs) }
+  .rowitem{
+    display:flex; justify-content:space-between; align-items:center; gap:.75rem;
+    padding:.75rem 1rem; border:1px solid rgba(255,255,255,.5); border-radius:.9rem;
+    background:rgba(255,255,255,.6); font-size:var(--fs-sm);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .rowitem .meta{ color:#556070; font-size:var(--fs-xs) }
 
   .grid-dash{ display:flex; flex-direction:column; gap:var(--space-3) }
   @media (min-width: 80rem){ .grid-dash{ flex-direction:row }
     .grid-dash > :first-child{ flex:2 1 0 } .grid-dash > :last-child{ flex:1 1 0 } }
 
   .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
-  .kpi{ flex:1 1 9rem; padding:.8rem; border-radius:.9rem; border:1px solid var(--border);
-    background:#fff; box-shadow:var(--shadow) }
+  .kpi{
+    flex:1 1 9rem; padding:.8rem; border-radius:.9rem; border:1px solid rgba(255,255,255,.45);
+    background:rgba(255,255,255,.55); box-shadow:var(--shadow); backdrop-filter: blur(8px)
+  }
   .kpi .v{ font-size:1.25rem; font-weight:800 }
 
   .toggle{ display:flex; justify-content:flex-end }
   .toggle button{ border:none; background:transparent; color:#0a84ff; font-weight:700; cursor:pointer; padding:.25rem .25rem }
 
-  /* ===== Picker Overlay (mobile full-screen; desktop modal) ===== */
+  /* Stock badge */
+  .badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:1.9rem; height:1.9rem; padding:0 .4rem; border-radius:9999px; font-size:.9rem; font-weight:800;
+    color:#fff; background:#7b8794;
+  }
+  .badge.red{ background:#ef4444 }     /* 0 or below min */
+  .badge.yellow{ background:#f59e0b }  /* ≤ 2×min */
+  .badge.green{ background:#10b981 }   /* ok */
+
+  /* ===== Picker Overlay (mobile fullscreen; desktop modal) ===== */
   #pickerOverlay{
     position:fixed; inset:0; z-index:2000; display:none;
     align-items:center; justify-content:center;
-    background:rgba(0,0,0,0.35);
+    background:rgba(15,18,23,0.35);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
   }
   #pickerOverlay.open{ display:flex }
 
   #pickerBox{
-    background:#fff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.2);
+    background:rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.45);
+    border-radius:16px; box-shadow:0 20px 50px rgba(0,0,0,.18);
     display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
-  .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid var(--border); background:#fff }
-  .picker-header input{ flex:1; padding:.9rem 1rem; font-size:16px; border:1px solid var(--border); border-radius:.9rem; outline:none }
-  .picker-list{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.5rem; background:#fff }
-  .pick-row{ padding:.95rem 1rem; font-size:1.02rem; line-height:1.25; border:1px solid var(--border); border-radius:.85rem; background:#fff; word-break:break-word; }
-  .picker-actions{ border-top:1px solid var(--border); padding:.6rem .75rem; background:#fff; display:flex; gap:.5rem }
+  .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid rgba(255,255,255,.4); background:rgba(255,255,255,.55) }
+  .picker-header input{
+    flex:1; padding:.9rem 1rem; font-size:16px; border:1px solid rgba(255,255,255,.65); border-radius:.9rem; outline:none;
+    background:rgba(255,255,255,.9)
+  }
+  .picker-list{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.5rem; background:rgba(255,255,255,.4) }
+  .pick-row{
+    padding:.95rem 1rem; font-size:1.02rem; line-height:1.25; border:1px solid rgba(255,255,255,.55); border-radius:.85rem; background:rgba(255,255,255,.9);
+    word-break:break-word;
+    backdrop-filter: blur(6px)
+  }
+  .picker-actions{ border-top:1px solid rgba(255,255,255,.4); padding:.6rem .75rem; background:rgba(255,255,255,.55); display:flex; gap:.5rem }
 
   /* Desktop modal sizing */
   @media (min-width: 769px){
@@ -129,110 +197,112 @@
   }
 
   .hidden{ display:none !important }
-  .toast{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.5rem);
-    transform:translateX(-50%); background:#111; color:#fff; padding:.6rem .95rem; border-radius:.9rem;
-    display:none; z-index:2500; font-size:var(--fs-sm) }
+  .toast{
+    position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.5rem);
+    transform:translateX(-50%); background:#111; color:#fff; padding:.7rem 1rem; border-radius:.9rem;
+    display:none; z-index:2500; font-size:var(--fs-sm); box-shadow:0 12px 30px rgba(0,0,0,.16)
+  }
   .toast.show{ display:block }
 </style>
 </head>
 <body>
 <div class="container" id="app">
   <header>
-    <h1 id="t_title">Inventory</h1>
+    <h1 id="t_title">ระบบสต็อกวัสดุ</h1>
     <div class="spacer"></div>
     <div class="lang">
-      <button id="lang-en" class="active" type="button">EN</button>
-      <button id="lang-th" type="button">TH</button>
+      <button id="lang-th" class="active" type="button">ไทย</button>
+      <button id="lang-en" type="button">EN</button>
     </div>
   </header>
 
-  <div class="tabs">
-    <button id="tab-dashboard" class="active" type="button">Dashboard</button>
-    <button id="tab-out" type="button">OUT</button>
-    <button id="tab-in" type="button">IN</button>
-    <button id="tab-adjust" type="button">ADJUST</button>
-    <button id="tab-purchase" type="button">PURCHASING</button>
+  <div class="tabs glass">
+    <button id="tab-dashboard" class="active" type="button">สรุป</button>
+    <button id="tab-out" type="button">จ่ายออก</button>
+    <button id="tab-in" type="button">รับเข้า</button>
+    <button id="tab-adjust" type="button">ปรับปรุง</button>
+    <button id="tab-purchase" type="button">ขอจัดซื้อ</button>
   </div>
 
   <!-- DASHBOARD -->
   <section id="panel-dashboard" class="grid-dash">
     <div>
-      <div class="card">
-        <h3 id="t_dash_lowstock">Low stock</h3>
+      <div class="card glass">
+        <h3 id="t_dash_lowstock">สต็อกใกล้หมด</h3>
         <div class="list" id="lowStockList" data-limit="5"></div>
-        <div class="toggle"><button type="button" data-toggle="#lowStockList">Show more</button></div>
+        <div class="toggle"><button type="button" data-toggle="#lowStockList">ดูเพิ่มเติม</button></div>
       </div>
-      <div class="card">
-        <h3 id="t_dash_topcontractors">Top contractors (usage)</h3>
+      <div class="card glass">
+        <h3 id="t_dash_topcontractors">ผู้รับเหมาที่ใช้บ่อย</h3>
         <div class="list" id="topContractors" data-limit="5"></div>
-        <div class="toggle"><button type="button" data-toggle="#topContractors">Show more</button></div>
+        <div class="toggle"><button type="button" data-toggle="#topContractors">ดูเพิ่มเติม</button></div>
       </div>
-      <div class="card">
-        <h3 id="t_pur_summary">Purchasing Summary</h3>
-        <div class="kpis" id="purKpis">
-          <div class="kpi"><div class="v" id="kpiReq">0</div><div>Requests</div></div>
-          <div class="kpi"><div class="v" id="kpiLines">0</div><div>Lines</div></div>
-          <div class="kpi"><div class="v" id="kpiUrgent">0</div><div>Urgent</div></div>
+      <div class="card glass">
+        <h3 id="t_pur_summary">สรุปการขอจัดซื้อ</h3>
+        <div class="kpis">
+          <div class="kpi glass"><div class="v" id="kpiReq">0</div><div>คำขอ</div></div>
+          <div class="kpi glass"><div class="v" id="kpiLines">0</div><div>รายการ</div></div>
+          <div class="kpi glass"><div class="v" id="kpiUrgent">0</div><div>ด่วน</div></div>
         </div>
         <div class="list" id="purSummaryDetail" data-limit="5"></div>
-        <div class="toggle"><button type="button" data-toggle="#purSummaryDetail">Show more</button></div>
+        <div class="toggle"><button type="button" data-toggle="#purSummaryDetail">ดูเพิ่มเติม</button></div>
       </div>
     </div>
     <div>
-      <div class="card">
-        <h3 id="t_dash_topitems">Top items</h3>
+      <div class="card glass">
+        <h3 id="t_dash_topitems">วัสดุยอดใช้</h3>
         <div class="list" id="topItems" data-limit="5"></div>
-        <div class="toggle"><button type="button" data-toggle="#topItems">Show more</button></div>
+        <div class="toggle"><button type="button" data-toggle="#topItems">ดูเพิ่มเติม</button></div>
       </div>
-      <div class="card">
-        <h3 id="t_dash_recent">Recent movements</h3>
+      <div class="card glass">
+        <h3 id="t_dash_recent">ความเคลื่อนไหวล่าสุด</h3>
         <div class="list" id="recentMoves" data-limit="5"></div>
-        <div class="toggle"><button type="button" data-toggle="#recentMoves">Show more</button></div>
+        <div class="toggle"><button type="button" data-toggle="#recentMoves">ดูเพิ่มเติม</button></div>
       </div>
-      <div class="card">
-        <h3 id="t_pur_history">Purchasing History</h3>
+      <div class="card glass">
+        <h3 id="t_pur_history">ประวัติการขอจัดซื้อ</h3>
         <div class="list" id="purHistory" data-limit="5"></div>
-        <div class="toggle"><button type="button" data-toggle="#purHistory">Show more</button></div>
+        <div class="toggle"><button type="button" data-toggle="#purHistory">ดูเพิ่มเติม</button></div>
       </div>
     </div>
   </section>
 
   <!-- OUT shared header -->
-  <div class="card" id="sharedCard">
+  <div class="card glass" id="sharedCard">
     <div class="row">
       <div>
-        <label id="t_project">Project / Location</label>
-        <input id="ProjectInput" data-picker="projects" placeholder="Search or pick" readonly />
+        <label id="t_project">โครงการ / สถานที่</label>
+        <input id="ProjectInput" data-picker="projects" placeholder="ค้นหาหรือเลือก" readonly />
       </div>
       <div>
-        <label id="t_contractor">Contractor</label>
+        <label id="t_contractor">ผู้รับเหมา</label>
         <div style="display:flex;gap:.5rem;align-items:center">
-          <input id="ContractorInput" data-picker="contractors" placeholder="Pick or add" readonly />
+          <input id="ContractorInput" data-picker="contractors" placeholder="เลือกหรือเพิ่มใหม่" readonly />
           <button class="btn icon" id="addContractorBtn" type="button">+</button>
         </div>
       </div>
     </div>
     <div class="row">
       <div>
-        <label id="t_requester">Requester</label>
+        <label id="t_requester">ผู้ขอเบิก</label>
         <div style="display:flex;gap:.5rem;align-items:center">
-          <input id="RequesterInput" data-picker="requesters" placeholder="Pick or add" readonly />
+          <input id="RequesterInput" data-picker="requesters" placeholder="เลือกหรือเพิ่มใหม่" readonly />
           <button class="btn icon" id="addRequesterBtn" type="button">+</button>
         </div>
       </div>
       <div>
-        <label id="t_note">Note</label>
-        <input id="Note" placeholder="Optional" />
+        <label id="t_note">หมายเหตุ</label>
+        <input id="Note" placeholder="ถ้ามี" />
       </div>
     </div>
   </div>
 
   <!-- OUT -->
-  <div class="card" id="panel-out" style="display:none">
-    <h3 id="t_out_title">Material OUT</h3>
+  <div class="card glass" id="panel-out" style="display:none">
+    <h3 id="t_out_title">จ่ายออก</h3>
     <div class="row">
       <div>
-        <label id="t_out_date">Date</label>
+        <label id="t_out_date">วันที่</label>
         <input id="OutDate" type="date" />
       </div>
     </div>
@@ -240,11 +310,11 @@
   </div>
 
   <!-- IN -->
-  <div class="card" id="panel-in" style="display:none">
-    <h3 id="t_in_title">Material IN</h3>
+  <div class="card glass" id="panel-in" style="display:none">
+    <h3 id="t_in_title">รับเข้า</h3>
     <div class="row">
       <div>
-        <label id="t_date">Date received</label>
+        <label id="t_date">วันที่รับ</label>
         <input id="InDate" type="date" />
       </div>
     </div>
@@ -252,59 +322,60 @@
   </div>
 
   <!-- ADJUST -->
-  <div class="card" id="panel-adjust" style="display:none">
-    <h3 id="t_adjust_title">Adjust</h3>
+  <div class="card glass" id="panel-adjust" style="display:none">
+    <h3 id="t_adjust_title">ปรับปรุงสต็อก</h3>
     <div class="lines" id="adjLines"></div>
   </div>
 
   <!-- PURCHASING -->
-  <div class="card" id="panel-purchase" style="display:none">
-    <h3 id="t_pur_title">Purchasing Request</h3>
+  <div class="card glass" id="panel-purchase" style="display:none">
+    <h3 id="t_pur_title">ขอจัดซื้อ</h3>
     <div class="row" style="margin-top:.25rem">
       <div>
-        <label id="t_pur_project">Project / Location</label>
-        <input id="PurProject" data-picker="projects" placeholder="Search or pick" readonly />
+        <label id="t_pur_project">โครงการ / สถานที่</label>
+        <input id="PurProject" data-picker="projects" placeholder="ค้นหาหรือเลือก" readonly />
       </div>
       <div>
-        <label id="t_pur_needby">Need by (date)</label>
+        <label id="t_pur_needby">ต้องการภายใน (วัน)</label>
         <input type="date" id="PurNeedBy" />
       </div>
     </div>
     <div class="row">
       <div>
-        <label id="t_pur_contractor">Contractor</label>
-        <input id="PurContractor" data-picker="contractors" placeholder="Pick or add contractor" readonly />
+        <label id="t_pur_contractor">ผู้รับเหมา</label>
+        <input id="PurContractor" data-picker="contractors" placeholder="เลือกหรือเพิ่ม" readonly />
       </div>
       <div>
-        <label id="t_pur_priority">Priority</label>
+        <label id="t_pur_priority">ความเร่งด่วน</label>
         <select id="PurPriority">
-          <option value="Normal">Normal</option>
-          <option value="Urgent">Urgent</option>
-          <option value="Critical">Critical</option>
+          <option value="Normal">ปกติ</option>
+          <option value="Urgent">ด่วน</option>
+          <option value="Critical">วิกฤติ</option>
         </select>
       </div>
     </div>
     <div class="lines" id="purLines"></div>
     <div class="row">
       <div>
-        <label id="t_pur_note">Request note</label>
-        <input id="PurNote" placeholder="Optional note for purchasing team" />
+        <label id="t_pur_note">หมายเหตุคำขอ</label>
+        <input id="PurNote" placeholder="บันทึกเพิ่มเติม (ถ้ามี)" />
       </div>
     </div>
 
-    <div class="card" style="margin-top:.25rem">
-      <h3>Older Requests</h3>
+    <div class="card glass" style="margin-top:.25rem">
+      <h3>คำขอเดิม</h3>
       <div class="list" id="purOlderList" data-limit="10"></div>
-      <div class="toggle"><button type="button" data-toggle="#purOlderList">Show more</button></div>
+      <div class="toggle"><button type="button" data-toggle="#purOlderList">ดูเพิ่มเติม</button></div>
     </div>
   </div>
 </div>
 
-<!-- Floating toolbar -->
-<div class="toolbar" id="toolbar" aria-live="polite" role="region">
-  <button class="btn icon" id="addLineBtn" type="button" title="Add line">＋</button>
-  <button class="btn" id="resetBtn" type="button">Reset</button>
-  <button class="btn primary" id="submitBtn" type="button">Submit</button>
+<!-- Floating toolbar (glass) -->
+<div class="toolbar glass" id="toolbar" aria-live="polite" role="region">
+  <!-- Swapped: Add first; Reset smaller -->
+  <button class="btn icon" id="addLineBtn" type="button" title="เพิ่มรายการ">＋</button>
+  <button class="btn small" id="resetBtn" type="button">ล้าง</button>
+  <button class="btn primary" id="submitBtn" type="button">บันทึก</button>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -313,12 +384,12 @@
 <div id="pickerOverlay" aria-hidden="true">
   <div id="pickerBox" role="dialog" aria-modal="true">
     <div class="picker-header">
-      <input id="pickerSearch" placeholder="Search…" inputmode="search" />
-      <button class="btn" id="pickerCancel" type="button">Close</button>
+      <input id="pickerSearch" placeholder="ค้นหา…" inputmode="search" />
+      <button class="btn" id="pickerCancel" type="button">ปิด</button>
     </div>
     <div class="picker-list" id="pickerList"></div>
     <div class="picker-actions">
-      <button class="btn" id="pickerAdd" type="button" title="Add new">Add “<span id="pickerAddText"></span>”</button>
+      <button class="btn" id="pickerAdd" type="button" title="เพิ่มใหม่">เพิ่ม “<span id="pickerAddText"></span>”</button>
     </div>
   </div>
 </div>
@@ -344,11 +415,11 @@
 
   const $ = q => document.querySelector(q);
   const $$ = q => Array.prototype.slice.call(document.querySelectorAll(q));
-  function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
+  function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 4500); } // longer duration
   const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const val = s => { const el=$(s); return el? (el.value||'').trim() : ''; };
+  const todayStr = () => new Date().toISOString().split('T')[0];
 
-  // Clamp lists
+  // Clamp lists (Show more / less)
   function clampList(listEl){
     const max = Number(listEl.dataset.limit||'5');
     const items = listEl.children;
@@ -364,24 +435,97 @@
       items[i].style.display = expanded ? ((i<Number(list.dataset.limit||'5'))? '' : 'none') : '';
     }
     list.dataset.expanded = expanded ? 'false' : 'true';
-    btn.textContent = expanded ? 'Show more' : 'Show less';
+    btn.textContent = expanded ? (LANG==='th'?'ดูเพิ่มเติม':'Show more') : (LANG==='th'?'ย่อ':'Show less');
   }
 
-  // i18n minimal
+  // i18n
   const STR = {
-    en:{title:'Inventory', typeToSearch:'Type to search…', stock:'Stock: ', prev:'Prev: ', dashNoSubmit:'Nothing to submit on Dashboard'},
-    th:{title:'สต็อกวัสดุ', typeToSearch:'พิมพ์เพื่อค้นหา…', stock:'คงเหลือ: ', prev:'คงเหลือก่อนหน้า: ', dashNoSubmit:'หน้านี้ไม่มีรายการให้บันทึก'}
+    th:{
+      title:'ระบบสต็อกวัสดุ',
+      tabs:{dash:'สรุป', out:'จ่ายออก', in:'รับเข้า', adj:'ปรับปรุง', pur:'ขอจัดซื้อ'},
+      searchPh:'พิมพ์เพื่อค้นหา…', pick:'ค้นหาหรือเลือก', pickAdd:'เลือกหรือเพิ่มใหม่',
+      proj:'โครงการ / สถานที่', contractor:'ผู้รับเหมา', requester:'ผู้ขอเบิก', note:'หมายเหตุ',
+      outTitle:'จ่ายออก', outDate:'วันที่', inTitle:'รับเข้า', inDate:'วันที่รับ', adjTitle:'ปรับปรุงสต็อก',
+      btnAdd:'＋', btnReset:'ล้าง', btnSubmit:'บันทึก',
+      dashLow:'สต็อกใกล้หมด', dashTopContract:'ผู้รับเหมาที่ใช้บ่อย', dashTopItems:'วัสดุยอดใช้', dashRecent:'ความเคลื่อนไหวล่าสุด',
+      purTitle:'ขอจัดซื้อ', purProj:'โครงการ / สถานที่', purNeedBy:'ต้องการภายใน (วัน)', purContractor:'ผู้รับเหมา',
+      purPriority:'ความเร่งด่วน', purNote:'หมายเหตุคำขอ', purOlder:'คำขอเดิม',
+      showMore:'ดูเพิ่มเติม', showLess:'ย่อ', noLow:'ไม่มีรายการใกล้หมด 🎉',
+      stock:'คงเหลือ: ', prev:'คงเหลือก่อนหน้า: ', dashNoSubmit:'หน้านี้ไม่มีรายการให้บันทึก',
+    },
+    en:{
+      title:'Inventory', tabs:{dash:'Dashboard', out:'OUT', in:'IN', adj:'ADJUST', pur:'PURCHASING'},
+      searchPh:'Type to search…', pick:'Search or pick', pickAdd:'Pick or add',
+      proj:'Project / Location', contractor:'Contractor', requester:'Requester', note:'Note',
+      outTitle:'Material OUT', outDate:'Date', inTitle:'Material IN', inDate:'Date received', adjTitle:'Adjust',
+      btnAdd:'＋', btnReset:'Reset', btnSubmit:'Submit',
+      dashLow:'Low stock', dashTopContract:'Top contractors (usage)', dashTopItems:'Top items', dashRecent:'Recent movements',
+      purTitle:'Purchasing Request', purProj:'Project / Location', purNeedBy:'Need by (date)', purContractor:'Contractor',
+      purPriority:'Priority', purNote:'Request note', purOlder:'Older Requests',
+      showMore:'Show more', showLess:'Show less', noLow:'No low stock 🎉',
+      stock:'Stock: ', prev:'Prev: ', dashNoSubmit:'Nothing to submit on Dashboard',
+    }
   };
-  let LANG='en';
-  function setText(s,t){ const el=$(s); if(el) el.textContent=t; }
-  function applyLang(){ setText('#t_title', STR[LANG].title); }
+  let LANG='th'; // default Thai
+
+  function applyLang(){
+    const S = STR[LANG];
+    $('#t_title').textContent = S.title;
+    // Tabs
+    $('#tab-dashboard').textContent = S.tabs.dash;
+    $('#tab-out').textContent = S.tabs.out;
+    $('#tab-in').textContent = S.tabs.in;
+    $('#tab-adjust').textContent = S.tabs.adj;
+    $('#tab-purchase').textContent = S.tabs.pur;
+    // Head labels
+    $('label#t_project').textContent = S.proj;
+    $('label#t_contractor').textContent = S.contractor;
+    $('label#t_requester').textContent = S.requester;
+    $('label#t_note').textContent = S.note;
+    // Placeholders
+    $('#ProjectInput').placeholder = S.pick;
+    $('#ContractorInput').placeholder = S.pickAdd;
+    $('#RequesterInput').placeholder = S.pickAdd;
+
+    // Panel titles + dates
+    $('#t_out_title').textContent = S.outTitle;
+    $('#t_out_date').textContent = S.outDate;
+    $('#t_in_title').textContent = S.inTitle;
+    $('#t_date').textContent = S.inDate;
+    $('#t_adjust_title').textContent = S.adjTitle;
+
+    // Dashboard titles
+    $('#t_dash_lowstock').textContent = S.dashLow;
+    $('#t_dash_topcontractors').textContent = S.dashTopContract;
+    $('#t_dash_topitems').textContent = S.dashTopItems;
+    $('#t_dash_recent').textContent = S.dashRecent;
+
+    // Purchasing section
+    $('#t_pur_title').textContent = S.purTitle;
+    $('#t_pur_project').textContent = S.purProj;
+    $('#t_pur_needby').textContent = S.purNeedBy;
+    $('#t_pur_contractor').textContent = S.purContractor;
+    $('#t_pur_priority').textContent = S.purPriority;
+    $('#t_pur_note').textContent = S.purNote;
+
+    // Buttons
+    $('#resetBtn').textContent = S.btnReset;
+    $('#submitBtn').textContent = S.btnSubmit;
+
+    // Toggle buttons text reset
+    $$('.toggle button').forEach(b=>{
+      b.textContent = S.showMore;
+    });
+
+    // Update placeholders in lines (newly created ones read STR at creation time)
+    // not strictly required here
+  }
 
   // Lookups
   let MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
 
   /* ===== Picker Overlay ===== */
   const pickerOverlay = $('#pickerOverlay');
-  const pickerBox = $('#pickerBox');
   const pickerList = $('#pickerList');
   const pickerSearch = $('#pickerSearch');
   const pickerAdd = $('#pickerAdd');
@@ -447,18 +591,18 @@
     if (!text) return;
     if (currentSourceKey === 'contractors'){
       apiGet('addContractor', {name:text}, ok=>{
-        if (ok){ CONTRACTORS = Array.from(new Set([text, ...CONTRACTORS])); toast('Added contractor'); }
+        if (ok){ CONTRACTORS = Array.from(new Set([text, ...CONTRACTORS])); toast(LANG==='th'?'เพิ่มผู้รับเหมาแล้ว':'Added contractor'); }
         if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
         closePicker();
       });
     } else if (currentSourceKey === 'requesters'){
       apiGet('addRequester', {name:text}, ok=>{
-        if (ok){ REQUESTERS = Array.from(new Set([text, ...REQUESTERS])); toast('Added requester'); }
+        if (ok){ REQUESTERS = Array.from(new Set([text, ...REQUESTERS])); toast(LANG==='th'?'เพิ่มผู้ขอแล้ว':'Added requester'); }
         if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
         closePicker();
       });
     } else {
-      toast('Use master sheet to add new entries');
+      toast(LANG==='th'?'กรุณาเพิ่มในชีทมาสเตอร์':'Use master sheet to add new entries');
       closePicker();
     }
   });
@@ -471,13 +615,27 @@
     });
   }
 
-  /* ===== Lines builders ===== */
+  /* ===== Stock badge helper ===== */
+  function stockBadge(stock, min){
+    const b=document.createElement('span');
+    b.className='badge';
+    b.textContent = (stock==null || isNaN(stock)) ? '-' : stock;
+    if (stock<=0 || (min!=null && stock<=Number(min||0))) b.classList.add('red');
+    else if (min!=null && stock <= 2*Number(min||0)) b.classList.add('yellow');
+    else b.classList.add('green');
+    return b;
+  }
+
+  /* ===== Line builders ===== */
   function outLine(){
     const card=document.createElement('div'); card.className='line';
-    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? STR.th.searchPh : STR.en.searchPh); name.readOnly=true; name.setAttribute('data-picker','materials');
     const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
     const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
-    const meta=document.createElement('div'); meta.className='rowitem meta'; meta.style.justifyContent='flex-start'; meta.textContent=STR[LANG].stock+'–';
+    const meta=document.createElement('div'); meta.className='rowitem'; meta.style.justifyContent='flex-start';
+    const label=document.createElement('span'); label.className='meta'; label.textContent=(LANG==='th' ? 'คงเหลือ:' : 'Stock: ');
+    const badge=document.createElement('span'); badge.className='badge'; badge.textContent='-';
+    meta.appendChild(label); meta.appendChild(badge);
     const actions=document.createElement('div'); actions.className='actions';
     const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
     actions.appendChild(rm);
@@ -485,15 +643,18 @@
     name.addEventListener('click', ()=>openPicker(name,'materials'));
     name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return;
       apiGet('getCurrentStock',{material:v}, res=>{
-        const n = (res && res.ok) ? res.stock : null;
-        meta.textContent = STR[LANG].stock + (n==null?'-':n);
+        const n = (res && res.ok) ? Number(res.stock) : null;
+        // try to fetch min from Materials if available in memory? backend sends only name list.
+        // We just color with min unknown => green if >0 else red.
+        const bNew = stockBadge(n, null);
+        meta.replaceChild(bNew, badge);
       });
     });
     return card;
   }
   function inLine(){
     const card=document.createElement('div'); card.className='line';
-    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? STR.th.searchPh : STR.en.searchPh); name.readOnly=true; name.setAttribute('data-picker','materials');
     const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
     const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
     const actions=document.createElement('div'); actions.className='actions';
@@ -505,10 +666,13 @@
   }
   function adjLine(){
     const card=document.createElement('div'); card.className='line';
-    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? STR.th.searchPh : STR.en.searchPh); name.readOnly=true; name.setAttribute('data-picker','materials');
     const qty=document.createElement('input'); qty.type='number'; qty.step='any'; qty.placeholder='±'; qty.inputMode='decimal';
     const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
-    const meta=document.createElement('div'); meta.className='rowitem meta'; meta.style.justifyContent='flex-start'; meta.textContent=STR[LANG].prev+'–';
+    const meta=document.createElement('div'); meta.className='rowitem'; meta.style.justifyContent='flex-start';
+    const label=document.createElement('span'); label.className='meta'; label.textContent=(LANG==='th' ? 'คงเหลือก่อนหน้า:' : 'Prev: ');
+    const badge=document.createElement('span'); badge.className='badge'; badge.textContent='-';
+    meta.appendChild(label); meta.appendChild(badge);
     const actions=document.createElement('div'); actions.className='actions';
     const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
     actions.appendChild(rm);
@@ -516,17 +680,18 @@
     name.addEventListener('click', ()=>openPicker(name,'materials'));
     name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return;
       apiGet('getCurrentStock',{material:v}, res=>{
-        const n = (res && res.ok) ? res.stock : null;
-        meta.textContent = STR[LANG].prev + (n==null?'-':n);
+        const n = (res && res.ok) ? Number(res.stock) : null;
+        const bNew = stockBadge(n, null);
+        meta.replaceChild(bNew, badge);
       });
     });
     return card;
   }
   function purLine(){
     const card=document.createElement('div'); card.className='line';
-    const name=document.createElement('input'); name.placeholder=STR[LANG].typeToSearch; name.readOnly=true; name.setAttribute('data-picker','materials');
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? STR.th.searchPh : STR.en.searchPh); name.readOnly=true; name.setAttribute('data-picker','materials');
     const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
-    const spec=document.createElement('input'); spec.placeholder='Spec / Brand (optional)'; spec.style.width='100%';
+    const spec=document.createElement('input'); spec.placeholder=(LANG==='th'?'สเปก / ยี่ห้อ (ถ้ามี)':'Spec / Brand (optional)'); spec.style.width='100%';
     const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty); grid.appendChild(spec);
     const actions=document.createElement('div'); actions.className='actions';
     const rm=document.createElement('button'); rm.type='button'; rm.className='btn icon'; rm.textContent='×'; rm.onclick=()=>card.remove();
@@ -541,7 +706,7 @@
     $$(containerSel+' .line').forEach(c=>{
       const nameEl=c.querySelector('input[data-picker="materials"]');
       const qtyEl=c.querySelector('input[type="number"]');
-      const specEl=c.querySelector('input[placeholder^="Spec"]');
+      const specEl=c.querySelector('input[placeholder^="สเปก"],input[placeholder^="Spec"]');
       const name=nameEl?nameEl.value.trim():'';
       const qty=Number(qtyEl?qtyEl.value:0)||0;
       const spec=specEl? (specEl.value.trim()||'') : '';
@@ -585,7 +750,7 @@
       };
       if (!pp.lines.length){ toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); return; }
       apiPost('submitPurchaseRequest', pp, res=>{
-        if(res && res.ok){ toast('Request sent • '+(res.docNo||'')); hardReset('purchase'); loadDashboard(); }
+        if(res && res.ok){ toast((LANG==='th'?'ส่งคำขอแล้ว • ':'Request sent • ')+(res.docNo||'')); hardReset('purchase'); loadDashboard(); }
         else toast((res && res.message) || 'Error');
       });
       return;
@@ -609,10 +774,11 @@
   }
 
   function hardReset(which){
-    if (!which || which==='out'){ $('#outLines').innerHTML=''; $('#outLines').appendChild(outLine()); $('#Note').value=''; $('#OutDate').value=''; }
-    if (!which || which==='in'){  $('#inLines').innerHTML='';  $('#inLines').appendChild(inLine());  $('#InDate').value=''; }
+    const d=todayStr();
+    if (!which || which==='out'){ $('#outLines').innerHTML=''; $('#outLines').appendChild(outLine()); $('#Note').value=''; $('#OutDate').value=d; }
+    if (!which || which==='in'){  $('#inLines').innerHTML='';  $('#inLines').appendChild(inLine());  $('#InDate').value=d; }
     if (!which || which==='adjust'){ $('#adjLines').innerHTML=''; $('#adjLines').appendChild(adjLine()); }
-    if (!which || which==='purchase'){ $('#purLines').innerHTML=''; $('#purLines').appendChild(purLine()); $('#PurNote').value=''; $('#PurNeedBy').value=''; $('#PurContractor').value=''; }
+    if (!which || which==='purchase'){ $('#purLines').innerHTML=''; $('#purLines').appendChild(purLine()); $('#PurNote').value=''; $('#PurNeedBy').value=d; $('#PurContractor').value=''; }
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
@@ -620,10 +786,15 @@
   function loadDashboard(){
     apiGet('dash_LowStock', {}, list=>{
       const box = $('#lowStockList'); box.innerHTML='';
-      if (!list || !list.length){ box.innerHTML = '<div class="rowitem"><span>No low stock 🎉</span></div>'; return clampList(box); }
+      if (!list || !list.length){ box.innerHTML = '<div class="rowitem"><span>'+ (LANG==='th' ? STR.th.noLow : STR.en.noLow) +'</span></div>'; return clampList(box); }
       list.forEach(x=>{
         const row=document.createElement('div'); row.className='rowitem';
-        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">Min '+(x.min==null?'-':x.min)+' • Stock '+esc(x.stock)+'</div></div>';
+        const left=document.createElement('div');
+        const title=document.createElement('div'); title.innerHTML='<strong>'+esc(x.name)+'</strong>';
+        const meta=document.createElement('div'); meta.className='meta'; meta.textContent='Min '+(x.min==null?'-':x.min);
+        left.appendChild(title); left.appendChild(meta);
+        const right=stockBadge(Number(x.stock), Number(x.min));
+        row.appendChild(left); row.appendChild(right);
         box.appendChild(row);
       });
       clampList(box);
@@ -699,9 +870,9 @@
         const body=document.createElement('div'); body.className='hidden';
         body.innerHTML = `
           <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
-          <div class="meta">NeedBy ${esc(x.needBy||'-')} • Current: <strong>${esc(x.status||'-')}</strong></div>
+          <div class="meta">NeedBy ${esc(x.needBy||'-')} • สถานะ: <strong>${esc(x.status||'-')}</strong></div>
           <div style="display:flex; gap:.5rem; align-items:center; margin:.5rem 0;">
-            <label style="min-width:7rem">Change status</label>
+            <label style="min-width:7rem">${LANG==='th'?'เปลี่ยนสถานะ':'Change status'}</label>
             <select id="status-${esc(x.docNo)}" style="flex:1">
               <option value="Requested" ${x.status==="Requested"?"selected":""}>Requested</option>
               <option value="Approved" ${x.status==="Approved"?"selected":""}>Approved</option>
@@ -709,9 +880,9 @@
               <option value="Received" ${x.status==="Received"?"selected":""}>Received</option>
               <option value="Cancelled" ${x.status==="Cancelled"?"selected":""}>Cancelled</option>
             </select>
-            <button class="btn" id="save-${esc(x.docNo)}" type="button">Save</button>
+            <button class="btn" id="save-${esc(x.docNo)}" type="button">${LANG==='th'?'บันทึก':'Save'}</button>
           </div>
-          <div id="doc-${esc(x.docNo)}">Loading…</div>
+          <div id="doc-${esc(x.docNo)}">${LANG==='th'?'กำลังโหลด…':'Loading…'}</div>
         `;
 
         // save button event
@@ -721,7 +892,7 @@
           saveBtn.addEventListener('click', ()=>{
             apiPost('pur_UpdateStatus', {docNo:x.docNo, status:sel.value}, res=>{
               if(res && res.ok){
-                toast('Status updated → '+sel.value);
+                toast((LANG==='th'?'อัปเดตสถานะแล้ว → ':'Status updated → ')+sel.value);
                 loadDashboard();
                 loadPurchasingOlder();
               } else {
@@ -737,7 +908,8 @@
           const holder = body.querySelector('#doc-'+CSS.escape(x.docNo));
           apiGet('pur_DocLines', {docNo:x.docNo}, lines=>{
             const tbl = document.createElement('table'); tbl.className='table';
-            tbl.innerHTML='<thead><tr><th>Item</th><th>Spec</th><th>Qty</th></tr></thead>';
+            tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
+            tbl.innerHTML='<thead><tr><th>รายการ</th><th>สเปก</th><th>จำนวน</th></tr></thead>';
             const tb=document.createElement('tbody');
             (lines||[]).forEach(li=>{
               const tr=document.createElement('tr');
@@ -760,7 +932,11 @@
 
   // Events
   document.addEventListener('DOMContentLoaded', function(){
-    // language
+    // language default = Thai
+    $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active');
+    applyLang();
+
+    // toggle language
     $('#lang-en').addEventListener('click', ()=>{ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
     $('#lang-th').addEventListener('click', ()=>{ LANG='th'; $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang(); });
 
@@ -771,7 +947,7 @@
     $('#tab-adjust').addEventListener('click', ()=>{ showTab('adjust'); });
     $('#tab-purchase').addEventListener('click', ()=>{ showTab('purchase'); });
 
-    // toolbar
+    // toolbar: Add first, small Reset, primary Submit
     $('#addLineBtn').addEventListener('click', ()=>{
       const tab=currentTab();
       if (tab==='out') $('#outLines').appendChild(outLine());
@@ -791,8 +967,7 @@
     apiGet('listRequesters', {}, a=>{ REQUESTERS=a||[]; });
 
     // initial
-    hardReset();
-    applyLang();
+    hardReset(); // sets dates to today
     showTab('dashboard');
     loadDashboard();
     bindPickerInputs();

@@ -221,21 +221,21 @@
     <h1 id="t_title">ระบบสต็อกวัสดุ</h1>
     <div class="spacer"></div>
     <div class="lang">
-      <button id="lang-th" class="active" type="button">ไทย</button>
-      <button id="lang-en" type="button">EN</button>
+      <button id="lang-th" class="active" type="button" aria-label="ภาษาไทย">ไทย</button>
+      <button id="lang-en" type="button" aria-label="English">EN</button>
     </div>
   </header>
 
-  <div class="tabs glass">
-    <button id="tab-dashboard" class="active" type="button">สรุป</button>
-    <button id="tab-out" type="button">จ่ายออก</button>
-    <button id="tab-in" type="button">รับเข้า</button>
-    <button id="tab-adjust" type="button">ปรับปรุง</button>
-    <button id="tab-purchase" type="button">ขอจัดซื้อ</button>
+  <div class="tabs glass" role="tablist" aria-label="เมนู">
+    <button id="tab-dashboard" class="active" type="button" role="tab" aria-controls="panel-dashboard">สรุป</button>
+    <button id="tab-out" type="button" role="tab" aria-controls="panel-out">จ่ายออก</button>
+    <button id="tab-in" type="button" role="tab" aria-controls="panel-in">รับเข้า</button>
+    <button id="tab-adjust" type="button" role="tab" aria-controls="panel-adjust">ปรับปรุง</button>
+    <button id="tab-purchase" type="button" role="tab" aria-controls="panel-purchase">ขอจัดซื้อ</button>
   </div>
 
   <!-- DASHBOARD -->
-  <section id="panel-dashboard" class="card glass">
+  <section id="panel-dashboard" class="card glass" role="tabpanel" aria-labelledby="tab-dashboard">
     <h3 id="t_dash_lowstock">สต็อกใกล้หมด</h3>
     <div class="list" id="lowStockList" data-limit="5"></div>
     <div class="toggle"><button type="button" data-toggle="#lowStockList">ดูเพิ่มเติม</button></div>
@@ -244,7 +244,7 @@
     <div class="list" id="topContractors" data-limit="5"></div>
     <div class="toggle"><button type="button" data-toggle="#topContractors">ดูเพิ่มเติม</button></div>
 
-    <h3 id="t_dash_topitems">วัสดุยอดใช้</h3>
+    <h3 id="t_dash_topitems">วัสดุใช้บ่อย</h3>
     <div class="list" id="topItems" data-limit="5"></div>
     <div class="toggle"><button type="button" data-toggle="#topItems">ดูเพิ่มเติม</button></div>
 
@@ -267,38 +267,38 @@
   </section>
 
   <!-- OUT (Toolbar & header form ONLY here) -->
-  <section id="panel-out" style="display:none">
+  <section id="panel-out" style="display:none" role="tabpanel" aria-labelledby="tab-out">
     <div class="card glass">
       <h3 id="t_out_title">จ่ายออก</h3>
       <div class="row">
         <div>
-          <label id="t_out_date">วันที่</label>
+          <label id="t_out_date" for="OutDate">วันที่</label>
           <input id="OutDate" type="date" />
         </div>
         <div>
-          <label id="t_project">โครงการ / สถานที่</label>
+          <label id="t_project" for="ProjectInput">โครงการ / สถานที่</label>
           <input id="ProjectInput" data-picker="projects" placeholder="ค้นหาหรือเลือก" readonly />
         </div>
       </div>
       <div class="row">
         <div>
-          <label id="t_contractor">ผู้รับเหมา</label>
+          <label id="t_contractor" for="ContractorInput">ผู้รับเหมา</label>
           <div style="display:flex;gap:.5rem;align-items:center">
             <input id="ContractorInput" data-picker="contractors" placeholder="เลือกหรือเพิ่มใหม่" readonly />
-            <button class="btn small" id="addContractorBtn" type="button">＋</button>
+            <button class="btn small" id="addContractorBtn" type="button" aria-label="เพิ่มผู้รับเหมาใหม่">＋</button>
           </div>
         </div>
         <div>
-          <label id="t_requester">ผู้ขอเบิก</label>
+          <label id="t_requester" for="RequesterInput">ผู้ขอเบิก</label>
           <div style="display:flex;gap:.5rem;align-items:center">
             <input id="RequesterInput" data-picker="requesters" placeholder="เลือกหรือเพิ่มใหม่" readonly />
-            <button class="btn small" id="addRequesterBtn" type="button">＋</button>
+            <button class="btn small" id="addRequesterBtn" type="button" aria-label="เพิ่มผู้ขอเบิกใหม่">＋</button>
           </div>
         </div>
       </div>
       <div class="row">
         <div>
-          <label id="t_note">หมายเหตุ</label>
+          <label id="t_note" for="Note">หมายเหตุ</label>
           <input id="Note" placeholder="ถ้ามี" />
         </div>
       </div>
@@ -306,7 +306,7 @@
     </div>
 
     <!-- Floating toolbar ONLY for OUT -->
-    <div class="toolbar" id="toolbar-out">
+    <div class="toolbar" id="toolbar-out" aria-label="แถบเครื่องมือจ่ายออก">
       <button class="btn" id="addLineBtnOut" type="button">＋ เพิ่ม</button>
       <button class="btn small" id="resetBtnOut" type="button">ล้าง</button>
       <button class="btn primary" id="submitBtnOut" type="button">บันทึก</button>
@@ -314,12 +314,12 @@
   </section>
 
   <!-- IN (no floating toolbar) -->
-  <section id="panel-in" style="display:none">
+  <section id="panel-in" style="display:none" role="tabpanel" aria-labelledby="tab-in">
     <div class="card glass">
       <h3 id="t_in_title">รับเข้า</h3>
       <div class="row">
         <div>
-          <label id="t_date">วันที่รับ</label>
+          <label id="t_date" for="InDate">วันที่รับ</label>
           <input id="InDate" type="date" />
         </div>
       </div>
@@ -333,7 +333,7 @@
   </section>
 
   <!-- ADJUST (no floating toolbar) -->
-  <section id="panel-adjust" style="display:none">
+  <section id="panel-adjust" style="display:none" role="tabpanel" aria-labelledby="tab-adjust">
     <div class="card glass">
       <h3 id="t_adjust_title">ปรับปรุงสต็อก</h3>
       <div class="lines" id="adjLines"></div>
@@ -346,26 +346,26 @@
   </section>
 
   <!-- PURCHASING (no floating toolbar) -->
-  <section id="panel-purchase" style="display:none">
+  <section id="panel-purchase" style="display:none" role="tabpanel" aria-labelledby="tab-purchase">
     <div class="card glass">
       <h3 id="t_pur_title">ขอจัดซื้อ</h3>
       <div class="row">
         <div>
-          <label id="t_pur_project">โครงการ / สถานที่</label>
+          <label id="t_pur_project" for="PurProject">โครงการ / สถานที่</label>
           <input id="PurProject" data-picker="projects" placeholder="ค้นหาหรือเลือก" readonly />
         </div>
         <div>
-          <label id="t_pur_needby">ต้องการภายใน (วัน)</label>
+          <label id="t_pur_needby" for="PurNeedBy">ต้องการภายใน (วันที่)</label>
           <input type="date" id="PurNeedBy" />
         </div>
       </div>
       <div class="row">
         <div>
-          <label id="t_pur_contractor">ผู้รับเหมา</label>
+          <label id="t_pur_contractor" for="PurContractor">ผู้รับเหมา</label>
           <input id="PurContractor" data-picker="contractors" placeholder="เลือกหรือเพิ่ม" readonly />
         </div>
         <div>
-          <label id="t_pur_priority">ความเร่งด่วน</label>
+          <label id="t_pur_priority" for="PurPriority">ความเร่งด่วน</label>
           <select id="PurPriority">
             <option value="Normal">ปกติ</option>
             <option value="Urgent">ด่วน</option>
@@ -376,7 +376,7 @@
       <div class="lines" id="purLines"></div>
       <div class="row">
         <div>
-          <label id="t_pur_note">หมายเหตุคำขอ</label>
+          <label id="t_pur_note" for="PurNote">หมายเหตุคำขอ</label>
           <input id="PurNote" placeholder="บันทึกเพิ่มเติม (ถ้ามี)" />
         </div>
       </div>
@@ -388,7 +388,7 @@
     </div>
 
     <div class="card glass" style="margin-top:.25rem">
-      <h3>คำขอเดิม</h3>
+      <h3>คำขอก่อนหน้า</h3>
       <div class="list" id="purOlderList" data-limit="10"></div>
       <div class="toggle"><button type="button" data-toggle="#purOlderList">ดูเพิ่มเติม</button></div>
     </div>
@@ -433,7 +433,10 @@
   const $ = q => document.querySelector(q);
   const $$ = q => Array.prototype.slice.call(document.querySelectorAll(q));
   function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 4600); }
-  const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]}[m]));
+
+  /* FIXED: the escape function had a typo earlier that broke all JS */
+  const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
   const todayStr = () => new Date().toISOString().split('T')[0];
 
   function clampList(listEl){
@@ -454,7 +457,7 @@
     btn.textContent = expanded ? (LANG==='th'?'ดูเพิ่มเติม':'Show more') : (LANG==='th'?'ย่อ':'Show less');
   }
 
-  // i18n
+  // i18n (improved Thai wording)
   const STR = {
     th:{
       title:'ระบบสต็อกวัสดุ',
@@ -463,9 +466,9 @@
       proj:'โครงการ / สถานที่', contractor:'ผู้รับเหมา', requester:'ผู้ขอเบิก', note:'หมายเหตุ',
       outTitle:'จ่ายออก', outDate:'วันที่', inTitle:'รับเข้า', inDate:'วันที่รับ', adjTitle:'ปรับปรุงสต็อก',
       btnAdd:'＋ เพิ่ม', btnReset:'ล้าง', btnSubmit:'บันทึก',
-      dashLow:'สต็อกใกล้หมด', dashTopContract:'ผู้รับเหมาที่ใช้บ่อย', dashTopItems:'วัสดุยอดใช้', dashRecent:'ความเคลื่อนไหวล่าสุด',
-      purTitle:'ขอจัดซื้อ', purProj:'โครงการ / สถานที่', purNeedBy:'ต้องการภายใน (วัน)', purContractor:'ผู้รับเหมา',
-      purPriority:'ความเร่งด่วน', purNote:'หมายเหตุคำขอ', purOlder:'คำขอเดิม',
+      dashLow:'สต็อกใกล้หมด', dashTopContract:'ผู้รับเหมาที่ใช้บ่อย', dashTopItems:'วัสดุใช้บ่อย', dashRecent:'ความเคลื่อนไหวล่าสุด',
+      purTitle:'ขอจัดซื้อ', purProj:'โครงการ / สถานที่', purNeedBy:'ต้องการภายใน (วันที่)', purContractor:'ผู้รับเหมา',
+      purPriority:'ความเร่งด่วน', purNote:'หมายเหตุคำขอ', purOlder:'คำขอก่อนหน้า',
       showMore:'ดูเพิ่มเติม', showLess:'ย่อ', noLow:'ไม่มีรายการใกล้หมด 🎉',
       stock:'คงเหลือ: ', prev:'คงเหลือก่อนหน้า: ',
     },
@@ -644,8 +647,8 @@
     const b=document.createElement('span');
     b.className='badge';
     b.textContent = (stock==null || isNaN(stock)) ? '-' : stock;
-    if (stock<=0 || (min!=null && stock<=Number(min||0))) b.classList.add('red');
-    else if (min!=null && stock <= 2*Number(min||0)) b.classList.add('yellow');
+    if (stock!=null && (stock<=0 || (min!=null && stock<=Number(min||0)))) b.classList.add('red');
+    else if (min!=null && stock!=null && stock <= 2*Number(min||0)) b.classList.add('yellow');
     else b.classList.add('green');
     return b;
   }
@@ -671,7 +674,7 @@
         const n = (res && res.ok) ? Number(res.stock) : null;
         const mn = (res && res.ok) ? Number(res.min||0) : null;
         const bNew = stockBadge(n, mn);
-        meta.replaceChild(bNew, badge);
+        meta.replaceChild(bNew, meta.querySelector('.badge'));
       });
     });
     return card;
@@ -708,7 +711,7 @@
         const n = (res && res.ok) ? Number(res.stock) : null;
         const mn = (res && res.ok) ? Number(res.min||0) : null;
         const bNew = stockBadge(n, mn);
-        meta.replaceChild(bNew, badge);
+        meta.replaceChild(bNew, meta.querySelector('.badge'));
       });
     });
     return card;
@@ -839,7 +842,7 @@
       const box = $('#topItems'); box.innerHTML='';
       (list||[]).forEach(x=>{
         const row=document.createElement('div'); row.className='rowitem';
-        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">Used • '+esc(x.qty)+'</div></div>';
+        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">ใช้ไป • '+esc(x.qty)+'</div></div>';
         box.appendChild(row);
       });
       clampList(box);
@@ -873,8 +876,8 @@
       (rows||[]).forEach(x=>{
         const row=document.createElement('div'); row.className='rowitem';
         row.innerHTML = '<div><strong>'+esc(x.docNo)+' • '+esc(x.project||'-')+'</strong>'+
-                        '<div class="meta">'+esc(x.ts)+' • NeedBy '+esc(x.needBy||'-')+' • '+esc(x.priority||'-')+' • '+esc(x.status||'-')+'</div>'+
-                        '<div class="meta">Lines '+esc(x.lines)+' • Qty '+esc(x.totalQty)+' • 👷 '+esc(x.contractor||'-')+' • 🙋 '+esc(x.requester||'-')+'</div></div>';
+                        '<div class="meta">'+esc(x.ts)+' • ต้องการภายใน '+esc(x.needBy||'-')+' • '+esc(x.priority||'-')+' • '+esc(x.status||'-')+'</div>'+
+                        '<div class="meta">รายการ '+esc(x.lines)+' • จำนวน '+esc(x.totalQty)+' • 👷 '+esc(x.contractor||'-')+' • 🙋 '+esc(x.requester||'-')+'</div></div>';
         box.appendChild(row);
       });
       clampList(box);
@@ -897,7 +900,7 @@
         const body=document.createElement('div'); body.className='hidden';
         body.innerHTML = `
           <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
-          <div class="meta">NeedBy ${esc(x.needBy||'-')} • สถานะ: <strong>${esc(x.status||'-')}</strong></div>
+          <div class="meta">ต้องการภายใน ${esc(x.needBy||'-')} • สถานะ: <strong>${esc(x.status||'-')}</strong></div>
           <div style="display:flex; gap:.5rem; align-items:center; margin:.5rem 0;">
             <label style="min-width:7rem">${LANG==='th'?'เปลี่ยนสถานะ':'Change status'}</label>
             <select id="status-${esc(x.docNo)}" style="flex:1">
@@ -953,8 +956,21 @@
     });
   }
 
-  // Events
+  // ===== Events =====
   document.addEventListener('DOMContentLoaded', function(){
+
+    // Quick backend health-check (wires frontend to backend)
+    apiGet('listMaterials', {}, a=>{
+      if (Array.isArray(a)) {
+        MATERIALS=a||[];
+      } else {
+        toast('ไม่พบข้อมูลจากเซิร์ฟเวอร์ • โปรดตรวจสอบ API_URL');
+      }
+    });
+    apiGet('listProjects', {}, a=>{ PROJECTS=a||[]; });
+    apiGet('listContractors', {}, a=>{ CONTRACTORS=a||[]; });
+    apiGet('listRequesters', {}, a=>{ REQUESTERS=a||[]; });
+
     // language
     $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang();
     $('#lang-en').addEventListener('click', ()=>{ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
@@ -987,17 +1003,13 @@
     $('#resetBtnPur').addEventListener('click', ()=>{ hardReset('purchase'); bindPickerInputs(); });
     $('#submitBtnPur').addEventListener('click', submitPur);
 
-    // lookups
-    apiGet('listMaterials', {}, a=>{ MATERIALS=a||[]; });
-    apiGet('listProjects', {}, a=>{ PROJECTS=a||[]; });
-    apiGet('listContractors', {}, a=>{ CONTRACTORS=a||[]; });
-    apiGet('listRequesters', {}, a=>{ REQUESTERS=a||[]; });
-
     // defaults
     const d=todayStr();
     $('#OutDate').value=d; $('#InDate').value=d; $('#PurNeedBy').value=d;
-    // bind pickers
+
+    // bind pickers on initial fields
     bindPickerInputs();
+
     // header pickers
     $('#ProjectInput').addEventListener('click', ()=>openPicker($('#ProjectInput'),'projects'));
     $('#ContractorInput').addEventListener('click', ()=>openPicker($('#ContractorInput'),'contractors'));

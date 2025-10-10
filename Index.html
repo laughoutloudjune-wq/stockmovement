@@ -7,8 +7,6 @@
   <title>ระบบสต็อกวัสดุ</title>
   <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <!-- Sarabun for Thai UI everywhere -->
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root{
       --fs-xs: clamp(0.78rem, 1.3vw, 0.9rem);
@@ -25,10 +23,10 @@
       --pad-x: max(4vw, 1rem);
       --footer-pad: 0.6rem;
 
-      /* NEW: input surface colors (higher contrast) */
-      --input-bg: #ffffff;                 /* near-solid white */
-      --input-bg-hover: #ffffff;           /* same but lifted by shadow */
-      --input-border: rgba(0,0,0,0.10);    /* darker border for contrast */
+      /* Input surface colors (higher contrast) */
+      --input-bg: #ffffff;
+      --input-bg-hover: #ffffff;
+      --input-border: rgba(0,0,0,0.10);
       --input-shadow: 0 2px 8px rgba(0,0,0,.08);
       --input-shadow-focus: 0 6px 18px rgba(10,132,255,.20);
       --section-grad: linear-gradient(135deg, rgba(10,132,255,.10), rgba(255,255,255,.00));
@@ -37,7 +35,7 @@
     html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
     body{
       min-height:100dvh; margin:0;
-      font-family:'Sarabun','TH Sarabun New','SarabunTH',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
       background: linear-gradient(180deg,#eaf0ff 0%, #f7f9ff 100%);
       color:var(--text)
     }
@@ -48,7 +46,7 @@
     }
     @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
 
-    /* ===== Liquid Glass primitives ===== */
+    /* Liquid Glass primitives */
     .glass{
       background: var(--card);
       border: 1px solid var(--border);
@@ -56,7 +54,6 @@
       box-shadow: var(--shadow);
       backdrop-filter: saturate(160%) blur(12px);
       -webkit-backdrop-filter: saturate(160%) blur(12px);
-      /* subtle accent wash */
       background-image: var(--section-grad);
       background-blend-mode: screen;
     }
@@ -73,7 +70,7 @@
     header h1{ margin:0; font-size:var(--fs-lg); font-weight:800 }
     .spacer{ flex:1 }
 
-    /* Language toggle => pill buttons */
+    /* Language toggle */
     .lang{ display:flex; gap:.5rem }
     .lang button{
       padding:.5rem 1rem; border-radius:var(--radius-pill); border:1px solid rgba(255,255,255,.5);
@@ -88,7 +85,7 @@
       box-shadow: 0 6px 14px rgba(10,132,255,.25), inset 0 0 0 1px rgba(255,255,255,.2)
     }
 
-    /* Tabs => pill container + pill buttons */
+    /* Tabs */
     .tabs{
       display:flex; gap:.5rem; padding:.45rem; overflow:auto;
       border-radius:var(--radius-pill);
@@ -114,7 +111,7 @@
 
     label{ font-size:var(--fs-xs); color:#2e3a48; font-weight:700 }
 
-    /* ===== Inputs (higher contrast, iOS feel) ===== */
+    /* Inputs */
     input,select,textarea{
       width:100%;
       padding:1rem 1.05rem; font-size:16px;
@@ -126,9 +123,7 @@
       box-shadow: var(--input-shadow);
       transition: box-shadow .2s ease, border-color .2s ease, transform .06s ease;
     }
-    input:hover,select:hover,textarea:hover{
-      background: var(--input-bg-hover);
-    }
+    input:hover,select:hover,textarea:hover{ background: var(--input-bg-hover); }
     input:focus,select:focus,textarea:focus{
       border-color:#0a84ff;
       box-shadow: var(--input-shadow-focus), 0 0 0 .25rem var(--accent-weak);
@@ -154,6 +149,19 @@
       background:#fff; font-size:var(--fs-sm); box-shadow:0 4px 10px rgba(0,0,0,.05);
     }
     .rowitem .meta{ color:#556070; font-size:var(--fs-xs) }
+
+    /* Dashboard responsive grid */
+    .dashboard-grid{
+      display:grid; gap:1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 48rem){ /* >=768px */
+      .dashboard-grid{ grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 75rem){ /* >=1200px */
+      .dashboard-grid{ grid-template-columns: 2fr 1fr 1fr; }
+      .span-2{ grid-column: span 2; }
+    }
 
     .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
     .kpi{
@@ -187,7 +195,7 @@
     }
     .toast.show{ display:block }
 
-    /* ===== Picker Overlay ===== */
+    /* Picker Overlay */
     #pickerOverlay{
       position:fixed; inset:0; z-index:2000; display:none;
       align-items:center; justify-content:center;
@@ -215,7 +223,7 @@
 
     @media (min-width: 769px){ #pickerBox{ width:520px; height:70vh } }
 
-    /* ===== Floating pill toolbar — OUT tab ONLY ===== */
+    /* Floating pill toolbar — OUT tab ONLY */
     .toolbar{
       position: fixed; left: 50%; right: auto;
       bottom: calc(env(safe-area-inset-bottom) + 1rem);
@@ -232,7 +240,7 @@
       white-space: nowrap; overflow: hidden;
     }
 
-    /* ===== Pill buttons (global) ===== */
+    /* Pill buttons (global) */
     .btn{
       appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm);
       padding:.9rem 1.1rem; border-radius:var(--radius-pill);
@@ -258,6 +266,24 @@
     @media (min-width:768px){
       .toolbar{ bottom:calc(env(safe-area-inset-bottom) + 1.25rem) }
     }
+
+    /* ===== Global Loading Overlay & Spinner ===== */
+    #loadingOverlay{
+      position:fixed; inset:0; z-index:4000; display:none;
+      align-items:center; justify-content:center;
+      background:rgba(255,255,255,.65);
+      backdrop-filter: blur(6px) saturate(130%);
+      -webkit-backdrop-filter: blur(6px) saturate(130%);
+    }
+    #loadingOverlay.show{ display:flex }
+    .spinner{
+      width:64px; height:64px; border-radius:50%;
+      border:6px solid rgba(10,132,255,.2);
+      border-top-color:#0a84ff;
+      animation: spin 0.9s linear infinite;
+      box-shadow: 0 8px 20px rgba(10,132,255,.25);
+    }
+    @keyframes spin{ to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -279,36 +305,53 @@
     <button id="tab-purchase" type="button">ขอจัดซื้อ</button>
   </div>
 
-  <!-- DASHBOARD -->
-  <section id="panel-dashboard" class="card glass">
-    <h3 id="t_dash_lowstock">สต็อกใกล้หมด</h3>
-    <div class="list" id="lowStockList" data-limit="5"></div>
-    <div class="toggle"><button type="button" data-toggle="#lowStockList">ดูเพิ่มเติม</button></div>
-
-    <h3 id="t_dash_topcontractors">ผู้รับเหมาที่ใช้บ่อย</h3>
-    <div class="list" id="topContractors" data-limit="5"></div>
-    <div class="toggle"><button type="button" data-toggle="#topContractors">ดูเพิ่มเติม</button></div>
-
-    <h3 id="t_dash_topitems">วัสดุใช้บ่อย</h3>
-    <div class="list" id="topItems" data-limit="5"></div>
-    <div class="toggle"><button type="button" data-toggle="#topItems">ดูเพิ่มเติม</button></div>
-
-    <h3 id="t_dash_recent">ความเคลื่อนไหวล่าสุด</h3>
-    <div class="list" id="recentMoves" data-limit="5"></div>
-    <div class="toggle"><button type="button" data-toggle="#recentMoves">ดูเพิ่มเติม</button></div>
-
-    <h3 id="t_pur_summary">สรุปการขอจัดซื้อ</h3>
-    <div class="kpis">
-      <div class="kpi"><div class="v" id="kpiReq">0</div><div>คำขอ</div></div>
-      <div class="kpi"><div class="v" id="kpiLines">0</div><div>รายการ</div></div>
-      <div class="kpi"><div class="v" id="kpiUrgent">0</div><div>ด่วน</div></div>
+  <!-- DASHBOARD (now a responsive grid of cards) -->
+  <section id="panel-dashboard" class="dashboard-grid">
+    <!-- Low stock -->
+    <div class="card glass">
+      <h3 id="t_dash_lowstock">สต็อกใกล้หมด</h3>
+      <div class="list" id="lowStockList" data-limit="5"></div>
+      <div class="toggle"><button type="button" data-toggle="#lowStockList">ดูเพิ่มเติม</button></div>
     </div>
-    <div class="list" id="purSummaryDetail" data-limit="5"></div>
-    <div class="toggle"><button type="button" data-toggle="#purSummaryDetail">ดูเพิ่มเติม</button></div>
 
-    <h3 id="t_pur_history">ประวัติการขอจัดซื้อ</h3>
-    <div class="list" id="purHistory" data-limit="5"></div>
-    <div class="toggle"><button type="button" data-toggle="#purHistory">ดูเพิ่มเติม</button></div>
+    <!-- Top contractors -->
+    <div class="card glass">
+      <h3 id="t_dash_topcontractors">ผู้รับเหมาที่ใช้บ่อย</h3>
+      <div class="list" id="topContractors" data-limit="5"></div>
+      <div class="toggle"><button type="button" data-toggle="#topContractors">ดูเพิ่มเติม</button></div>
+    </div>
+
+    <!-- Top items -->
+    <div class="card glass">
+      <h3 id="t_dash_topitems">วัสดุใช้บ่อย</h3>
+      <div class="list" id="topItems" data-limit="5"></div>
+      <div class="toggle"><button type="button" data-toggle="#topItems">ดูเพิ่มเติม</button></div>
+    </div>
+
+    <!-- Recent movements -->
+    <div class="card glass span-2">
+      <h3 id="t_dash_recent">ความเคลื่อนไหวล่าสุด</h3>
+      <div class="list" id="recentMoves" data-limit="5"></div>
+      <div class="toggle"><button type="button" data-toggle="#recentMoves">ดูเพิ่มเติม</button></div>
+    </div>
+
+    <!-- Purchasing summary KPIs + recent purchase history -->
+    <div class="card glass">
+      <h3 id="t_pur_summary">สรุปการขอจัดซื้อ</h3>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kpiReq">0</div><div>คำขอ</div></div>
+        <div class="kpi"><div class="v" id="kpiLines">0</div><div>รายการ</div></div>
+        <div class="kpi"><div class="v" id="kpiUrgent">0</div><div>ด่วน</div></div>
+      </div>
+      <div class="list" id="purSummaryDetail" data-limit="5"></div>
+      <div class="toggle"><button type="button" data-toggle="#purSummaryDetail">ดูเพิ่มเติม</button></div>
+    </div>
+
+    <div class="card glass span-2">
+      <h3 id="t_pur_history">ประวัติการขอจัดซื้อ</h3>
+      <div class="list" id="purHistory" data-limit="5"></div>
+      <div class="toggle"><button type="button" data-toggle="#purHistory">ดูเพิ่มเติม</button></div>
+    </div>
   </section>
 
   <!-- OUT (Floating pill toolbar) -->
@@ -442,6 +485,9 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<!-- Global Loading Overlay -->
+<div id="loadingOverlay" aria-hidden="true"><div class="spinner" role="status" aria-label="กำลังโหลด"></div></div>
+
 <!-- Picker Overlay -->
 <div id="pickerOverlay" aria-hidden="true">
   <div id="pickerBox" role="dialog" aria-modal="true">
@@ -461,18 +507,34 @@
   /* ===== API CONFIG (embedded) ===== */
   const API_URL = "https://script.google.com/macros/s/AKfycbwEJDNfo63e0LjEZa-bhXmX3aY2PUs96bUBGz186T-pVlphV4NGNYxGT2tcx1DWgbDI/exec";
 
+  /* Loading overlay helpers */
+  const loadingEl = document.getElementById('loadingOverlay');
+  let pendingRequests = 0;
+  function showLoading(){ if(loadingEl){ loadingEl.classList.add('show'); loadingEl.setAttribute('aria-hidden','false'); } }
+  function hideLoading(){ if(loadingEl){ loadingEl.classList.remove('show'); loadingEl.setAttribute('aria-hidden','true'); } }
+  function bumpLoading(delta){
+    pendingRequests = Math.max(0, pendingRequests + delta);
+    if (pendingRequests > 0) showLoading(); else hideLoading();
+  }
+
   const safeJson = t => { try { return JSON.parse(t); } catch(e){ return {ok:false,error:'Bad JSON'}; } };
   function apiGet(fn, payload, cb){
     const q = new URLSearchParams(); q.set('fn',fn);
     if (payload && Object.keys(payload).length) q.set('payload', JSON.stringify(payload));
+    bumpLoading(1);
     fetch(API_URL + "?" + q.toString(), { method:'GET' })
-      .then(r=>r.text()).then(safeJson).then(d=>cb && cb(d.result !== undefined ? d.result : d)).catch(e=>console.error(fn,e));
+      .then(r=>r.text()).then(safeJson).then(d=>cb && cb(d.result !== undefined ? d.result : d))
+      .catch(e=>console.error(fn,e))
+      .finally(()=>bumpLoading(-1));
   }
   function apiPost(fn, payload, cb){
+    bumpLoading(1);
     fetch(API_URL, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({fn:fn, payload:payload||{}})
-    }).then(r=>r.text()).then(safeJson).then(d=>cb && cb(d.result !== undefined ? d.result : d)).catch(e=>console.error(fn,e));
+    }).then(r=>r.text()).then(safeJson).then(d=>cb && cb(d.result !== undefined ? d.result : d))
+      .catch(e=>console.error(fn,e))
+      .finally(()=>bumpLoading(-1));
   }
 
   const $ = q => document.querySelector(q);
@@ -481,7 +543,7 @@
   const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const todayStr = () => new Date().toISOString().split('T')[0];
 
-  /* ===== Clamp lists ===== */
+  /* Clamp lists */
   function clampList(listEl){
     const max = Number(listEl.dataset.limit||'5');
     const items = listEl.children;
@@ -566,7 +628,7 @@
   // Lookups
   let MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
 
-  /* ===== Picker Overlay ===== */
+  /* Picker Overlay */
   const pickerOverlay = $('#pickerOverlay');
   const pickerList = $('#pickerList');
   const pickerSearch = $('#pickerSearch');
@@ -658,7 +720,7 @@
     });
   }
 
-  /* ===== Stock badge helper ===== */
+  /* Stock badge helper */
   function stockBadge(stock, min){
     const b=document.createElement('span');
     b.className='badge';
@@ -669,7 +731,7 @@
     return b;
   }
 
-  /* ===== Line builders (NO spec/brand fields) ===== */
+  /* Line builders (no spec/brand fields) */
   function outLine(){
     const card=document.createElement('div'); card.className='line';
     const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
@@ -781,7 +843,7 @@
   function showTab(which){
     ['#panel-dashboard','#panel-out','#panel-in','#panel-adjust','#panel-purchase'].forEach(s=> $(s).style.display='none');
     ['#tab-dashboard','#tab-out','#tab-in','#tab-adjust','#tab-purchase'].forEach(s=> $(s).classList.remove('active'));
-    if (which==='dashboard'){ $('#tab-dashboard').classList.add('active'); $('#panel-dashboard').style.display='block'; loadDashboard(); }
+    if (which==='dashboard'){ $('#tab-dashboard').classList.add('active'); $('#panel-dashboard').style.display='grid'; loadDashboard(); }
     if (which==='out'){ $('#tab-out').classList.add('active'); $('#panel-out').style.display='block'; }
     if (which==='in'){ $('#tab-in').classList.add('active'); $('#panel-in').style.display='block'; }
     if (which==='adjust'){ $('#tab-adjust').classList.add('active'); $('#panel-adjust').style.display='block'; }
@@ -992,7 +1054,7 @@
     });
   }
 
-  // ===== Floating toolbar keyboard avoidance (VisualViewport) =====
+  /* Floating toolbar keyboard avoidance */
   const tbOut = document.getElementById('toolbar-out');
   const baseOffset = 16; // px above safe-area
   function setToolbarBottom(px){ if(tbOut) tbOut.style.bottom = `calc(env(safe-area-inset-bottom) + ${px}px)`; }

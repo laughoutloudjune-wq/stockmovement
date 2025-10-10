@@ -7,7 +7,7 @@
   <title>ระบบสต็อกวัสดุ</title>
   <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <!-- Sarabun for Thai UI -->
+  <!-- Sarabun for Thai UI everywhere -->
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root{
@@ -18,12 +18,20 @@
       --space-1:.5rem; --space-2:.75rem; --space-3:1rem; --space-4:1.25rem;
       --radius: 1rem; --radius-pill: 9999px;
       --border: rgba(255,255,255,.35);
-      --bg:#eef1f6; --card: rgba(255,255,255,0.6); --text:#0b0b0d;
+      --bg:#eef1f6; --card: rgba(255,255,255,0.68); --text:#0b0b0d;
       --accent:#0a84ff; --accent-weak:#e5f0ff;
       --shadow: 0 10px 30px rgba(0,0,0,.08);
       --container-max: 72rem;
       --pad-x: max(4vw, 1rem);
       --footer-pad: 0.6rem;
+
+      /* NEW: input surface colors (higher contrast) */
+      --input-bg: #ffffff;                 /* near-solid white */
+      --input-bg-hover: #ffffff;           /* same but lifted by shadow */
+      --input-border: rgba(0,0,0,0.10);    /* darker border for contrast */
+      --input-shadow: 0 2px 8px rgba(0,0,0,.08);
+      --input-shadow-focus: 0 6px 18px rgba(10,132,255,.20);
+      --section-grad: linear-gradient(135deg, rgba(10,132,255,.10), rgba(255,255,255,.00));
     }
     *,*::before,*::after{ box-sizing:border-box }
     html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
@@ -48,10 +56,13 @@
       box-shadow: var(--shadow);
       backdrop-filter: saturate(160%) blur(12px);
       -webkit-backdrop-filter: saturate(160%) blur(12px);
+      /* subtle accent wash */
+      background-image: var(--section-grad);
+      background-blend-mode: screen;
     }
     .glass-pill{
-      background: rgba(255,255,255,0.6);
-      border: 1px solid rgba(255,255,255,.5);
+      background: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,.6);
       border-radius: var(--radius-pill);
       box-shadow: 0 8px 24px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.35);
       backdrop-filter: blur(14px) saturate(150%);
@@ -66,11 +77,11 @@
     .lang{ display:flex; gap:.5rem }
     .lang button{
       padding:.5rem 1rem; border-radius:var(--radius-pill); border:1px solid rgba(255,255,255,.5);
-      background:rgba(255,255,255,.6); color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer;
+      background:rgba(255,255,255,.8); color:#111; font-weight:700; font-size:var(--fs-sm); cursor:pointer;
       backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       transition: transform .2s ease, background .2s ease;
     }
-    .lang button:hover{ transform: translateY(-1px); background:rgba(255,255,255,.75); }
+    .lang button:hover{ transform: translateY(-1px); background:rgba(255,255,255,.95); }
     .lang button.active{
       background:linear-gradient(145deg,#0a84ff,#4da3ff);
       color:#fff; border-color:transparent;
@@ -81,8 +92,8 @@
     .tabs{
       display:flex; gap:.5rem; padding:.45rem; overflow:auto;
       border-radius:var(--radius-pill);
-      background:rgba(255,255,255,0.55);
-      border:1px solid rgba(255,255,255,.45);
+      background:rgba(255,255,255,0.65);
+      border:1px solid rgba(255,255,255,.55);
       -webkit-overflow-scrolling:touch
     }
     .tabs button{
@@ -91,7 +102,7 @@
       color:#1e1e20; font-size:var(--fs-sm);
       transition: transform .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
     }
-    .tabs button:hover{ background:rgba(255,255,255,.8); transform:translateY(-1px) }
+    .tabs button:hover{ background:rgba(255,255,255,.9); transform:translateY(-1px) }
     .tabs button.active{
       background:#fff; color:#0a84ff; box-shadow:0 8px 20px rgba(0,0,0,.08)
     }
@@ -101,20 +112,35 @@
     .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
     .row > *{ flex:1 1 14rem }
 
-    label{ font-size:var(--fs-xs); color:#3f4753 }
+    label{ font-size:var(--fs-xs); color:#2e3a48; font-weight:700 }
+
+    /* ===== Inputs (higher contrast, iOS feel) ===== */
     input,select,textarea{
-      width:100%; padding:.95rem 1rem; font-size:16px; background:rgba(255,255,255,.88);
-      color:#111; border:1px solid rgba(255,255,255,.55); border-radius:1rem; outline:none;
-      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-      transition: box-shadow .15s ease, border-color .15s ease;
+      width:100%;
+      padding:1rem 1.05rem; font-size:16px;
+      background: var(--input-bg);
+      color:#111;
+      border:1px solid var(--input-border);
+      border-radius: 14px;
+      outline:none;
+      box-shadow: var(--input-shadow);
+      transition: box-shadow .2s ease, border-color .2s ease, transform .06s ease;
     }
-    input:focus,select:focus,textarea:focus{ border-color:#0a84ff; box-shadow:0 0 0 .25rem var(--accent-weak) }
+    input:hover,select:hover,textarea:hover{
+      background: var(--input-bg-hover);
+    }
+    input:focus,select:focus,textarea:focus{
+      border-color:#0a84ff;
+      box-shadow: var(--input-shadow-focus), 0 0 0 .25rem var(--accent-weak);
+      transform: translateY(-0.5px);
+    }
 
     .lines{ display:flex; flex-direction:column; gap:.75rem }
     .line{
-      display:flex; flex-direction:column; gap:.65rem; padding:.75rem;
-      border:1px dashed rgba(255,255,255,.55); border-radius:1rem; background:rgba(255,255,255,.58);
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      display:flex; flex-direction:column; gap:.65rem; padding:.85rem;
+      border:1px dashed rgba(0,0,0,.08);
+      border-radius:14px; background:rgba(255,255,255,.9);
+      box-shadow: 0 4px 12px rgba(0,0,0,.05);
     }
     .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
     .line .grid > *{ flex:1 1 10rem }
@@ -124,18 +150,17 @@
     .list{ display:flex; flex-direction:column; gap:.6rem }
     .rowitem{
       display:flex; justify-content:space-between; align-items:center; gap:.75rem;
-      padding:.75rem 1rem; border:1px solid rgba(255,255,255,.5); border-radius:1rem;
-      background:rgba(255,255,255,.6); font-size:var(--fs-sm);
-      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      padding:.75rem 1rem; border:1px solid rgba(0,0,0,.08); border-radius:14px;
+      background:#fff; font-size:var(--fs-sm); box-shadow:0 4px 10px rgba(0,0,0,.05);
     }
     .rowitem .meta{ color:#556070; font-size:var(--fs-xs) }
 
     .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
     .kpi{
-      flex:1 1 9rem; padding:.9rem; border-radius:1rem; border:1px solid rgba(255,255,255,.45);
-      background:rgba(255,255,255,.55); box-shadow:var(--shadow); backdrop-filter: blur(8px)
+      flex:1 1 9rem; padding:.9rem; border-radius:14px; border:1px solid rgba(0,0,0,.08);
+      background:#fff; box-shadow:0 4px 12px rgba(0,0,0,.06)
     }
-    .kpi .v{ font-size:1.25rem; font-weight:800 }
+    .kpi .v{ font-size:1.25rem; font-weight:800; color:#0a84ff }
 
     .toggle{ display:flex; justify-content:flex-end }
     .toggle button{
@@ -143,12 +168,13 @@
       border-radius: var(--radius-pill);
       transition: background .2s; 
     }
-    .toggle button:hover{ background:rgba(255,255,255,.7) }
+    .toggle button:hover{ background:rgba(10,132,255,.12) }
 
     .badge{
       display:inline-flex; align-items:center; justify-content:center;
       min-width:2rem; height:2rem; padding:0 .5rem; border-radius:var(--radius-pill); font-size:.95rem; font-weight:800;
       color:#fff; background:#7b8794;
+      box-shadow: inset 0 -1px 0 rgba(255,255,255,.3);
     }
     .badge.red{ background:#ef4444 }
     .badge.yellow{ background:#f59e0b }
@@ -170,22 +196,22 @@
     }
     #pickerOverlay.open{ display:flex }
     #pickerBox{
-      background:rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.45);
-      border-radius:16px; box-shadow:0 20px 50px rgba(0,0,0,.18);
+      background:rgba(255,255,255,.92); border:1px solid rgba(0,0,0,.08);
+      border-radius:18px; box-shadow:0 20px 50px rgba(0,0,0,.18);
       display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden;
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
     }
-    .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid rgba(255,255,255,.4); background:rgba(255,255,255,.55) }
+    .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid rgba(0,0,0,.06); background:rgba(255,255,255,.95) }
     .picker-header input{
-      flex:1; padding:.9rem 1rem; font-size:16px; border:1px solid rgba(255,255,255,.65); border-radius:var(--radius-pill); outline:none;
-      background:rgba(255,255,255,.95)
+      flex:1; padding:1rem 1.05rem; font-size:16px; border:1px solid var(--input-border); border-radius:14px; outline:none;
+      background:var(--input-bg); box-shadow:var(--input-shadow)
     }
-    .picker-list{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.5rem; background:rgba(255,255,255,.4) }
+    .picker-header input:focus{ border-color:#0a84ff; box-shadow: var(--input-shadow-focus), 0 0 0 .25rem var(--accent-weak) }
+    .picker-list{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.5rem; background:rgba(255,255,255,.9) }
     .pick-row{
-      padding:.95rem 1rem; font-size:1.02rem; line-height:1.25; border:1px solid rgba(255,255,255,.55); border-radius:1rem; background:rgba(255,255,255,.95);
-      word-break:break-word; backdrop-filter: blur(6px)
+      padding:.95rem 1rem; font-size:1.02rem; line-height:1.25; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:#fff;
+      word-break:break-word; box-shadow:0 4px 10px rgba(0,0,0,.05)
     }
-    .picker-actions{ border-top:1px solid rgba(255,255,255,.4); padding:.6rem .75rem; background:rgba(255,255,255,.55); display:flex; gap:.5rem }
+    .picker-actions{ border-top:1px solid rgba(0,0,0,.06); padding:.6rem .75rem; background:rgba(255,255,255,.95); display:flex; gap:.5rem }
 
     @media (min-width: 769px){ #pickerBox{ width:520px; height:70vh } }
 
@@ -198,9 +224,9 @@
       margin: 0; padding: .45rem .5rem;
       display:flex; align-items:center; gap:.45rem;
       width: max-content; max-width: calc(100% - 1.5rem);
-      background: rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.96);
       backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
-      border: 1px solid rgba(255,255,255,.5);
+      border: 1px solid rgba(0,0,0,.08);
       border-radius: var(--radius-pill);
       box-shadow: 0 10px 24px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.3);
       white-space: nowrap; overflow: hidden;
@@ -210,15 +236,14 @@
     .btn{
       appearance:none; cursor:pointer; font-weight:800; font-size:var(--fs-sm);
       padding:.9rem 1.1rem; border-radius:var(--radius-pill);
-      border:1px solid rgba(255,255,255,.45);
-      background:rgba(255,255,255,0.55); color:#111;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 6px 14px rgba(0,0,0,.10);
+      border:1px solid rgba(0,0,0,.08);
+      background:#fff; color:#111;
+      box-shadow:inset 0 -1px 0 rgba(255,255,255,.6), 0 6px 14px rgba(0,0,0,.10);
       -webkit-tap-highlight-color:transparent; touch-action:manipulation;
       flex:1 1 0;
-      backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%);
       transition: all .2s ease;
     }
-    .btn:hover{ background:rgba(255,255,255,0.75); transform:translateY(-1px) }
+    .btn:hover{ background:#fefefe; transform:translateY(-1px) }
     .btn.primary{
       color:#fff; border-color:transparent;
       background:linear-gradient(145deg,#0a84ff,#4da3ff);
@@ -226,7 +251,7 @@
     }
     .btn.small{
       flex:0 0 auto; padding:.55rem .9rem; font-size:var(--fs-xs); font-weight:700;
-      background:rgba(255,255,255,0.6); border-radius:var(--radius-pill)
+      background:#fff; border-radius:var(--radius-pill)
     }
     .btn:disabled{ opacity:.45; cursor:not-allowed }
     .inline-actions{ display:flex; gap:.6rem; justify-content:flex-end }
@@ -274,9 +299,9 @@
 
     <h3 id="t_pur_summary">สรุปการขอจัดซื้อ</h3>
     <div class="kpis">
-      <div class="kpi glass"><div class="v" id="kpiReq">0</div><div>คำขอ</div></div>
-      <div class="kpi glass"><div class="v" id="kpiLines">0</div><div>รายการ</div></div>
-      <div class="kpi glass"><div class="v" id="kpiUrgent">0</div><div>ด่วน</div></div>
+      <div class="kpi"><div class="v" id="kpiReq">0</div><div>คำขอ</div></div>
+      <div class="kpi"><div class="v" id="kpiLines">0</div><div>รายการ</div></div>
+      <div class="kpi"><div class="v" id="kpiUrgent">0</div><div>ด่วน</div></div>
     </div>
     <div class="list" id="purSummaryDetail" data-limit="5"></div>
     <div class="toggle"><button type="button" data-toggle="#purSummaryDetail">ดูเพิ่มเติม</button></div>
@@ -535,12 +560,6 @@
     $('#t_pur_priority').textContent = S.purPriority;
     $('#t_pur_note').textContent = S.purNote;
 
-    // Dashboard headings
-    $('#t_dash_lowstock').textContent = S.dashLow;
-    $('#t_dash_topcontractors').textContent = S.dashTopContract;
-    $('#t_dash_topitems').textContent = S.dashTopItems;
-    $('#t_dash_recent').textContent = S.dashRecent;
-
     updateAllSubmitStates();
   }
 
@@ -650,13 +669,12 @@
     return b;
   }
 
-  /* ===== Line builders ===== */
+  /* ===== Line builders (NO spec/brand fields) ===== */
   function outLine(){
     const card=document.createElement('div'); card.className='line';
     const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
     const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
-    const spec=document.createElement('input'); spec.placeholder=(LANG==='th'?'สเปก / ยี่ห้อ (ถ้ามี)':'Spec / Brand (optional)');
-    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty); grid.appendChild(spec);
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
     const meta=document.createElement('div'); meta.className='rowitem'; meta.style.justifyContent='flex-start';
     const label=document.createElement('span'); label.className='meta'; label.textContent=(LANG==='th' ? 'คงเหลือ:' : 'Stock: ');
     const badge=document.createElement('span'); badge.className='badge'; badge.textContent='-';
@@ -676,15 +694,13 @@
     });
     qty.addEventListener('input', updateAllSubmitStates);
     name.addEventListener('input', updateAllSubmitStates);
-    spec.addEventListener('input', updateAllSubmitStates);
     return card;
   }
   function inLine(){
     const card=document.createElement('div'); card.className='line';
     const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
     const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
-    const spec=document.createElement('input'); spec.placeholder=(LANG==='th'?'สเปก / ยี่ห้อ (ถ้ามี)':'Spec / Brand (optional)');
-    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty); grid.appendChild(spec);
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
     const actions=document.createElement('div'); actions.className='actions';
     const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>{ card.remove(); updateAllSubmitStates(); };
     actions.appendChild(rm);
@@ -692,7 +708,6 @@
     name.addEventListener('click', ()=>openPicker(name,'materials'));
     qty.addEventListener('input', updateAllSubmitStates);
     name.addEventListener('input', updateAllSubmitStates);
-    spec.addEventListener('input', updateAllSubmitStates);
     return card;
   }
   function adjLine(){
@@ -725,8 +740,7 @@
     const card=document.createElement('div'); card.className='line';
     const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
     const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
-    const spec=document.createElement('input'); spec.placeholder=(LANG==='th'?'สเปก / ยี่ห้อ (ถ้ามี)':'Spec / Brand (optional)');
-    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty); grid.appendChild(spec);
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
     const actions=document.createElement('div'); actions.className='actions';
     const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>{ card.remove(); updateAllSubmitStates(); };
     actions.appendChild(rm);
@@ -734,7 +748,6 @@
     name.addEventListener('click', ()=>openPicker(name,'materials'));
     qty.addEventListener('input', updateAllSubmitStates);
     name.addEventListener('input', updateAllSubmitStates);
-    spec.addEventListener('input', updateAllSubmitStates);
     return card;
   }
 
@@ -743,11 +756,9 @@
     $$(containerSel+' .line').forEach(c=>{
       const nameEl=c.querySelector('input[data-picker="materials"]');
       const qtyEl=c.querySelector('input[type="number"]');
-      const specEl=c.querySelector('input[placeholder^="สเปก"],input[placeholder^="Spec"]');
       const name=nameEl?nameEl.value.trim():'';
       const qty=Number(qtyEl?qtyEl.value:0)||0;
-      const spec=specEl? (specEl.value.trim()||'') : '';
-      if (name) out.push({name:name, qty:qty, spec:spec});
+      if (name) out.push({name:name, qty:qty});
     });
     return out;
   }
@@ -960,11 +971,11 @@
           apiGet('pur_DocLines', {docNo:x.docNo}, lines=>{
             const tbl = document.createElement('table');
             tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
-            tbl.innerHTML='<thead><tr><th>รายการ</th><th>สเปก</th><th>จำนวน</th></tr></thead>';
+            tbl.innerHTML='<thead><tr><th>รายการ</th><th>จำนวน</th></tr></thead>';
             const tb=document.createElement('tbody');
             (lines||[]).forEach(li=>{
               const tr=document.createElement('tr');
-              tr.innerHTML='<td>'+esc(li.item)+'</td><td>'+esc(li.spec||'')+'</td><td>'+esc(li.qty)+'</td>';
+              tr.innerHTML='<td>'+esc(li.item)+'</td><td>'+esc(li.qty)+'</td>';
               tb.appendChild(tr);
             });
             tbl.appendChild(tb);

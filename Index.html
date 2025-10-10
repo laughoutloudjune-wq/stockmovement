@@ -17,7 +17,7 @@
       --radius: 14px; --radius-pill: 9999px;
       --border-weak: rgba(0,0,0,.06);
       --border: rgba(0,0,0,.10);
-      --bg:#eef1f6; --card: rgba(255,255,255,0.82); --text:#0b0b0d;
+      --bg:#eef1f6; --card: rgba(255,255,255,0.9); --text:#0b0b0d;
       --accent:#0a84ff; --accent-weak:#e5f0ff;
       --shadow-s: 0 2px 6px rgba(0,0,0,.06);
       --shadow-m: 0 6px 16px rgba(0,0,0,.10);
@@ -28,7 +28,6 @@
 
       /* Input surface colors (higher contrast) */
       --input-bg: #ffffff;
-      --input-bg-hover: #ffffff;
       --input-border: rgba(0,0,0,0.12);
       --input-shadow: 0 2px 8px rgba(0,0,0,.08);
       --input-shadow-focus: 0 6px 18px rgba(10,132,255,.20);
@@ -39,9 +38,10 @@
     body{
       min-height:100dvh; margin:0;
       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-      background: radial-gradient(1200px 800px at 10% -10%, #eaf2ff 0%, transparent 60%),
-                  radial-gradient(1000px 700px at 110% 10%, #fff2e6 0%, transparent 55%),
-                  linear-gradient(180deg,#f7f9ff 0%, #eef1f6 100%);
+      background:
+        radial-gradient(1200px 800px at 10% -10%, #eaf2ff 0%, transparent 60%),
+        radial-gradient(1000px 700px at 110% 10%, #fff2e6 0%, transparent 55%),
+        linear-gradient(180deg,#f7f9ff 0%, #eef1f6 100%);
       color:var(--text);
       -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
     }
@@ -62,14 +62,6 @@
       -webkit-backdrop-filter: saturate(160%) blur(12px);
       background-image: var(--section-grad);
       background-blend-mode: screen;
-    }
-    .glass-pill{
-      background: rgba(255,255,255,0.9);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-pill);
-      box-shadow: var(--shadow-l), inset 0 0 0 1px rgba(255,255,255,.35);
-      backdrop-filter: blur(14px) saturate(150%);
-      -webkit-backdrop-filter: blur(14px) saturate(150%);
     }
 
     header{ display:flex; align-items:flex-end; gap:var(--space-2) }
@@ -162,13 +154,8 @@
       display:grid; gap:1rem;
       grid-template-columns: 1fr;
     }
-    @media (min-width: 48rem){ /* >=768px */
-      .dashboard-grid{ grid-template-columns: 1fr 1fr; }
-    }
-    @media (min-width: 75rem){ /* >=1200px */
-      .dashboard-grid{ grid-template-columns: 2fr 1fr 1fr; }
-      .span-2{ grid-column: span 2; }
-    }
+    @media (min-width: 48rem){ .dashboard-grid{ grid-template-columns: 1fr 1fr; } }   /* >=768px */
+    @media (min-width: 75rem){ .dashboard-grid{ grid-template-columns: 2fr 1fr 1fr; } .span-2{ grid-column: span 2; } } /* >=1200px */
 
     .kpis{ display:flex; gap:.5rem; flex-wrap:wrap }
     .kpi{
@@ -202,14 +189,15 @@
     }
     .toast.show{ display:block }
 
-    /* Picker Overlay */
+    /* Picker Overlay (hidden until opened) */
     #pickerOverlay{
       position:fixed; inset:0; z-index:2000; display:none;
       align-items:center; justify-content:center;
       background:rgba(15,18,23,0.15);
       backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+      pointer-events:none; /* <<< important: prevent blocking clicks when hidden */
     }
-    #pickerOverlay.open{ display:flex }
+    #pickerOverlay.open{ display:flex; pointer-events:auto; }
     #pickerBox{
       background:rgba(255,255,255,.98); border:1px solid var(--border);
       border-radius:18px; box-shadow: var(--shadow-l);
@@ -245,6 +233,7 @@
       border-radius: var(--radius-pill);
       box-shadow: var(--shadow-l), inset 0 0 0 1px rgba(255,255,255,.3);
       white-space: nowrap; overflow: hidden;
+      pointer-events:auto;
     }
 
     /* Pill buttons (global) */
@@ -516,9 +505,675 @@
 </div>
 
 <script>
-// --- The same JS as in the previous cell continues here (omitted for brevity in this execution cell) ---
-// For correctness of the delivered file, the full JS has been included above this comment.
-// (No changes are needed here; this comment does not appear in the written file.)
+(function(){
+  /* ===== API CONFIG (embedded) ===== */
+  const API_URL = "https://script.google.com/macros/s/AKfycbwEJDNfo63e0LjEZa-bhXmX3aY2PUs96bUBGz186T-pVlphV4NGNYxGT2tcx1DWgbDI/exec";
+
+  const safeJson = t => { try { return JSON.parse(t); } catch(e){ return {ok:false,error:'Bad JSON'}; } };
+  function apiGet(fn, payload){
+    const q = new URLSearchParams(); q.set('fn',fn);
+    if (payload && payload.payload && Object.keys(payload.payload).length) q.set('payload', JSON.stringify(payload.payload));
+    return fetch(API_URL + "?" + q.toString(), { method:'GET' })
+      .then(r=>r.text()).then(safeJson)
+      .then(d=> (d.result !== undefined ? d.result : d));
+  }
+  function apiPost(fn, body){
+    return fetch(API_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({fn:fn, payload:body||{}})
+    }).then(r=>r.text()).then(safeJson)
+      .then(d=> (d.result !== undefined ? d.result : d));
+  }
+
+  const $ = q => document.querySelector(q);
+  const $$ = q => Array.prototype.slice.call(document.querySelectorAll(q));
+  function toast(m){ const t=$('#toast'); if(!t) return; t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 4600); }
+  const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const todayStr = () => new Date().toISOString().split('T')[0];
+
+  /* Local loading helpers */
+  function setCardLoading(cardEl, count = 5){
+    if(!cardEl) return;
+    const list = cardEl.querySelector('.list');
+    if(!list) return;
+    list.innerHTML='';
+    for(let i=0;i<count;i++){
+      const sk = document.createElement('div');
+      sk.className = 'rowitem is-loading';
+      sk.style.minHeight = '52px';
+      list.appendChild(sk);
+    }
+  }
+  function setBtnLoading(btn, isLoading){
+    if(!btn) return;
+    btn.classList.toggle('is-loading', !!isLoading);
+    btn.disabled = !!isLoading;
+  }
+
+  /* Clamp lists */
+  function clampList(listEl){
+    const max = Number(listEl.dataset.limit||'5');
+    const items = listEl.children;
+    for (let i=0;i<items.length;i++){ items[i].style.display = (i<max) ? '' : 'none'; }
+    listEl.dataset.expanded = 'false';
+  }
+  function toggleClamp(btn){
+    const sel = btn.getAttribute('data-toggle');
+    const list = $(sel); if(!list) return;
+    const expanded = list.dataset.expanded === 'true';
+    const items = list.children;
+    for (let i=0;i<items.length;i++){
+      items[i].style.display = expanded ? ((i<Number(list.dataset.limit||'5'))? '' : 'none') : '';
+    }
+    list.dataset.expanded = expanded ? 'false' : 'true';
+    btn.textContent = expanded ? (LANG==='th'?'ดูเพิ่มเติม':'Show more') : (LANG==='th'?'ย่อ':'Show less');
+  }
+
+  // i18n
+  const STR = {
+    th:{
+      title:'ระบบสต็อกวัสดุ',
+      sub:'ระบบเบา เร็ว และใช้ง่าย',
+      tabs:{dash:'สรุป', out:'จ่ายออก', in:'รับเข้า', adj:'ปรับปรุง', pur:'ขอจัดซื้อ'},
+      searchPh:'พิมพ์เพื่อค้นหา…', pick:'ค้นหาหรือเลือก', pickAdd:'เลือกหรือเพิ่มใหม่',
+      proj:'โครงการ / สถานที่', contractor:'ผู้รับเหมา', requester:'ผู้ขอเบิก', note:'หมายเหตุ',
+      outTitle:'จ่ายออก', outDate:'วันที่', inTitle:'รับเข้า', inDate:'วันที่รับ', adjTitle:'ปรับปรุงสต็อก',
+      btnAdd:'＋ เพิ่ม', btnReset:'ล้าง', btnSubmit:'บันทึก',
+      dashLow:'สต็อกใกล้หมด', dashTopContract:'ผู้รับเหมาที่ใช้บ่อย', dashTopItems:'วัสดุใช้บ่อย', dashRecent:'ความเคลื่อนไหวล่าสุด',
+      purTitle:'ขอจัดซื้อ', purProj:'โครงการ / สถานที่', purNeedBy:'ต้องการภายใน (วันที่)', purContractor:'ผู้รับเหมา',
+      purPriority:'ความเร่งด่วน', purNote:'หมายเหตุคำขอ', purOlder:'คำขอก่อนหน้า',
+      showMore:'ดูเพิ่มเติม', showLess:'ย่อ', noLow:'ไม่มีรายการใกล้หมด 🎉',
+      stock:'คงเหลือ: ', prev:'คงเหลือก่อนหน้า: ',
+      save:'บันทึก'
+    },
+    en:{
+      title:'Inventory',
+      sub:'Lightweight, fast, and friendly',
+      tabs:{dash:'Dashboard', out:'OUT', in:'IN', adj:'ADJUST', pur:'PURCHASING'},
+      searchPh:'Type to search…', pick:'Search or pick', pickAdd:'Pick or add',
+      proj:'Project / Location', contractor:'Contractor', requester:'Requester', note:'Note',
+      outTitle:'Material OUT', outDate:'Date', inTitle:'Material IN', inDate:'Date received', adjTitle:'Adjust',
+      btnAdd:'＋ Add', btnReset:'Reset', btnSubmit:'Submit',
+      dashLow:'Low stock', dashTopContract:'Top contractors (usage)', dashTopItems:'Top items', dashRecent:'Recent movements',
+      purTitle:'Purchasing Request', purProj:'Project / Location', purNeedBy:'Need by (date)', purContractor:'Contractor',
+      purPriority:'Priority', purNote:'Request note', purOlder:'Older Requests',
+      showMore:'Show more', showLess:'Show less', noLow:'No low stock 🎉',
+      stock:'Stock: ', prev:'Prev: ',
+      save:'Save'
+    }
+  };
+  let LANG='th';
+  function applyLang(){
+    const S = STR[LANG];
+    $('#t_title').textContent = S.title;
+    $('#t_sub').textContent = S.sub;
+    $('#tab-dashboard').textContent = S.tabs.dash;
+    $('#tab-out').textContent = S.tabs.out;
+    $('#tab-in').textContent = S.tabs.in;
+    $('#tab-adjust').textContent = S.tabs.adj;
+    $('#tab-purchase').textContent = S.tabs.pur;
+
+    // OUT labels
+    $('#t_out_title').textContent = S.outTitle;
+    $('#t_out_date').textContent = S.outDate;
+    $('label#t_project').textContent = S.proj;
+    $('label#t_contractor').textContent = S.contractor;
+    $('label#t_requester').textContent = S.requester;
+    $('label#t_note').textContent = S.note;
+
+    // IN / ADJ / PUR
+    $('#t_in_title').textContent = S.inTitle;
+    $('#t_date').textContent = S.inDate;
+    $('#t_adjust_title').textContent = S.adjTitle;
+    $('#t_pur_title').textContent = S.purTitle;
+    $('#t_pur_project').textContent = S.purProj;
+    $('#t_pur_needby').textContent = S.purNeedBy;
+    $('#t_pur_contractor').textContent = S.purContractor;
+    $('#t_pur_priority').textContent = S.purPriority;
+    $('#t_pur_note').textContent = S.purNote;
+
+    updateAllSubmitStates();
+  }
+
+  // Lookups
+  let MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
+
+  /* ===== Picker Overlay ===== */
+  const pickerOverlay = $('#pickerOverlay');
+  const pickerList = $('#pickerList');
+  const pickerSearch = $('#pickerSearch');
+  const pickerAdd = $('#pickerAdd');
+  const pickerAddText = $('#pickerAddText');
+  const pickerCancel = $('#pickerCancel');
+
+  const sources = {
+    materials: () => MATERIALS,
+    projects:  () => PROJECTS,
+    contractors: () => CONTRACTORS,
+    requesters: () => REQUESTERS
+  };
+
+  let currentTargetInput = null;
+  let currentSourceKey = null;
+
+  function openPicker(targetInput, sourceKey){
+    currentTargetInput = targetInput;
+    currentSourceKey = sourceKey;
+    if (pickerSearch) pickerSearch.value = '';
+    renderPickerList('');
+    pickerOverlay.classList.add('open');
+    pickerOverlay.setAttribute('aria-hidden','false');
+    setTimeout(()=>pickerSearch && pickerSearch.focus(), 50);
+  }
+  function closePicker(){
+    pickerOverlay.classList.remove('open');
+    pickerOverlay.setAttribute('aria-hidden','true');
+    currentTargetInput = null;
+    currentSourceKey = null;
+  }
+  function renderPickerList(query){
+    const all = (sources[currentSourceKey] ? sources[currentSourceKey]() : []) || [];
+    const q = (query||'').toLowerCase().trim();
+    const list = q ? all.filter(v => String(v).toLowerCase().includes(q)) : all.slice();
+    pickerList.innerHTML = '';
+
+    if (!list.length){
+      pickerAdd.classList.remove('hidden');
+      pickerAddText.textContent = query || '';
+    } else {
+      pickerAdd.classList.add('hidden');
+    }
+
+    list.forEach(v=>{
+      const row = document.createElement('div');
+      row.className = 'pick-row';
+      row.innerHTML = '<strong>'+esc(v)+'</strong>';
+      row.addEventListener('click', ()=>{
+        if (currentTargetInput){ currentTargetInput.value = v; currentTargetInput.dispatchEvent(new Event('change')); }
+        closePicker();
+      });
+      pickerList.appendChild(row);
+    });
+  }
+  pickerSearch && pickerSearch.addEventListener('input', e => renderPickerList(e.target.value));
+  pickerCancel && pickerCancel.addEventListener('click', closePicker);
+  pickerOverlay && pickerOverlay.addEventListener('click', e=>{ if(e.target===pickerOverlay) closePicker(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && pickerOverlay.classList.contains('open')) closePicker(); });
+
+  pickerAdd && pickerAdd.addEventListener('click', ()=>{
+    const text = pickerSearch.value.trim();
+    if (!text) return;
+    if (currentSourceKey === 'contractors'){
+      apiGet('addContractor', {payload:{name:text}}).then(ok=>{
+        if (ok){ CONTRACTORS = Array.from(new Set([text, ...CONTRACTORS])); toast(LANG==='th'?'เพิ่มผู้รับเหมาแล้ว':'Added contractor'); }
+        if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
+        closePicker();
+      });
+    } else if (currentSourceKey === 'requesters'){
+      apiGet('addRequester', {payload:{name:text}}).then(ok=>{
+        if (ok){ REQUESTERS = Array.from(new Set([text, ...REQUESTERS])); toast(LANG==='th'?'เพิ่มผู้ขอแล้ว':'Added requester'); }
+        if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
+        closePicker();
+      });
+    } else {
+      toast(LANG==='th'?'กรุณาเพิ่มในชีทมาสเตอร์':'Use master sheet to add new entries');
+      closePicker();
+    }
+  });
+
+  function bindPickerInputs(){
+    $$('input[data-picker]').forEach(inp=>{
+      inp.addEventListener('click', ()=>{
+        const key = inp.getAttribute('data-picker');
+        openPicker(inp, key);
+      });
+    });
+  }
+
+  /* Stock badge helper */
+  function stockBadge(stock, min){
+    const b=document.createElement('span');
+    b.className='badge';
+    b.textContent = (stock==null || isNaN(stock)) ? '-' : stock;
+    if (stock<=0 || (min!=null && stock<=Number(min||0))) b.classList.add('red');
+    else if (min!=null && stock <= 2*Number(min||0)) b.classList.add('yellow');
+    else b.classList.add('green');
+    return b;
+  }
+
+  /* Line builders (no spec/brand fields) */
+  function outLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
+    const meta=document.createElement('div'); meta.className='rowitem'; meta.style.justifyContent='flex-start';
+    const label=document.createElement('span'); label.className='meta'; label.textContent=(LANG==='th' ? 'คงเหลือ:' : 'Stock: ');
+    const badge=document.createElement('span'); badge.className='badge'; badge.textContent='-';
+    meta.appendChild(label); meta.appendChild(badge);
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>{ card.remove(); updateAllSubmitStates(); };
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return;
+      meta.classList.add('is-loading');
+      apiGet('getCurrentStock',{payload:{material:v}}).then(res=>{
+        const n = (res && res.ok) ? Number(res.stock) : null;
+        const mn = (res && res.ok) ? Number(res.min||0) : null;
+        const bNew = stockBadge(n, mn);
+        meta.replaceChild(bNew, badge);
+      }).finally(()=> meta.classList.remove('is-loading'));
+    });
+    qty.addEventListener('input', updateAllSubmitStates);
+    name.addEventListener('input', updateAllSubmitStates);
+    return card;
+  }
+  function inLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>{ card.remove(); updateAllSubmitStates(); };
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    qty.addEventListener('input', updateAllSubmitStates);
+    name.addEventListener('input', updateAllSubmitStates);
+    return card;
+  }
+  function adjLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.step='any'; qty.placeholder='±'; qty.inputMode='decimal';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
+    const meta=document.createElement('div'); meta.className='rowitem'; meta.style.justifyContent='flex-start';
+    const label=document.createElement('span'); label.className='meta'; label.textContent=(LANG==='th' ? 'คงเหลือก่อนหน้า:' : 'Prev: ');
+    const badge=document.createElement('span'); badge.className='badge'; badge.textContent='-';
+    meta.appendChild(label); meta.appendChild(badge);
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>{ card.remove(); updateAllSubmitStates(); };
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(meta); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    name.addEventListener('change', ()=>{ const v=name.value.trim(); if(!v) return;
+      meta.classList.add('is-loading');
+      apiGet('getCurrentStock',{payload:{material:v}}).then(res=>{
+        const n = (res && res.ok) ? Number(res.stock) : null;
+        const mn = (res && res.ok) ? Number(res.min||0) : null;
+        const bNew = stockBadge(n, mn);
+        meta.replaceChild(bNew, badge);
+      }).finally(()=> meta.classList.remove('is-loading'));
+    });
+    qty.addEventListener('input', updateAllSubmitStates);
+    name.addEventListener('input', updateAllSubmitStates);
+    return card;
+  }
+  function purLine(){
+    const card=document.createElement('div'); card.className='line';
+    const name=document.createElement('input'); name.placeholder=(LANG==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
+    const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+    const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
+    const actions=document.createElement('div'); actions.className='actions';
+    const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>{ card.remove(); updateAllSubmitStates(); };
+    actions.appendChild(rm);
+    card.appendChild(grid); card.appendChild(actions);
+    name.addEventListener('click', ()=>openPicker(name,'materials'));
+    qty.addEventListener('input', updateAllSubmitStates);
+    name.addEventListener('input', updateAllSubmitStates);
+    return card;
+  }
+
+  function collectLines(containerSel){
+    const out=[];
+    $$(containerSel+' .line').forEach(c=>{
+      const nameEl=c.querySelector('input[data-picker="materials"]');
+      const qtyEl=c.querySelector('input[type="number"]');
+      const name=nameEl?nameEl.value.trim():'';
+      const qty=Number(qtyEl?qtyEl.value:0)||0;
+      if (name) out.push({name:name, qty:qty});
+    });
+    return out;
+  }
+
+  // Save button labeling + disabling
+  function setSubmitState(btn, count){
+    if(!btn) return;
+    const lbl = (LANG==='th' ? STR.th.save : STR.en.save);
+    btn.querySelector('.btn-label').textContent = lbl + ' (' + count + ')';
+    btn.disabled = count<=0;
+  }
+  function countLines(sel){ return $$(sel+' .line').length; }
+  function updateAllSubmitStates(){
+    setSubmitState($('#submitBtnOut'), countLines('#outLines'));
+    setSubmitState($('#submitBtnIn'),  countLines('#inLines'));
+    setSubmitState($('#submitBtnAdj'), countLines('#adjLines'));
+    setSubmitState($('#submitBtnPur'), countLines('#purLines'));
+  }
+
+  function showTab(which){
+    ['#panel-dashboard','#panel-out','#panel-in','#panel-adjust','#panel-purchase'].forEach(s=> $(s).style.display='none');
+    ['#tab-dashboard','#tab-out','#tab-in','#tab-adjust','#tab-purchase'].forEach(s=> $(s).classList.remove('active'));
+    if (which==='dashboard'){ $('#tab-dashboard').classList.add('active'); $('#panel-dashboard').style.display='grid'; loadDashboard(); }
+    if (which==='out'){ $('#tab-out').classList.add('active'); $('#panel-out').style.display='block'; }
+    if (which==='in'){ $('#tab-in').classList.add('active'); $('#panel-in').style.display='block'; }
+    if (which==='adjust'){ $('#tab-adjust').classList.add('active'); $('#panel-adjust').style.display='block'; }
+    if (which==='purchase'){ $('#tab-purchase').classList.add('active'); $('#panel-purchase').style.display='block'; loadPurchasingOlder(); }
+    window.scrollTo({top:0,behavior:'smooth'});
+    updateAllSubmitStates();
+  }
+
+  function withButtonLoading(btn, fn){
+    return (...args)=>{
+      setBtnLoading(btn, true);
+      Promise.resolve(fn(...args)).finally(()=> setBtnLoading(btn, false));
+    };
+  }
+
+  function submitOut(){
+    const p = {
+      type:'OUT',
+      project: $('#ProjectInput').value.trim(),
+      contractor: $('#ContractorInput').value.trim(),
+      requester: $('#RequesterInput').value.trim(),
+      note: $('#Note').value.trim(),
+      date: $('#OutDate').value.trim(),
+      lines: collectLines('#outLines')
+    };
+    if (!p.lines.length) return toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line');
+    return apiPost('submitMovementBulk', p).then(res=>{
+      if(res && res.ok){ toast((LANG==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||'')); hardReset('out'); loadDashboard(); }
+      else toast((res && res.message) || 'Error');
+    });
+  }
+  function submitIn(){
+    const p = { type:'IN', date: $('#InDate').value.trim(), lines: collectLines('#inLines') };
+    if (!p.lines.length) return toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line');
+    return apiPost('submitMovementBulk', p).then(res=>{
+      if(res && res.ok){ toast((LANG==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||'')); hardReset('in'); loadDashboard(); }
+      else toast((res && res.message) || 'Error');
+    });
+  }
+  function submitAdj(){
+    const p = { type:'ADJUST', lines: collectLines('#adjLines') };
+    if (!p.lines.length) return toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line');
+    return apiPost('submitMovementBulk', p).then(res=>{
+      if(res && res.ok){ toast((LANG==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||'')); hardReset('adjust'); loadDashboard(); }
+      else toast((res && res.message) || 'Error');
+    });
+  }
+  function submitPur(){
+    const p = {
+      type:'PURCHASE',
+      project: $('#PurProject').value.trim(),
+      contractor: $('#PurContractor').value.trim(),
+      needBy: $('#PurNeedBy').value.trim(),
+      priority: $('#PurPriority').value,
+      note: $('#PurNote').value.trim(),
+      lines: collectLines('#purLines')
+    };
+    if (!p.lines.length) return toast(LANG==='th'?'กรุณาเพิ่มรายการ':'Add at least one line');
+    return apiPost('submitPurchaseRequest', p).then(res=>{
+      if(res && res.ok){ toast((LANG==='th'?'ส่งคำขอแล้ว • ':'Request sent • ')+(res.docNo||'')); hardReset('purchase'); loadDashboard(); }
+      else toast((res && res.message) || 'Error');
+    });
+  }
+
+  function hardReset(which){
+    const d=todayStr();
+    if (!which || which==='out'){ $('#outLines').innerHTML=''; $('#outLines').appendChild(outLine()); $('#Note').value=''; $('#OutDate').value=d; }
+    if (!which || which==='in'){  $('#inLines').innerHTML='';  $('#inLines').appendChild(inLine());  $('#InDate').value=d; }
+    if (!which || which==='adjust'){ $('#adjLines').innerHTML=''; $('#adjLines').appendChild(adjLine()); }
+    if (!which || which==='purchase'){ $('#purLines').innerHTML=''; $('#purLines').appendChild(purLine()); $('#PurNote').value=''; $('#PurNeedBy').value=d; $('#PurContractor').value=''; }
+    updateAllSubmitStates();
+  }
+
+  // Dashboard fills (each card shows local skeletons while loading)
+  function loadDashboard(){
+    // Low stock
+    setCardLoading($('#card-low'), 4);
+    apiGet('dash_LowStock').then(list=>{
+      const box = $('#lowStockList'); box.innerHTML='';
+      if (!list || !list.length){ box.innerHTML = '<div class="rowitem"><span>'+ (LANG==='th' ? STR.th.noLow : STR.en.noLow) +'</span></div>'; return clampList(box); }
+      list.forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        const left=document.createElement('div');
+        const title=document.createElement('div'); title.innerHTML='<strong>'+esc(x.name)+'</strong>';
+        const meta=document.createElement('div'); meta.className='meta'; meta.textContent='Min '+(x.min==null?'-':x.min);
+        left.appendChild(title); left.appendChild(meta);
+        const right=stockBadge(Number(x.stock), Number(x.min));
+        row.appendChild(left); row.appendChild(right);
+        box.appendChild(row);
+      });
+      clampList(box);
+    });
+
+    // Top contractors
+    setCardLoading($('#card-topcontract'), 4);
+    apiGet('dash_TopContractors').then(list=>{
+      const box = $('#topContractors'); box.innerHTML='';
+      (list||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.contractor||'(unknown)')+'</strong><div class="meta">Qty '+(x.qty||0)+'</div></div>';
+        box.appendChild(row);
+      });
+      clampList(box);
+    });
+
+    // Top items
+    setCardLoading($('#card-topitems'), 4);
+    apiGet('dash_TopItems').then(list=>{
+      const box = $('#topItems'); box.innerHTML='';
+      (list||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.name)+'</strong><div class="meta">'+(LANG==='th'?'ใช้ไป • ':'Used • ')+esc(x.qty)+'</div></div>';
+        box.appendChild(row);
+      });
+      clampList(box);
+    });
+
+    // Recent moves
+    setCardLoading($('#card-recent'), 6);
+    apiGet('dash_Recent').then(rows=>{
+      const box = $('#recentMoves'); box.innerHTML='';
+      (rows||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.type)+' • '+esc(x.item)+'</strong><div class="meta">'+esc(x.ts)+' — '+esc(x.doc)+' • Qty '+esc(x.qty)+'</div></div>';
+        box.appendChild(row);
+      });
+      clampList(box);
+    });
+
+    // Purchase summary & history
+    setCardLoading($('#card-pursum'), 3);
+    apiGet('pur_Summary').then(s=>{
+      $('#kpiReq').textContent = (s && s.requests) ? s.requests : 0;
+      $('#kpiLines').textContent = (s && s.lines) ? s.lines : 0;
+      $('#kpiUrgent').textContent = (s && s.urgent) ? s.urgent : 0;
+    }).finally(()=>{
+      apiGet('pur_History').then(rows=>{
+        const sum = $('#purSummaryDetail'); sum.innerHTML='';
+        (rows||[]).slice(0,5).forEach(x=>{
+          const row=document.createElement('div'); row.className='rowitem';
+          row.innerHTML = '<div><strong>'+esc(x.docNo)+' • '+esc(x.project||'-')+'</strong>'+
+                          '<div class="meta">👷 '+esc(x.contractor||'-')+' • 🙋 '+esc(x.requester||'-')+'</div>'+
+                          '<div class="meta">🗓 '+esc(x.ts)+' → 📆 '+esc(x.needBy||'-')+'</div></div>';
+          sum.appendChild(row);
+        });
+        clampList(sum);
+      });
+    });
+
+    setCardLoading($('#card-purhist'), 6);
+    apiGet('pur_History').then(rows=>{
+      const box = $('#purHistory'); box.innerHTML='';
+      (rows||[]).forEach(x=>{
+        const row=document.createElement('div'); row.className='rowitem';
+        row.innerHTML = '<div><strong>'+esc(x.docNo)+' • '+esc(x.project||'-')+'</strong>'+
+                        '<div class="meta">'+esc(x.ts)+' • '+(LANG==='th'?'ต้องการภายใน ':'NeedBy ')+esc(x.needBy||'-')+' • '+esc(x.priority||'-')+' • '+esc(x.status||'-')+'</div>'+
+                        '<div class="meta">'+(LANG==='th'?'รายการ ':'Lines ')+esc(x.lines)+' • '+(LANG==='th'?'จำนวน ':'Qty ')+esc(x.totalQty)+' • 👷 '+esc(x.contractor||'-')+' • 🙋 '+esc(x.requester||'-')+'</div></div>';
+        box.appendChild(row);
+      });
+      clampList(box);
+    });
+
+    $$('.toggle button').forEach(btn=> btn.onclick = ()=>toggleClamp(btn));
+  }
+
+  // Purchasing tab older list with status control
+  function loadPurchasingOlder(){
+    const holder = $('#purOlderList');
+    if (holder){ holder.innerHTML=''; for(let i=0;i<5;i++){ const sk=document.createElement('div'); sk.className='rowitem is-loading'; sk.style.minHeight='48px'; holder.appendChild(sk);} }
+    apiGet('pur_History').then(rows=>{
+      const box=$('#purOlderList'); box.innerHTML='';
+      (rows||[]).forEach(x=>{
+        const acc=document.createElement('div'); acc.className='rowitem';
+        acc.style.flexDirection='column'; acc.style.alignItems='stretch';
+        const head=document.createElement('div');
+        head.style.display='flex'; head.style.justifyContent='space-between'; head.style.cursor='pointer';
+        head.innerHTML = '<span>'+esc(x.docNo)+' • '+esc(x.project||'-')+' • '+esc(x.ts)+'</span><span>›</span>';
+
+        const body=document.createElement('div'); body.className='hidden';
+        body.innerHTML = `
+          <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
+          <div class="meta">${LANG==='th'?'ต้องการภายใน':'NeedBy'} ${esc(x.needBy||'-')} • ${LANG==='th'?'สถานะ':'Status'}: <strong>${esc(x.status||'-')}</strong></div>
+          <div style="display:flex; gap:.5rem; align-items:center; margin:.5rem 0;">
+            <label style="min-width:7rem">${LANG==='th'?'เปลี่ยนสถานะ':'Change status'}</label>
+            <select id="status-${esc(x.docNo)}" style="flex:1">
+              <option value="Requested" ${x.status==="Requested"?"selected":""}>Requested</option>
+              <option value="Approved" ${x.status==="Approved"?"selected":""}>Approved</option>
+              <option value="Ordered" ${x.status==="Ordered"?"selected":""}>Ordered</option>
+              <option value="Received" ${x.status==="Received"?"selected":""}>Received</option>
+              <option value="Cancelled" ${x.status==="Cancelled"?"selected":""}>Cancelled</option>
+            </select>
+            <button class="btn small" id="save-${esc(x.docNo)}" type="button">${LANG==='th'?'บันทึก':'Save'}</button>
+          </div>
+          <div id="doc-${esc(x.docNo)}">${LANG==='th'?'กำลังโหลด…':'Loading…'}</div>
+        `;
+        setTimeout(()=>{
+          const saveBtn = body.querySelector('#save-'+CSS.escape(x.docNo));
+          const sel = body.querySelector('#status-'+CSS.escape(x.docNo));
+          if (saveBtn && sel) {
+            saveBtn.addEventListener('click', ()=>{
+              setBtnLoading(saveBtn, true);
+              apiPost('pur_UpdateStatus', {docNo:x.docNo, status:sel.value}).then(res=>{
+                if(res && res.ok){
+                  toast((LANG==='th'?'อัปเดตสถานะแล้ว → ':'Status updated → ')+sel.value);
+                  loadDashboard(); loadPurchasingOlder();
+                } else { toast(res && res.message || 'Error'); }
+              }).finally(()=> setBtnLoading(saveBtn, false));
+            });
+          }
+        },100);
+        head.addEventListener('click', ()=>{
+          const open = !body.classList.contains('hidden');
+          if (open){ body.classList.add('hidden'); return; }
+          const holder = body.querySelector('#doc-'+CSS.escape(x.docNo));
+          holder.innerHTML = ''; for(let i=0;i<3;i++){ const sk=document.createElement('div'); sk.className='skeleton'; sk.style.height='18px'; sk.style.margin='8px 0'; holder.appendChild(sk); }
+          apiGet('pur_DocLines', {payload:{docNo:x.docNo}}).then(lines=>{
+            const tbl = document.createElement('table');
+            tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
+            tbl.innerHTML='<thead><tr><th style="text-align:left;padding:.25rem 0;">รายการ</th><th style="text-align:left;padding:.25rem 0;">จำนวน</th></tr></thead>';
+            const tb=document.createElement('tbody');
+            (lines||[]).forEach(li=>{
+              const tr=document.createElement('tr');
+              tr.innerHTML='<td style="padding:.25rem 0;">'+esc(li.item)+'</td><td style="padding:.25rem 0;">'+esc(li.qty)+'</td>';
+              tb.appendChild(tr);
+            });
+            tbl.appendChild(tb);
+            holder.replaceWith(tbl);
+          });
+          body.classList.remove('hidden');
+        });
+        acc.appendChild(head); acc.appendChild(body);
+        box.appendChild(acc);
+      });
+      clampList(box);
+      const toggleBtn = document.querySelector('.toggle button[data-toggle="#purOlderList"]');
+      if (toggleBtn) toggleBtn.onclick = ()=>toggleClamp(toggleBtn);
+    });
+  }
+
+  /* Floating toolbar keyboard avoidance */
+  const tbOut = document.getElementById('toolbar-out');
+  const baseOffset = 16; // px above safe-area
+  function setToolbarBottom(px){ if(tbOut) tbOut.style.bottom = `calc(env(safe-area-inset-bottom) + ${px}px)`; }
+  if (window.visualViewport){
+    const vv = window.visualViewport;
+    const update = ()=>{
+      const delta = Math.max(0, window.innerHeight - vv.height);
+      setToolbarBottom(baseOffset + (delta>0 ? delta + 8 : 0));
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+  }
+
+  // Events
+  document.addEventListener('DOMContentLoaded', function(){
+    // language
+    $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang();
+    $('#lang-en').addEventListener('click', ()=>{ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
+    $('#lang-th').addEventListener('click', ()=>{ LANG='th'; $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang(); });
+
+    // tabs
+    $('#tab-dashboard').addEventListener('click', ()=> showTab('dashboard'));
+    $('#tab-out').addEventListener('click', ()=> showTab('out'));
+    $('#tab-in').addEventListener('click', ()=> showTab('in'));
+    $('#tab-adjust').addEventListener('click', ()=> showTab('adjust'));
+    $('#tab-purchase').addEventListener('click', ()=> showTab('purchase'));
+
+    // OUT toolbar
+    $('#addLineBtnOut').addEventListener('click', ()=>{ $('#outLines').appendChild(outLine()); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#resetBtnOut').addEventListener('click', ()=>{ hardReset('out'); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#submitBtnOut').addEventListener('click', withButtonLoading($('#submitBtnOut'), submitOut));
+
+    // IN inline
+    $('#addLineBtnIn').addEventListener('click', ()=>{ $('#inLines').appendChild(inLine()); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#resetBtnIn').addEventListener('click', ()=>{ hardReset('in'); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#submitBtnIn').addEventListener('click', withButtonLoading($('#submitBtnIn'), submitIn));
+
+    // ADJUST inline
+    $('#addLineBtnAdj').addEventListener('click', ()=>{ $('#adjLines').appendChild(adjLine()); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#resetBtnAdj').addEventListener('click', ()=>{ hardReset('adjust'); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#submitBtnAdj').addEventListener('click', withButtonLoading($('#submitBtnAdj'), submitAdj));
+
+    // PUR inline
+    $('#addLineBtnPur').addEventListener('click', ()=>{ $('#purLines').appendChild(purLine()); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#resetBtnPur').addEventListener('click', ()=>{ hardReset('purchase'); bindPickerInputs(); updateAllSubmitStates(); });
+    $('#submitBtnPur').addEventListener('click', withButtonLoading($('#submitBtnPur'), submitPur));
+
+    // lookups
+    Promise.all([
+      apiGet('listMaterials'),
+      apiGet('listProjects'),
+      apiGet('listContractors'),
+      apiGet('listRequesters')
+    ]).then(([m,p,c,r])=>{
+      MATERIALS=Array.isArray(m)?m:[]; PROJECTS=Array.isArray(p)?p:[]; CONTRACTORS=Array.isArray(c)?c:[]; REQUESTERS=Array.isArray(r)?r:[];
+    });
+
+    // defaults
+    const d=todayStr();
+    $('#OutDate').value=d; $('#InDate').value=d; $('#PurNeedBy').value=d;
+
+    // bind pickers
+    bindPickerInputs();
+    $('#ProjectInput').addEventListener('click', ()=>openPicker($('#ProjectInput'),'projects'));
+    $('#ContractorInput').addEventListener('click', ()=>openPicker($('#ContractorInput'),'contractors'));
+    $('#RequesterInput').addEventListener('click', ()=>openPicker($('#RequesterInput'),'requesters'));
+    $('#PurProject').addEventListener('click', ()=>openPicker($('#PurProject'),'projects'));
+    $('#PurContractor').addEventListener('click', ()=>openPicker($('#PurContractor'),'contractors'));
+
+    // quick-add
+    $('#addContractorBtn').addEventListener('click', ()=>{ openPicker($('#ContractorInput'),'contractors'); pickerSearch && pickerSearch.focus(); });
+    $('#addRequesterBtn').addEventListener('click', ()=>{ openPicker($('#RequesterInput'),'requesters'); pickerSearch && pickerSearch.focus(); });
+
+    // initial data
+    showTab('dashboard'); loadDashboard(); hardReset();
+  });
+})();
 </script>
 </body>
 </html>

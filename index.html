@@ -71,7 +71,6 @@
       outline:none;
     }
 
-    /* Toolbar — centered glass pill with entrance animation */
     .toolbar{
       position:fixed; left:50%; transform:translateX(-50%);
       bottom:max(1rem, env(safe-area-inset-bottom)); z-index:40;
@@ -183,7 +182,7 @@
       *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition:none !important }
     }
 
-    /* ===== Safe-boot helpers ===== */
+    /* Error overlay */
     #boot-error{
       position:fixed; inset:0; z-index:9999; display:none;
       background: rgba(0,0,0,.45); backdrop-filter: blur(6px);
@@ -191,7 +190,7 @@
     }
     #boot-error .box{
       max-width:760px; margin:10vh auto 0; border-radius:14px; padding:16px;
-      background: rgba(30,30,34,.9);
+      background: rgba(30,30,34,.92);
       box-shadow: 0 20px 50px rgba(0,0,0,.4);
       white-space: pre-wrap; word-break: break-word;
     }
@@ -202,7 +201,7 @@
 </head>
 <body>
 
-  <!-- Fallback content so the page is never completely blank -->
+  <!-- Non-blank fallback UI -->
   <div id="app">
     <div class="dash-grid" style="padding: 16px; max-width: 72rem; margin: 0 auto;">
       <div class="card glass"><div class="skeleton"></div><div class="skeleton"></div></div>
@@ -230,16 +229,12 @@
   <!-- Toast -->
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <!-- Error overlay (shown if JS fails) -->
+  <!-- Error overlay -->
   <div id="boot-error" role="alert" aria-live="assertive">
     <div class="box">
       <h2>⚠️ App failed to start</h2>
-      <div>Open DevTools → <strong>Console</strong> for details. Common causes:
-        <ul>
-          <li>Incorrect <code>&lt;script src&gt;</code> path (e.g., <code>./js/main.js</code> vs <code>main.js</code>)</li>
-          <li>Syntax error in <code>main.js</code></li>
-          <li>Blocked by mixed content/CORS</li>
-        </ul>
+      <div id="boot-help">
+        Couldn’t load your JavaScript bundle or it crashed on start.
       </div>
       <code id="boot-error-text"></code>
     </div>
@@ -247,50 +242,80 @@
 
   <noscript>JavaScript is disabled. Please enable it to use this app.</noscript>
 
-  <!-- Safe-boot guard: shows overlay if main.js fails or renders nothing -->
+  <!-- Bootloader: tries multiple script paths and reports syntax/path errors -->
   <script>
     (function(){
-      // 1) Show any runtime error as an overlay
+      // Candidate paths to try. First successful one wins.
+      var CANDIDATES = [
+        'main.js',
+        './main.js',
+        'js/main.js',
+        './js/main.js',
+        'assets/main.js',
+        './assets/main.js',
+        'dist/main.js',
+        'dist/assets/index.js'
+      ];
+
+      var tried = [];
+      var mounted = false;
+      var loadErr = null;
+
       function showErr(msg){
         var el = document.getElementById('boot-error');
         var code = document.getElementById('boot-error-text');
-        if (code) code.textContent = String(msg || 'Unknown error');
+        if (code) code.textContent = (tried.length ? ('Tried:\n- ' + tried.join('\n- ') + '\n\n') : '') + String(msg || 'Unknown error');
         if (el) el.style.display = 'block';
       }
-      window.addEventListener('error', function(e){ showErr(e.message + (e.filename?('\n' + e.filename + ':' + e.lineno):'')); });
-      window.addEventListener('unhandledrejection', function(e){ showErr((e.reason && (e.reason.stack || e.reason.message)) || String(e.reason)); });
 
-      // 2) After main.js loads, verify that #app has content
-      //    If it's still empty after a short delay, show a helpful overlay
-      function verifyMount(){
-        var app = document.getElementById('app');
-        // If your app replaces fallback with real UI, app should have more than skeletons
-        // Give it a little time to render.
-        setTimeout(function(){
-          // Heuristic: if no interactive elements added, assume mount failed
-          var hasButtons = app && app.querySelector('.tabs, .toolbar, button[id^="tab-"]');
-          if (!app || !hasButtons){
-            showErr('App did not render into #app.\nCheck that main.js calls your render/init function and the selector matches (#app).');
-          }
-        }, 900);
-      }
-      // Expose for main.js to call when it has successfully mounted
-      window.__APP_MOUNTED__ = function(){ /* noop: presence indicates success */ };
-
-      // Trigger verification slightly after main.js
-      window.addEventListener('DOMContentLoaded', function(){
-        // If main.js calls __APP_MOUNTED__ we skip verify
-        setTimeout(function(){
-          if (typeof window.__APP_MOUNTED__ !== 'function' || window.__APP_MOUNTED__.called !== true){
-            verifyMount();
-          }
-        }, 1200);
+      // Surface runtime/syntax errors
+      window.addEventListener('error', function(e){
+        loadErr = e.message + (e.filename?(' @ ' + e.filename + ':' + e.lineno):'');
       });
+      window.addEventListener('unhandledrejection', function(e){
+        loadErr = (e.reason && (e.reason.stack || e.reason.message)) || String(e.reason);
+      });
+
+      // Called by your app when it finishes mounting
+      window.__APP_MOUNTED__ = function(){
+        mounted = true;
+      };
+
+      function tryPath(path){
+        return new Promise(function(resolve, reject){
+          var s = document.createElement('script');
+          s.type = 'module'; // allow ES module syntax
+          s.src = path + (path.indexOf('?')>-1?'':'?v=' + Date.now()); // bust cache during debug
+          s.onload = function(){ resolve(path); };
+          s.onerror = function(){ reject(new Error('Failed to load ' + path)); };
+          document.head.appendChild(s);
+        });
+      }
+
+      (async function boot(){
+        for (var i=0; i<CANDIDATES.length; i++){
+          var p = CANDIDATES[i];
+          try{
+            tried.push(p);
+            await tryPath(p);
+            // wait a tick for app to mount
+            await new Promise(r => setTimeout(r, 800));
+            if (mounted){ return; } // success
+          }catch(e){
+            loadErr = e.message;
+          }
+        }
+        // If we end up here, nothing mounted
+        showErr(loadErr || 'Script path incorrect or bundle has a syntax error.');
+        // Small hint depending on environment
+        var help = document.getElementById('boot-help');
+        if (help){
+          help.innerHTML = 'Check that your built file exists and the path matches. '
+            + 'If using a bundler (Vite/webpack), the output may be in <code>dist/</code> or <code>assets/</code>. '
+            + 'Also ensure your bundle uses valid ES syntax for the browser (or keep <code>type="module"</code> here).';
+        }
+      })();
     })();
   </script>
-
-  <!-- IMPORTANT: ensure this path matches your repo structure -->
-  <!-- If your JS lives in /js/main.js, change to src="js/main.js" -->
-  <script src="main.js" onload="if (typeof __APP_MOUNTED__==='function'){ __APP_MOUNTED__.called=true }" defer></script>
 </body>
 </html>

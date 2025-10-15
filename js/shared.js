@@ -6,22 +6,62 @@ export const $$ = (q, r = document) => Array.prototype.slice.call(r.querySelecto
 export const esc = v => (v==null)?'':String(v).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 export const todayStr = () => new Date().toISOString().split('T')[0];
 
+/* ========== API with timeout + local cache ========== */
 const safeJson = t => { try { return JSON.parse(t); } catch(e){ return {ok:false,error:'Bad JSON'}; } };
-export function apiGet(fn, payload){
-  const q = new URLSearchParams(); q.set('fn',fn);
-  if (payload && payload.payload && Object.keys(payload.payload).length) q.set('payload', JSON.stringify(payload.payload));
-  return fetch(API_URL + "?" + q.toString(), { method:'GET' })
-    .then(r=>r.text()).then(safeJson)
-    .then(d=> (d.result !== undefined ? d.result : d));
+
+function withTimeout(promise, ms=10000){
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort('timeout'), ms);
+  return {
+    promise: promise(ctrl.signal).finally(()=>clearTimeout(t)),
+    controller: ctrl
+  };
 }
-export function apiPost(fn, body){
-  return fetch(API_URL, {
-    method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify({fn:fn, payload:body||{}})
-  }).then(r=>r.text()).then(safeJson)
-    .then(d=> (d.result !== undefined ? d.result : d));
+function cacheKey(fn, payload){ return `cache:${fn}:${payload?JSON.stringify(payload):''}`; }
+function getCache(k, ttlMs){
+  try{
+    const raw = localStorage.getItem(k);
+    if(!raw) return null;
+    const {ts, data} = JSON.parse(raw);
+    if (Date.now() - ts > ttlMs) return null;
+    return data;
+  }catch{return null;}
+}
+function setCache(k, data){
+  try{ localStorage.setItem(k, JSON.stringify({ts:Date.now(), data})); }catch{}
 }
 
+/** GET wrapper with optional cache */
+export async function apiGet(fn, payload=null, {cacheTtlMs=0} = {}){
+  const key = cacheTtlMs ? cacheKey(fn, payload) : null;
+  if (cacheTtlMs){
+    const hit = getCache(key, cacheTtlMs);
+    if (hit) return hit;
+  }
+  const run = (signal)=> fetch(API_URL + "?" + new URLSearchParams({
+    fn, ...(payload ? {payload: JSON.stringify(payload.payload || payload)} : {})
+  }), { method:'GET', signal });
+  const {promise} = withTimeout(run, 12000);
+  const resText = await promise.then(r=>r.text()).catch(()=>null);
+  const data = resText ? safeJson(resText) : {ok:false, error:'Network/timeout'};
+  const result = (data.result !== undefined ? data.result : data);
+  if (cacheTtlMs && result) setCache(key, result);
+  return result;
+}
+
+/** POST wrapper */
+export async function apiPost(fn, body){
+  const run = (signal)=> fetch(API_URL, {
+    method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, signal,
+    body: JSON.stringify({fn:fn, payload:body||{}})
+  });
+  const {promise} = withTimeout(run, 15000);
+  const resText = await promise.then(r=>r.text()).catch(()=>null);
+  const data = resText ? safeJson(resText) : {ok:false, error:'Network/timeout'};
+  return (data.result !== undefined ? data.result : data);
+}
+
+/* ========== UI bits ========== */
 export function toast(m){
   const t = $('#toast'); if(!t) return;
   t.textContent = m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 4600);
@@ -35,7 +75,7 @@ export const STR = {
     proj:'โครงการ / สถานที่', contractor:'ผู้รับเหมา', requester:'ผู้ขอเบิก', note:'หมายเหตุ',
     outTitle:'จ่ายออก', outDate:'วันที่', inTitle:'รับเข้า', inDate:'วันที่รับ', adjTitle:'ปรับปรุงสต็อก',
     btnAdd:'＋ เพิ่ม', btnReset:'ล้าง', btnSubmit:'บันทึก',
-    dashLow:'สต็อกใกล้หมด', dashTopContract:'ผู้รับเหมาที่ใช้บ่อย', dashTopItems:'วัสดุใช้บ่อย', dashRecent:'ความเคลื่อนไหวล่าสุด',
+    dashLow:'สต็อกใกล้หมด', dashTopContract:'ผู้รับเหมาใช้บ่อย', dashTopItems:'วัสดุใช้บ่อย', dashRecent:'ความเคลื่อนไหวล่าสุด',
     purTitle:'ขอจัดซื้อ', purProj:'โครงการ / สถานที่', purNeedBy:'ต้องการภายใน (วันที่)', purContractor:'ผู้รับเหมา',
     purPriority:'ความเร่งด่วน', purNote:'หมายเหตุคำขอ', purOlder:'ขอจัดซื้อก่อนหน้า',
     showMore:'ดูเพิ่มเติม', showLess:'ย่อ', noLow:'ไม่มีรายการใกล้หมด 🎉',
@@ -60,8 +100,6 @@ export function applyLangTexts(LANG){
   const S = STR[LANG];
   $('#t_title').textContent = S.title;
   $('#t_sub').textContent = S.sub;
-
-  // Update tab labels
   const tabMap = [
     ['dashboard', S.tabs.dash],
     ['out', S.tabs.out],
@@ -95,8 +133,7 @@ export function toggleClamp(btn, LANG){
 
 export function setCardLoading(cardEl, count = 5){
   if(!cardEl) return;
-  const list = cardEl.querySelector('.list');
-  if(!list) return;
+  const list = cardEl.querySelector('.list') || (()=>{ const l=document.createElement('div'); l.className='list'; cardEl.appendChild(l); return l; })();
   list.innerHTML='';
   for(let i=0;i<count;i++){
     const row = document.createElement('div'); row.className = 'skeleton-row';
@@ -126,7 +163,7 @@ export function stockBadge(stock, min){
   return b;
 }
 
-/* ====== Shared item/person/project picker ====== */
+/* ====== Picker (shared) ====== */
 let MATERIALS=[], PROJECTS=[], CONTRACTORS=[], REQUESTERS=[];
 const pickerOverlay = $('#pickerOverlay');
 const pickerList   = $('#pickerList');
@@ -145,15 +182,16 @@ const sources = {
 let currentTargetInput = null;
 let currentSourceKey = null;
 
+/* Cache lookups for 5 minutes */
 export function preloadLookups(){
   return Promise.all([
-    apiGet('listMaterials'),
-    apiGet('listProjects'),
-    apiGet('listContractors'),
-    apiGet('listRequesters')
+    apiGet('listMaterials', null, {cacheTtlMs: 5*60*1000}),
+    apiGet('listProjects', null, {cacheTtlMs: 5*60*1000}),
+    apiGet('listContractors', null, {cacheTtlMs: 5*60*1000}),
+    apiGet('listRequesters', null, {cacheTtlMs: 5*60*1000})
   ]).then(([m,p,c,r])=>{
     MATERIALS=Array.isArray(m)?m:[]; PROJECTS=Array.isArray(p)?p:[]; CONTRACTORS=Array.isArray(c)?c:[]; REQUESTERS=Array.isArray(r)?r:[];
-  });
+  }).catch(()=>{ /* ignore */ });
 }
 
 function renderPickerList(query){
@@ -199,21 +237,19 @@ pickerCancel && pickerCancel.addEventListener('click', closePicker);
 pickerOverlay && pickerOverlay.addEventListener('click', e=>{ if(e.target===pickerOverlay) closePicker(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && pickerOverlay.classList.contains('open')) closePicker(); });
 
-pickerAdd && pickerAdd.addEventListener('click', ()=>{
+pickerAdd && pickerAdd.addEventListener('click', async ()=>{
   const text = pickerSearch.value.trim();
   if (!text) return;
   if (currentSourceKey === 'contractors'){
-    apiGet('addContractor', {payload:{name:text}}).then(ok=>{
-      if (ok){ CONTRACTORS = Array.from(new Set([text, ...CONTRACTORS])); toast('Added contractor'); }
-      if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
-      closePicker();
-    });
+    const ok = await apiGet('addContractor', {payload:{name:text}});
+    if (ok){ CONTRACTORS = Array.from(new Set([text, ...CONTRACTORS])); toast('Added contractor'); }
+    if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
+    closePicker();
   } else if (currentSourceKey === 'requesters'){
-    apiGet('addRequester', {payload:{name:text}}).then(ok=>{
-      if (ok){ REQUESTERS = Array.from(new Set([text, ...REQUESTERS])); toast('Added requester'); }
-      if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
-      closePicker();
-    });
+    const ok = await apiGet('addRequester', {payload:{name:text}});
+    if (ok){ REQUESTERS = Array.from(new Set([text, ...REQUESTERS])); toast('Added requester'); }
+    if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event('change')); }
+    closePicker();
   } else {
     toast('Use master sheet to add new entries');
     closePicker();

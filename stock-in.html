@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Stock In · Stock Inventory</title>
+  <link rel="stylesheet" href="assets/css/base.css"/>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div data-include="partials/nav.html"></div>
+    </aside>
+    <main class="main">
+      <div class="container">
+
+<div class="card">
+  <h2>Stock In</h2>
+  <p class="muted">Record materials arriving at the warehouse.</p>
+  <form id="stockin-form" class="grid">
+    <div class="col-6"><label>Item Name<input class="input" name="item" required/></label></div>
+    <div class="col-3"><label>Code<input class="input" name="code"/></label></div>
+    <div class="col-3"><label>Quantity<input class="input" name="qty" type="number" min="0" step="1"/></label></div>
+    <div class="col-6"><label>Project<input class="input" name="project"/></label></div>
+    <div class="col-6"><label>Requester<input class="input" name="requester"/></label></div>
+    <div class="col-12"><button class="btn primary" type="submit">Submit In</button></div>
+  </form>
+</div>
+<div class="card" style="margin-top:16px">
+  <h2>Recent “In” Records</h2>
+  <div id="in-section">
+    <div class="loader" data-loader hidden><div class="spinner"></div><span>Loading records…</span></div>
+    <table class="table" id="in-table">
+      <thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Project</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+<script type="module">
+  import {{ withLoader }} from './assets/js/main.js';
+  const section = document.getElementById('in-section');
+  const delay = ms => new Promise(r=>setTimeout(r, ms));
+  withLoader(section, async () => {{ await delay(500); document.querySelector('#in-table tbody').innerHTML = '<tr><td>—</td><td>—</td><td>—</td><td>—</td></tr>'; }});
+  document.getElementById('stockin-form').addEventListener('submit', async (e)=>{{
+    e.preventDefault();
+    await withLoader(section, async ()=> {{ await delay(700); /* TODO: POST to Apps Script */ }});
+    e.target.reset();
+  }});
+</script>
+
+      </div>
+    </main>
+  </div>
+  <div data-include="partials/footer.html"></div>
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>

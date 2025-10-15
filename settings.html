@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Settings · Stock Inventory</title>
+  <link rel="stylesheet" href="assets/css/base.css"/>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div data-include="partials/nav.html"></div>
+    </aside>
+    <main class="main">
+      <div class="container">
+
+<div class="card">
+  <h2>Settings</h2>
+  <p class="muted">Configure integrations and preferences.</p>
+  <div class="grid">
+    <div class="col-6">
+      <label>Google Sheet ID<input class="input" id="gsheet-id" placeholder="1oEvZBX6-..."/></label>
+    </div>
+    <div class="col-6">
+      <label>Apps Script Web App URL<input class="input" id="script-url" placeholder="https://script.google.com/macros/s/.../exec"/></label>
+    </div>
+    <div class="col-12"><button class="btn primary" id="save-settings">Save</button></div>
+  </div>
+  <hr/>
+  <div class="badge">These settings are saved in localStorage</div>
+</div>
+<script type="module">
+  // Minimal localStorage config
+  const $ = sel => document.querySelector(sel);
+  const KEY = "stockapp:cfg";
+  const load = () => JSON.parse(localStorage.getItem(KEY) || "{{}}");
+  const save = (cfg) => localStorage.setItem(KEY, JSON.stringify(cfg));
+  const cfg = load();
+  if(cfg.gsheetId) $('#gsheet-id').value = cfg.gsheetId;
+  if(cfg.scriptUrl) $('#script-url').value = cfg.scriptUrl;
+  $('#save-settings').addEventListener('click', ()=>{{
+    save({{ gsheetId: $('#gsheet-id').value.trim(), scriptUrl: $('#script-url').value.trim() }});
+    alert('Saved.');
+  }});
+</script>
+
+      </div>
+    </main>
+  </div>
+  <div data-include="partials/footer.html"></div>
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>

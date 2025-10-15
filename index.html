@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Dashboard · Stock Inventory</title>
+  <link rel="stylesheet" href="assets/css/base.css"/>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div data-include="partials/nav.html"></div>
+    </aside>
+    <main class="main">
+      <div class="container">
+
+<div class="grid">
+  <div class="col-8">
+    <div class="card">
+      <h2>Dashboard</h2>
+      <p class="muted">Overview of inventory and recent activity.</p>
+      <div id="overview" class="grid">
+        <div class="col-4"><div class="card"><strong>Items</strong><div class="badge" id="stat-items">—</div></div></div>
+        <div class="col-4"><div class="card"><strong>Stock In (30d)</strong><div class="badge" id="stat-in">—</div></div></div>
+        <div class="col-4"><div class="card"><strong>Stock Out (30d)</strong><div class="badge" id="stat-out">—</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card">
+      <h2>Recent Activity</h2>
+      <div id="activity-section">
+        <div class="loader" data-loader hidden><div class="spinner"></div><span>Loading activity…</span></div>
+        <ul id="activity-list"></ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card">
+      <h2>Low Stock</h2>
+      <div id="lowstock-section">
+        <div class="loader" data-loader hidden><div class="spinner"></div><span>Loading low stock…</span></div>
+        <table class="table" id="lowstock-table">
+          <thead><tr><th>Item</th><th>Code</th><th>Qty</th><th>Min</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import {{ withLoader }} from './assets/js/main.js';
+  const activitySection = document.getElementById('activity-section');
+  const lowStockSection = document.getElementById('lowstock-section');
+  // Demo data fetchers—replace with Google Apps Script endpoints later
+  const delay = ms => new Promise(r=>setTimeout(r, ms));
+  withLoader(activitySection, async () => { await delay(600); document.getElementById('activity-list').innerHTML = '<li>No activity yet.</li>'; });
+  withLoader(lowStockSection, async () => { await delay(800); document.querySelector('#lowstock-table tbody').innerHTML = '<tr><td>—</td><td>—</td><td>—</td><td>—</td></tr>'; });
+</script>
+
+      </div>
+    </main>
+  </div>
+  <div data-include="partials/footer.html"></div>
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>

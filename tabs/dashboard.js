@@ -1,4 +1,4 @@
-import { $, STR, clampList, toggleClamp, setCardLoading, apiGet, stockBadge, esc } from '../js/shared.js';
+import { $, STR, clampList, toggleClamp, setCardLoading, apiGet, stockBadge, esc, toast } from '../js/shared.js';
 
 export default async function mount({ root, lang }){
   const S = STR[lang];
@@ -48,12 +48,12 @@ export default async function mount({ root, lang }){
     </section>
   `;
 
-  // Wire "show more/less"
+  // Wire show more/less
   root.querySelectorAll('.toggle button').forEach(btn=>{
     btn.onclick = ()=> toggleClamp(btn, lang);
   });
 
-  // Load cards with skeletons
+  // Skeletons first (visible even if API fails)
   setCardLoading($('#card-low'), 4);
   setCardLoading($('#card-topcontract'), 4);
   setCardLoading($('#card-topitems'), 4);
@@ -61,12 +61,27 @@ export default async function mount({ root, lang }){
   setCardLoading($('#card-pursum'), 3);
   setCardLoading($('#card-purhist'), 6);
 
-  // Low stock
-  apiGet('dash_LowStock').then(list=>{
+  // Helper: safe fill (never leaves skeleton forever)
+  function safeFill(selector, filler, emptyStateHtml){
+    const el = $(selector);
+    return async (fetcher)=>{
+      try{
+        const data = await fetcher();
+        filler(data || []);
+      }catch(e){
+        el.querySelector('.list')?.replaceChildren();
+        if (emptyStateHtml) el.querySelector('.list')?.insertAdjacentHTML('beforeend', emptyStateHtml);
+        console.error('dashboard fill error', selector, e);
+      }
+    };
+  }
+
+  // Low stock (cache 30s)
+  await safeFill('#card-low', (list)=>{
     const box = $('#lowStockList'); box.innerHTML='';
-    if (!list || !list.length){ 
-      box.innerHTML = `<div class="rowitem"><span>${STR[lang].noLow}</span></div>`; 
-      return clampList(box); 
+    if (!list.length){ 
+      box.innerHTML = `<div class="rowitem"><span>${STR[lang].noLow}</span></div>`;
+      return clampList(box);
     }
     list.forEach(x=>{
       const row=document.createElement('div'); row.className='rowitem';
@@ -79,10 +94,10 @@ export default async function mount({ root, lang }){
       box.appendChild(row);
     });
     clampList(box);
-  });
+  })(()=> apiGet('dash_LowStock', null, {cacheTtlMs: 30*1000}));
 
   // Top contractors
-  apiGet('dash_TopContractors').then(list=>{
+  await safeFill('#card-topcontract', (list)=>{
     const box = $('#topContractors'); box.innerHTML='';
     (list||[]).forEach(x=>{
       const row=document.createElement('div'); row.className='rowitem';
@@ -90,10 +105,10 @@ export default async function mount({ root, lang }){
       box.appendChild(row);
     });
     clampList(box);
-  });
+  })(()=> apiGet('dash_TopContractors', null, {cacheTtlMs: 30*1000}));
 
   // Top items
-  apiGet('dash_TopItems').then(list=>{
+  await safeFill('#card-topitems', (list)=>{
     const box = $('#topItems'); box.innerHTML='';
     (list||[]).forEach(x=>{
       const row=document.createElement('div'); row.className='rowitem';
@@ -101,10 +116,10 @@ export default async function mount({ root, lang }){
       box.appendChild(row);
     });
     clampList(box);
-  });
+  })(()=> apiGet('dash_TopItems', null, {cacheTtlMs: 30*1000}));
 
   // Recent moves
-  apiGet('dash_Recent').then(rows=>{
+  await safeFill('#card-recent', (rows)=>{
     const box = $('#recentMoves'); box.innerHTML='';
     (rows||[]).forEach(x=>{
       const row=document.createElement('div'); row.className='rowitem';
@@ -112,28 +127,29 @@ export default async function mount({ root, lang }){
       box.appendChild(row);
     });
     clampList(box);
-  });
+  })(()=> apiGet('dash_Recent', null, {cacheTtlMs: 20*1000}));
 
   // Purchasing summary + history
-  apiGet('pur_Summary').then(s=>{
+  try{
+    const s = await apiGet('pur_Summary', null, {cacheTtlMs: 20*1000});
     $('#kpiReq').textContent = (s && s.requests) ? s.requests : 0;
     $('#kpiLines').textContent = (s && s.lines) ? s.lines : 0;
     $('#kpiUrgent').textContent = (s && s.urgent) ? s.urgent : 0;
-  }).finally(()=>{
-    apiGet('pur_History').then(rows=>{
-      const sum = $('#purSummaryDetail'); sum.innerHTML='';
-      (rows||[]).slice(0,5).forEach(x=>{
-        const row=document.createElement('div'); row.className='rowitem';
-        row.innerHTML = `<div><strong>${esc(x.docNo)} • ${esc(x.project||'-')}</strong>
-          <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
-          <div class="meta">🗓 ${esc(x.ts)} → 📆 ${esc(x.needBy||'-')}</div></div>`;
-        sum.appendChild(row);
-      });
-      clampList(sum);
-    });
-  });
+  }catch(e){ /* keep zeros */ }
 
-  apiGet('pur_History').then(rows=>{
+  await safeFill('#card-pursum', (rows)=>{
+    const sum = $('#purSummaryDetail'); sum.innerHTML='';
+    (rows||[]).slice(0,5).forEach(x=>{
+      const row=document.createElement('div'); row.className='rowitem';
+      row.innerHTML = `<div><strong>${esc(x.docNo)} • ${esc(x.project||'-')}</strong>
+        <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
+        <div class="meta">🗓 ${esc(x.ts)} → 📆 ${esc(x.needBy||'-')}</div></div>`;
+      sum.appendChild(row);
+    });
+    clampList(sum);
+  })(()=> apiGet('pur_History', null, {cacheTtlMs: 20*1000}));
+
+  await safeFill('#card-purhist', (rows)=>{
     const box = $('#purHistory'); box.innerHTML='';
     (rows||[]).forEach(x=>{
       const row=document.createElement('div'); row.className='rowitem';
@@ -143,5 +159,5 @@ export default async function mount({ root, lang }){
       box.appendChild(row);
     });
     clampList(box);
-  });
+  })(()=> apiGet('pur_History', null, {cacheTtlMs: 20*1000}));
 }

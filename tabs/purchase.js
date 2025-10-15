@@ -1,4 +1,4 @@
-import { $, $$, STR, bindPickerInputs, openPicker, apiGet, apiPost, setBtnLoading, clampList, esc, toast } from '../js/shared.js';
+import { $, $$, STR, bindPickerInputs, openPicker, apiGet, apiPost, setBtnLoading, clampList, esc, toast, todayStr } from '../js/shared.js';
 
 function setSubmitState(btn, count, lang){
   const lbl = (lang==='th' ? STR.th.save : STR.en.save);
@@ -92,8 +92,7 @@ export default async function mount({ root, lang }){
   function hardReset(){
     lines.innerHTML=''; addLine();
     $('#PurNote').value=''; $('#PurContractor').value='';
-    const d=new Date().toISOString().split('T')[0];
-    $('#PurNeedBy').value=d;
+    $('#PurNeedBy').value=todayStr();
     updateSubmit();
   }
 
@@ -132,11 +131,14 @@ export default async function mount({ root, lang }){
     return out;
   }
 
-  function loadOlder(){
+  async function loadOlder(){
     const holder = $('#purOlderList', root);
-    holder.innerHTML=''; for(let i=0;i<5;i++){ const r=document.createElement('div'); r.className='skeleton-row'; holder.appendChild(r);}
-    apiGet('pur_History').then(rows=>{
-      const box=$('#purOlderList', root); box.innerHTML='';
+    holder.innerHTML='';
+    for(let i=0;i<5;i++){ const r=document.createElement('div'); r.className='skeleton-row'; holder.appendChild(r); }
+
+    try{
+      const rows = await apiGet('pur_History', null, {cacheTtlMs: 20*1000});
+      holder.innerHTML='';
       (rows||[]).forEach(x=>{
         const acc=document.createElement('div'); acc.className='rowitem';
         acc.style.flexDirection='column'; acc.style.alignItems='stretch';
@@ -150,12 +152,14 @@ export default async function mount({ root, lang }){
           <div class="meta">${lang==='th'?'ต้องการภายใน':'NeedBy'} ${esc(x.needBy||'-')} • ${lang==='th'?'สถานะ':'Status'}: <strong>${esc(x.status||'-')}</strong></div>
           <div id="doc-${esc(x.docNo)}">${lang==='th'?'กำลังโหลด…':'Loading…'}</div>
         `;
-        head.addEventListener('click', ()=>{
-          const open = !body.classList.contains('hidden');
-          if (open){ body.classList.add('hidden'); return; }
-          const holder = body.querySelector('#doc-'+CSS.escape(x.docNo));
-          holder.innerHTML = ''; for(let i=0;i<3;i++){ const sk=document.createElement('div'); sk.className='skeleton-bar'; sk.style.height='14px'; sk.style.margin='8px 0'; holder.appendChild(sk); }
-          apiGet('pur_DocLines', {payload:{docNo:x.docNo}}).then(lines=>{
+        head.addEventListener('click', async ()=>{
+          const isOpen = !body.classList.contains('hidden');
+          if (isOpen){ body.classList.add('hidden'); return; }
+          const holderEl = body.querySelector(`#doc-${CSS.escape(x.docNo)}`);
+          holderEl.innerHTML = ''; 
+          for(let i=0;i<3;i++){ const sk=document.createElement('div'); sk.className='skeleton-bar'; sk.style.height='14px'; sk.style.margin='8px 0'; holderEl.appendChild(sk); }
+          try{
+            const lines = await apiGet('pur_DocLines', {payload:{docNo:x.docNo}}, {cacheTtlMs: 10*1000});
             const tbl = document.createElement('table'); tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
             tbl.innerHTML='<thead><tr><th style="text-align:left;padding:.25rem 0;">รายการ</th><th style="text-align:left;padding:.25rem 0;">จำนวน</th></tr></thead>';
             const tb=document.createElement('tbody');
@@ -165,17 +169,36 @@ export default async function mount({ root, lang }){
               tb.appendChild(tr);
             });
             tbl.appendChild(tb);
-            holder.replaceWith(tbl);
-          });
+            holderEl.replaceWith(tbl);
+          }catch(e){
+            holderEl.innerHTML = `<div class="meta" style="color:#b91c1c">${lang==='th'?'โหลดไม่สำเร็จ':'Failed to load'}</div>`;
+          }
           body.classList.remove('hidden');
         });
         acc.appendChild(head); acc.appendChild(body);
-        box.appendChild(acc);
+        holder.appendChild(acc);
       });
-      clampList(box);
-      const tbtn = root.querySelector('.toggle button[data-toggle="#purOlderList"]');
-      if (tbtn) tbtn.onclick = ()=> clampList(box) || null; // simple reset on click
-    });
+      clampList(holder);
+    }catch(e){
+      holder.innerHTML = `<div class="rowitem"><div class="meta" style="color:#b91c1c">${lang==='th'?'ไม่สามารถโหลดข้อมูลได้':'Unable to load data'}</div></div>`;
+    }
+
+    // Proper toggle
+    const tbtn = root.querySelector('.toggle button[data-toggle="#purOlderList"]');
+    if (tbtn){
+      tbtn.onclick = ()=>{
+        const expanded = holder.dataset.expanded === 'true';
+        if (expanded){
+          clampList(holder);
+          holder.dataset.expanded = 'false';
+          tbtn.textContent = STR[lang].showMore;
+        } else {
+          Array.from(holder.children).forEach(el=> el.style.display='');
+          holder.dataset.expanded = 'true';
+          tbtn.textContent = STR[lang].showLess;
+        }
+      };
+    }
   }
 
   // Bind pickers

@@ -1,12 +1,13 @@
 // tabs/dashboard.js
-// Responsive dashboard with two-column+ layout, skeletons, and reliable data loading.
+// Per-card skeletons that are cleared immediately after each section loads
+// to avoid duplicate/lingering loading animations.
 
 import { $, esc, apiGet, clampList, stockBadge, STR } from '../js/shared.js';
 
-function card(titleHtml, bodyHtml = '') {
+function card(titleHtml) {
   const s = document.createElement('section');
   s.className = 'card glass';
-  s.innerHTML = `<h3>${titleHtml}</h3>${bodyHtml}`;
+  s.innerHTML = `<h3>${titleHtml}</h3>`;
   return s;
 }
 function skeletonList(count = 5) {
@@ -23,45 +24,58 @@ function skeletonList(count = 5) {
   }
   return c;
 }
-function listBox(id, limit=5){ const box=document.createElement('div'); box.className='list'; box.id=id; box.dataset.limit=String(limit); return box; }
+function listBox(id, limit=5){
+  const box=document.createElement('div'); box.className='list'; box.id=id; box.dataset.limit=String(limit); return box;
+}
+function toggleRow(selector, S){
+  const wrap = document.createElement('div');
+  wrap.className = 'toggle';
+  const b = document.createElement('button');
+  b.type='button';
+  b.setAttribute('data-toggle', selector);
+  b.textContent = S.showMore;
+  wrap.appendChild(b);
+  return wrap;
+}
+function safeEmpty(box, lang){
+  box.innerHTML = `<div class="rowitem"><div class="meta">${lang==='th'?'ไม่มีข้อมูล':'No data'}</div></div>`;
+  clampList(box);
+}
 
 export default async function mount({ root, lang }){
   const S = STR[lang];
-
   root.innerHTML = '';
+
   const grid = document.createElement('div');
   grid.className = 'dashboard-grid';
 
-  // Low stock
-  const lowStockCard = card(S.dashLow, '');
-  const lowStockList = listBox('lowStockList', 5);
-  lowStockCard.appendChild(lowStockList);
-  lowStockCard.appendChild(toggleRow('#lowStockList', S));
-  lowStockCard.appendChild(skeletonList(5));
+  // Build cards + content + per-card skeleton refs
+  const sections = [
+    { key:'low',  title:S.dashLow,          listId:'lowStockList',     fetch:() => apiGet('dash_LowStock', {}, { cacheTtlMs: 30_000 }), fill:fillLowStock },
+    { key:'cons', title:S.dashTopContract,  listId:'topContractors',   fetch:() => apiGet('dash_TopContractors', {}, { cacheTtlMs: 30_000 }), fill:fillTopContractors },
+    { key:'items',title:S.dashTopItems,     listId:'topItems',         fetch:() => apiGet('dash_TopItems', {}, { cacheTtlMs: 30_000 }), fill:fillTopItems },
+    { key:'recent',title:S.dashRecent,      listId:'recentMoves',      fetch:() => apiGet('dash_Recent', {}, { cacheTtlMs: 20_000 }), fill:fillRecent },
+  ];
 
-  // Top contractors
-  const topConCard = card(S.dashTopContract, '');
-  const topConList = listBox('topContractors', 5);
-  topConCard.appendChild(topConList);
-  topConCard.appendChild(toggleRow('#topContractors', S));
-  topConCard.appendChild(skeletonList(5));
+  const nodes = {};
 
-  // Top items
-  const topItemsCard = card(S.dashTopItems, '');
-  const topItemsList = listBox('topItems', 5);
-  topItemsCard.appendChild(topItemsList);
-  topItemsCard.appendChild(toggleRow('#topItems', S));
-  topItemsCard.appendChild(skeletonList(5));
+  for (const sec of sections){
+    const c = card(sec.title);
+    const list = listBox(sec.listId, 5);
+    const togg = toggleRow(`#${sec.listId}`, S);
+    const skel = skeletonList(5);
 
-  // Recent
-  const recentCard = card(S.dashRecent, '');
-  const recentList = listBox('recentMoves', 5);
-  recentCard.appendChild(recentList);
-  recentCard.appendChild(toggleRow('#recentMoves', S));
-  recentCard.appendChild(skeletonList(5));
+    c.appendChild(list);
+    c.appendChild(togg);
+    c.appendChild(skel);
 
-  // Purchase summary KPIs + history
-  const purSummary = card(S.purTitle, `
+    nodes[sec.key] = { card: c, list, skel };
+    grid.appendChild(c);
+  }
+
+  // Purchase summary KPIs
+  const purSummary = card(S.purTitle);
+  purSummary.insertAdjacentHTML('beforeend', `
     <div class="kpis" style="display:flex;gap:.5rem;flex-wrap:wrap">
       <div class="kpi glass" style="flex:1 1 9rem;padding:.8rem;border-radius:.9rem;border:1px solid rgba(0,0,0,.08);background:#fff;box-shadow:var(--shadow-s)"><div class="v" id="kpiReq">0</div><div>${lang==='th'?'คำขอ':'Requests'}</div></div>
       <div class="kpi glass" style="flex:1 1 9rem;padding:.8rem;border-radius:.9rem;border:1px solid rgba(0,0,0,.08);background:#fff;box-shadow:var(--shadow-s)"><div class="v" id="kpiLines">0</div><div>${lang==='th'?'รายการ':'Lines'}</div></div>
@@ -69,54 +83,60 @@ export default async function mount({ root, lang }){
     </div>
   `);
   const purDetail = listBox('purSummaryDetail', 5);
+  const purTogg = toggleRow('#purSummaryDetail', S);
+  const purSkel = skeletonList(5);
   purSummary.appendChild(purDetail);
-  purSummary.appendChild(toggleRow('#purSummaryDetail', S));
-  purSummary.appendChild(skeletonList(5));
+  purSummary.appendChild(purTogg);
+  purSummary.appendChild(purSkel);
 
-  const purHistory = card(lang==='th'?'ประวัติการขอจัดซื้อ':'Purchase History', '');
+  // Purchase history
+  const purHistory = card(lang==='th'?'ประวัติการขอจัดซื้อ':'Purchase History');
   const purHistList = listBox('purHistory', 5);
+  const purHistTogg = toggleRow('#purHistory', S);
+  const purHistSkel = skeletonList(5);
   purHistory.appendChild(purHistList);
-  purHistory.appendChild(toggleRow('#purHistory', S));
-  purHistory.appendChild(skeletonList(5));
+  purHistory.appendChild(purHistTogg);
+  purHistory.appendChild(purHistSkel);
 
-  grid.appendChild(lowStockCard);
-  grid.appendChild(topConCard);
-  grid.appendChild(topItemsCard);
-  grid.appendChild(recentCard);
   grid.appendChild(purSummary);
   grid.appendChild(purHistory);
   root.appendChild(grid);
 
-  // Load data
-  try{
-    const low = await apiGet('dash_LowStock', {}, { cacheTtlMs: 30*1000 });
-    fillLowStock(low, lowStockList, S, lang);
-  }catch{ safeEmpty(lowStockList, lang); }
-  try{
-    const cons = await apiGet('dash_TopContractors', {}, { cacheTtlMs: 30*1000 });
-    fillTopContractors(cons, topConList, lang);
-  }catch{ safeEmpty(topConList, lang); }
-  try{
-    const items = await apiGet('dash_TopItems', {}, { cacheTtlMs: 30*1000 });
-    fillTopItems(items, topItemsList);
-  }catch{ safeEmpty(topItemsList, lang); }
-  try{
-    const rows = await apiGet('dash_Recent', {}, { cacheTtlMs: 20*1000 });
-    fillRecent(rows, recentList);
-  }catch{ safeEmpty(recentList, lang); }
-  try{
-    const s = await apiGet('pur_Summary', {}, { cacheTtlMs: 15*1000 });
-    $('#kpiReq').textContent = (s && s.requests) ? s.requests : 0;
-    $('#kpiLines').textContent = (s && s.lines) ? s.lines : 0;
-    $('#kpiUrgent').textContent = (s && s.urgent) ? s.urgent : 0;
-  }catch{}
-  try{
-    const hist = await apiGet('pur_History', {}, { cacheTtlMs: 20*1000 });
-    fillPurHistory(hist, purHistList, lang);
-  }catch{ safeEmpty(purHistList, lang); }
+  // Load each section and remove only THAT section's skeleton
+  const run = async (sec, fillFn) => {
+    const ref = nodes[sec];
+    if (!ref) return;
+    try{
+      const data = await sections.find(s=>s.key===sec).fetch();
+      fillFn(data, ref.list, S, lang);
+    }catch{
+      safeEmpty(ref.list, lang);
+    }finally{
+      ref.skel.remove(); // clear that card's skeleton
+    }
+  };
 
-  // remove skeletons
-  root.querySelectorAll('.skeleton-row').forEach(n => n.remove());
+  await Promise.all([
+    run('low', fillLowStock),
+    run('cons', fillTopContractors),
+    run('items', fillTopItems),
+    run('recent', fillRecent),
+    (async ()=>{
+      try{
+        const s = await apiGet('pur_Summary', {}, { cacheTtlMs: 15_000 });
+        $('#kpiReq').textContent = (s && s.requests) ? s.requests : 0;
+        $('#kpiLines').textContent = (s && s.lines) ? s.lines : 0;
+        $('#kpiUrgent').textContent = (s && s.urgent) ? s.urgent : 0;
+      }catch{} finally { purSkel.remove(); }
+    })(),
+    (async ()=>{
+      try{
+        const hist = await apiGet('pur_History', {}, { cacheTtlMs: 20_000 });
+        fillPurHistory(hist, purHistList, lang);
+      }catch{ safeEmpty(purHistList, lang); }
+      finally { purHistSkel.remove(); }
+    })()
+  ]);
 
   // Clamp controls
   root.querySelectorAll('.toggle button').forEach(btn=>{
@@ -132,22 +152,6 @@ export default async function mount({ root, lang }){
       btn.textContent = expanded ? S.showMore : S.showLess;
     });
   });
-}
-
-function toggleRow(selector, S){
-  const wrap = document.createElement('div');
-  wrap.className = 'toggle';
-  const b = document.createElement('button');
-  b.type='button';
-  b.setAttribute('data-toggle', selector);
-  b.textContent = S.showMore;
-  wrap.appendChild(b);
-  return wrap;
-}
-
-function safeEmpty(box, lang){
-  box.innerHTML = `<div class="rowitem"><div class="meta">${lang==='th'?'ไม่มีข้อมูล':'No data'}</div></div>`;
-  clampList(box);
 }
 
 function fillLowStock(list, box, S, lang){
@@ -168,7 +172,6 @@ function fillLowStock(list, box, S, lang){
   });
   clampList(box);
 }
-
 function fillTopContractors(list, box, lang){
   box.innerHTML = '';
   (list||[]).forEach(x=>{

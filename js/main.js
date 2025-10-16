@@ -1,58 +1,92 @@
-import { $, $$, STR, applyLangTexts, preloadLookups, todayStr, toast } from './shared.js';
+// js/main.js
+// Mount tabs only after lookups are preloaded. Adds cache cleanup and manual refresh.
 
-let LANG = 'th';
-const view = $('#view');
+import {
+  $, $$, STR, applyLangTexts, preloadLookups, bindPickerInputs,
+  toast, currentLang, cleanOldCache
+} from './shared.js';
 
-function setActiveTab(key){
-  $$('.tabs button').forEach(b=> b.classList.toggle('active', b.dataset.tab===key));
+// Lazy import tab modules
+const TAB_MODULES = {
+  dashboard: () => import('../tabs/dashboard.js'),
+  out:       () => import('../tabs/out.js'),
+  in:        () => import('../tabs/in.js'),
+  adjust:    () => import('../tabs/adjust.js'),
+  purchase:  () => import('../tabs/purchase.js'),
+};
+
+let LANG = currentLang();
+let currentTab = 'dashboard';
+
+async function mountTab(tabKey) {
+  const loader = TAB_MODULES[tabKey];
+  if (!loader) return;
+  const mod = await loader();
+  const root = $('#view');
+  await mod.default({ root, lang: LANG });
+  bindPickerInputs(root, LANG);
 }
 
-async function mountTab(key){
-  setActiveTab(key);
-  // Clear current view
-  view.innerHTML = '';
-  // Dynamically import and mount
-  const moduleMap = {
-    dashboard: () => import('../tabs/dashboard.js'),
-    out:       () => import('../tabs/out.js'),
-    in:        () => import('../tabs/in.js'),
-    adjust:    () => import('../tabs/adjust.js'),
-    purchase:  () => import('../tabs/purchase.js'),
-  };
-  const load = moduleMap[key];
-  if (!load) return;
+async function init() {
+  // 0) Clean stale cache first (keeps fresh, drops old)
+  cleanOldCache();
 
-  const mod = await load();
-  await mod.default({ root: view, lang: LANG });
-}
+  // Language toggle
+  $('#lang-en')?.addEventListener('click', () => { LANG = 'en'; document.documentElement.lang = 'en'; onLangChange(); });
+  $('#lang-th')?.addEventListener('click', () => { LANG = 'th'; document.documentElement.lang = 'th'; onLangChange(); });
 
-// Language switching
-function applyLang(){
+  // Tabs
+  $$('.tabs button').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const key = btn.getAttribute('data-tab');
+      if (!key) return;
+      $$('.tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTab = key;
+      await mountTab(currentTab);
+    });
+  });
+
+  // 1) Preload lookups BEFORE first mount
+  try {
+    await preloadLookups();
+  } catch {
+    toast(LANG === 'th' ? 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ กำลังใช้ข้อมูลเก่า' : 'Failed to load lookups; using cached data');
+  }
+
+  // 2) Apply language and bind pickers
   applyLangTexts(LANG);
-  // Re-mount current tab to refresh inner texts
-  const active = document.querySelector('.tabs button.active')?.dataset.tab || 'dashboard';
-  mountTab(active);
+  bindPickerInputs(document, LANG);
+
+  // 3) Manual refresh button (if present)
+  $('#refreshDataBtn')?.addEventListener('click', async ()=>{
+    try {
+      // remove only our cached keys
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('cache:')) keys.push(k);
+      }
+      keys.forEach(k => localStorage.removeItem(k));
+
+      await preloadLookups();
+      toast(LANG==='th' ? 'รีเฟรชข้อมูลแล้ว' : 'Data refreshed');
+
+      // re-mount current tab so UI picks up fresh lists
+      await mountTab(currentTab);
+    } catch {
+      toast(LANG==='th' ? 'รีเฟรชไม่สำเร็จ' : 'Refresh failed');
+    }
+  });
+
+  // 4) Mount default tab
+  await mountTab(currentTab);
 }
 
-// Tabs events
-$('#tabs').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-tab]');
-  if(!btn) return;
-  mountTab(btn.dataset.tab);
-});
+function onLangChange() {
+  applyLangTexts(LANG);
+  bindPickerInputs(document, LANG);
+  mountTab(currentTab);
+}
 
-$('#lang-en').addEventListener('click', ()=>{ LANG='en'; $('#lang-en').classList.add('active'); $('#lang-th').classList.remove('active'); applyLang(); });
-$('#lang-th').addEventListener('click', ()=>{ LANG='th'; $('#lang-th').classList.add('active'); $('#lang-en').classList.remove('active'); applyLang(); });
-
-// Boot
-document.addEventListener('DOMContentLoaded', async ()=>{
-  try { await preloadLookups(); } catch(e){ toast('Lookup preload failed'); }
-  // Defaults for some date fields that may exist later
-  // Just set when tab mounts.
-  await mountTab('dashboard');
-});
-
-// Expose for tabs that need base texts
-export function getLang(){ return LANG; }
-export function getStrings(){ return STR[LANG]; }
-export function getToday(){ return todayStr(); }
+document.addEventListener('DOMContentLoaded', init);

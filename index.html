@@ -60,11 +60,8 @@
       background-blend-mode: screen;
     }
 
-    header{ display:flex; align-items:flex-end; gap:var(--space-2) }
-    header h1{ margin:0; font-size:var(--fs-lg); font-weight:900; letter-spacing:.2px }
-    .subtle{ color:#5a6573; font-size:var(--fs-xs) }
+    header{ display:flex; align-items:center; gap:var(--space-2) }
     .spacer{ flex:1 }
-
     .lang{ display:flex; gap:.5rem; align-items:center }
     .lang button{
       padding:.5rem 1rem; border-radius:var(--radius-pill); border:1px solid rgba(0,0,0,.08);
@@ -99,6 +96,7 @@
     .card{ padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
     .card h3{ margin:0; font-size:var(--fs-md); font-weight:900; letter-spacing:.2px }
 
+    /* Dashboard grid */
     .dashboard-grid{ display:grid; gap:1rem; grid-template-columns: 1fr; }
     @media (min-width: 48rem){ .dashboard-grid{ grid-template-columns: 1fr 1fr; } }
     @media (min-width: 75rem){ .dashboard-grid{ grid-template-columns: 2fr 1fr 1fr; } .span-2{ grid-column: span 2; } }
@@ -118,14 +116,7 @@
       border-color:#0a84ff; box-shadow: var(--input-shadow-focus), 0 0 0 .25rem var(--accent-weak);
       transform: translateY(-0.5px);
     }
-
-    /* date input width fix */
-    input[type="date"]{
-      -webkit-appearance: none; appearance: none;
-      min-width: 12.5rem;
-      max-width: 100%;
-      background-color:#fff;
-    }
+    input[type="date"]{ -webkit-appearance: none; appearance: none; min-width: 12.5rem; max-width: 100%; background-color:#fff; }
 
     .lines{ display:flex; flex-direction:column; gap:.75rem }
     .line{ display:flex; flex-direction:column; gap:.65rem; padding:.85rem; border:1px dashed var(--border-weak); border-radius:14px; background:#fff; box-shadow: var(--shadow-s); }
@@ -173,21 +164,31 @@
     @keyframes pulse { 0% { opacity:.7; } 50% { opacity:1; } 100% { opacity:.7; } }
     @media (prefers-reduced-motion: reduce){ .spinner, .skeleton-row{ animation: none } }
 
-    .toolbar{
-      position: fixed; left: 50%;
-      bottom: calc(env(safe-area-inset-bottom) + 1rem);
-      transform: translateX(-50%);
-      z-index: 50; margin: 0; padding: .45rem .5rem;
-      display:flex; align-items:center; gap:.45rem; width: max-content; max-width: calc(100% - 1.5rem);
-      background: #fff; backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
-      border: 1px solid var(--border); border-radius: var(--radius-pill);
-      box-shadow: var(--shadow-l), inset 0 0 0 1px rgba(255,255,255,.3);
-      white-space: nowrap; overflow: hidden; pointer-events:auto;
+    /* Speed-Dial FAB (OUT tab) */
+    .fab{
+      position: fixed; right: 1rem; bottom: calc(env(safe-area-inset-bottom) + 1rem);
+      z-index: 60; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem;
     }
-
+    .fab .mini{
+      display:flex; align-items:center; gap:.5rem; transform: translateY(8px); opacity:0; pointer-events:none;
+      transition: transform .18s ease, opacity .18s ease;
+    }
+    .fab.expanded .mini{ transform: translateY(0); opacity:1; pointer-events:auto; }
+    .fab .label{
+      background:#fff; border:1px solid var(--border); border-radius: var(--radius-pill); padding:.45rem .7rem; font-size:var(--fs-xs); font-weight:800; box-shadow: var(--shadow-s);
+    }
+    .fab .mini .btn.small{ box-shadow: var(--shadow-m); }
+    .fab-main{
+      width:56px; height:56px; border-radius: 50%; display:grid; place-items:center;
+      background:linear-gradient(145deg,#0a84ff,#4da3ff); color:#fff; border:none; box-shadow: var(--shadow-l);
+      cursor:pointer;
+    }
+    .fab-main .icon{ font-size: 22px; line-height: 1; transform: rotate(0deg); transition: transform .18s ease }
+    .fab.expanded .fab-main .icon{ transform: rotate(45deg) } /* turns + into × look */
     .toast{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.6rem); transform:translateX(-50%); background:#111; color:#fff; padding:.7rem 1rem; border-radius:var(--radius-pill); display:none; z-index:2500; font-size:var(--fs-sm); box-shadow: var(--shadow-m) }
     .toast.show{ display:block }
 
+    /* Picker overlay */
     #pickerOverlay{ position:fixed; inset:0; z-index:2000; display:none; align-items:center; justify-content:center; background:rgba(15,18,23,0.15); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); pointer-events:none; }
     #pickerOverlay.open{ display:flex; pointer-events:auto; }
     #pickerBox{ background:rgba(255,255,255,.98); border:1px solid var(--border); border-radius:18px; box-shadow: var(--shadow-l); display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; }
@@ -204,15 +205,15 @@
 <body>
 <div class="container">
   <header>
-    <div>
-      <h1 id="t_title">ระบบสต็อกวัสดุ</h1>
-      <div class="subtle" id="t_sub">ระบบเบา เร็ว และใช้ง่าย</div>
-    </div>
+    <!-- Header text removed as requested -->
     <div class="spacer"></div>
     <div class="lang">
       <button id="lang-th" class="active" type="button">ไทย</button>
       <button id="lang-en" type="button">EN</button>
-      <button id="refreshDataBtn" class="btn small" type="button" style="margin-left:.5rem">↻ Refresh Data</button>
+      <button id="refreshDataBtn" class="btn small" type="button" style="margin-left:.5rem">
+        <span class="btn-label">↻ Refresh Data</span>
+        <span class="btn-spinner"><span class="spinner"></span></span>
+      </button>
     </div>
   </header>
 

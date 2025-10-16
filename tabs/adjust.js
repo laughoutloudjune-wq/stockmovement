@@ -1,6 +1,6 @@
 // tabs/adjust.js
-// Stock ADJUST screen with speed-dial FAB (“Add Item” + “Submit Form”)
-// and a small Reset button inside the card.
+// Stock ADJUST screen with speed-dial FAB (“Add Item” + “Submit Form”).
+// Reset button removed.
 
 import {
   $, $$, STR, bindPickerInputs, openPicker,
@@ -40,23 +40,23 @@ export default async function mount({ root, lang }){
     <section class="card glass">
       <h3>${S.adjTitle}</h3>
       <div class="lines" id="adjLines"></div>
-      <div class="row" style="justify-content:flex-end; gap:.6rem">
-        <button class="btn" id="resetBtnAdj" type="button">
-          <span class="btn-label">${S.btnReset}</span>
-          <span class="btn-spinner"><span class="spinner"></span></span>
-        </button>
-      </div>
     </section>
 
     <!-- Speed-Dial FAB -->
     <div class="fab" id="fab">
       <div class="mini" id="fabSubmitWrap" aria-hidden="true">
         <div class="label">${S.btnSubmit}</div>
-        <button class="btn small primary" id="fabSubmitBtn" type="button"><span class="btn-label">✓</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+        <button class="btn small primary" id="fabSubmitBtn" type="button">
+          <span class="btn-label">💾</span>
+          <span class="btn-spinner"><span class="spinner"></span></span>
+        </button>
       </div>
       <div class="mini" id="fabAddWrap" aria-hidden="true">
         <div class="label">${S.btnAdd}</div>
-        <button class="btn small" id="fabAddBtn" type="button"><span class="btn-label">＋</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+        <button class="btn small" id="fabAddBtn" type="button">
+          <span class="btn-label">＋</span>
+          <span class="btn-spinner"><span class="spinner"></span></span>
+        </button>
       </div>
       <button class="fab-main" id="fabMain" aria-expanded="false" aria-controls="fab">
         <span class="icon">＋</span>
@@ -65,23 +65,9 @@ export default async function mount({ root, lang }){
   `;
 
   const lines = $('#adjLines', root);
-  const resetBtn = $('#resetBtnAdj', root);
 
   function addLine(){ lines.appendChild(AdjLine(lang)); bindPickerInputs(root, lang); }
-
-  function hardReset(){
-    lines.innerHTML=''; addLine();
-  }
-
-  // Reset
-  resetBtn.addEventListener('click', async ()=>{
-    try{
-      setBtnLoading(resetBtn, true);
-      hardReset();
-    } finally {
-      setBtnLoading(resetBtn, false);
-    }
-  });
+  function clearForm(){ lines.innerHTML=''; addLine(); }
 
   // FAB
   const fab = $('#fab', root);
@@ -94,7 +80,6 @@ export default async function mount({ root, lang }){
     fabMain.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   }
   fabMain.addEventListener('click', toggleFab);
-
   fabAdd.addEventListener('click', ()=>{ addLine(); });
 
   fabSubmit.addEventListener('click', async ()=>{
@@ -105,11 +90,11 @@ export default async function mount({ root, lang }){
       const res = await apiPost('submitMovementBulk', p);
       if(res && res.ok){
         toast(lang==='th'?'บันทึกแล้ว':'Saved');
-        hardReset();
+        clearForm();
       } else {
         toast((res && res.message) || 'Error');
       }
-    } catch(e){
+    } catch{
       toast(lang==='th'?'เกิดข้อผิดพลาดในการบันทึก':'Failed to submit');
     } finally {
       setBtnLoading(fabSubmit, false);

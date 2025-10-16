@@ -1,7 +1,8 @@
 // tabs/purchase.js
 // Purchasing tab with speed-dial FAB (“Add Item” + “Submit Form”),
-// status badge in history, smooth loading, robust error handling,
-// and auto-refresh of lookups after successful submit.
+// changeable status in history (inside expanded details),
+// no preloaded skeleton inside collapsed items (only show after expand),
+// and auto-refresh of lookups after submit.
 
 import {
   $, $$, STR, bindPickerInputs, openPicker,
@@ -45,6 +46,43 @@ function collectLines(root){
   return out;
 }
 
+function renderStatusEditor(docNo, currentStatus, lang, onSaved){
+  const wrap = document.createElement('div');
+  wrap.style.display='flex'; wrap.style.gap='.5rem'; wrap.style.alignItems='center'; wrap.style.margin='.5rem 0';
+  const label = document.createElement('label');
+  label.style.minWidth='7rem';
+  label.textContent = (lang==='th'?'เปลี่ยนสถานะ':'Change status');
+  const sel = document.createElement('select');
+  sel.innerHTML = `
+    <option value="Requested">Requested</option>
+    <option value="Approved">Approved</option>
+    <option value="Ordered">Ordered</option>
+    <option value="Received">Received</option>
+    <option value="Cancelled">Cancelled</option>
+  `;
+  sel.value = currentStatus || 'Requested';
+  const save = document.createElement('button'); save.className='btn small'; save.type='button';
+  save.innerHTML = `<span class="btn-label">${lang==='th'?'บันทึก':'Save'} </span><span class="btn-spinner"><span class="spinner"></span></span>`;
+  save.addEventListener('click', async ()=>{
+    setBtnLoading(save, true);
+    try{
+      const res = await apiPost('pur_UpdateStatus', {docNo, status: sel.value});
+      if (res && res.ok){
+        toast(lang==='th'?'อัปเดตสถานะแล้ว':'Status updated');
+        onSaved?.(sel.value);
+      } else {
+        toast((res && res.message) || 'Error');
+      }
+    } catch {
+      toast(lang==='th'?'ไม่สามารถอัปเดตสถานะได้':'Failed to update status');
+    } finally {
+      setBtnLoading(save, false);
+    }
+  });
+  wrap.appendChild(label); wrap.appendChild(sel); wrap.appendChild(save);
+  return wrap;
+}
+
 /* ------------ main mount ------------ */
 export default async function mount({ root, lang }){
   const S = STR[lang];
@@ -83,9 +121,6 @@ export default async function mount({ root, lang }){
           <input id="PurNote" placeholder="${lang==='th'?'บันทึกเพิ่มเติม (ถ้ามี)':'Optional note'}" />
         </div>
       </div>
-      <div class="row" style="justify-content:flex-end; gap:.6rem">
-        <button class="btn" id="resetBtnPur" type="button"><span class="btn-label">${S.btnReset}</span><span class="btn-spinner"><span class="spinner"></span></span></button>
-      </div>
     </section>
 
     <section class="card glass" style="margin-top:.25rem">
@@ -98,11 +133,17 @@ export default async function mount({ root, lang }){
     <div class="fab" id="fab">
       <div class="mini" id="fabSubmitWrap" aria-hidden="true">
         <div class="label">${S.btnSubmit}</div>
-        <button class="btn small primary" id="fabSubmitBtn" type="button"><span class="btn-label">✓</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+        <button class="btn small primary" id="fabSubmitBtn" type="button">
+          <span class="btn-label">💾</span>
+          <span class="btn-spinner"><span class="spinner"></span></span>
+        </button>
       </div>
       <div class="mini" id="fabAddWrap" aria-hidden="true">
         <div class="label">${S.btnAdd}</div>
-        <button class="btn small" id="fabAddBtn" type="button"><span class="btn-label">＋</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+        <button class="btn small" id="fabAddBtn" type="button">
+          <span class="btn-label">＋</span>
+          <span class="btn-spinner"><span class="spinner"></span></span>
+        </button>
       </div>
       <button class="fab-main" id="fabMain" aria-expanded="false" aria-controls="fab">
         <span class="icon">＋</span>
@@ -111,23 +152,17 @@ export default async function mount({ root, lang }){
   `;
 
   const lines = $('#purLines', root);
-  const btnReset = $('#resetBtnPur', root);
 
   function addLine(){
     const ln = purLine(lang);
     lines.appendChild(ln);
     bindPickerInputs(root, lang);
   }
-  function hardReset(){
+  function clearForm(){
     lines.innerHTML=''; addLine();
     $('#PurNote', root).value=''; $('#PurContractor', root).value=''; $('#PurProject', root).value='';
     $('#PurNeedBy', root).value=todayStr();
   }
-
-  btnReset.addEventListener('click', async ()=>{
-    try { setBtnLoading(btnReset, true); hardReset(); }
-    finally { setBtnLoading(btnReset, false); }
-  });
 
   // FAB behavior
   const fab = $('#fab', root);
@@ -159,11 +194,11 @@ export default async function mount({ root, lang }){
       if(res && res.ok){
         toast((lang==='th'?'ส่งคำขอแล้ว • ':'Request sent • ')+(res.docNo||''));
         try { await preloadLookups(); } catch {}
-        hardReset();
-        loadOlder();
+        clearForm();
+        loadOlder(); // refresh history panel
       }
       else toast((res && res.message) || 'Error');
-    } catch(e){
+    } catch{
       toast(lang==='th'?'เกิดข้อผิดพลาดในการส่งคำขอ':'Failed to submit request');
     } finally {
       setBtnLoading(fabSubmit, false);
@@ -172,10 +207,11 @@ export default async function mount({ root, lang }){
     }
   });
 
-  // Older list with status badge + expandable details
+  // Previous requests (no internal skeleton until expanded rows are opened)
   async function loadOlder(){
     const holder = $('#purOlderList', root);
     holder.innerHTML='';
+    // show list-level skeletons only
     for(let i=0;i<5;i++){ const r=document.createElement('div'); r.className='skeleton-row'; holder.appendChild(r); }
 
     try{
@@ -199,12 +235,12 @@ export default async function mount({ root, lang }){
           <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
         `;
 
-        const status = document.createElement('span');
-        status.className = `badge ${statusColor(x.status)}`;
-        status.textContent = esc(x.status || '-');
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `badge ${statusColor(x.status)}`;
+        statusBadge.textContent = esc(x.status || '-');
 
         headWrap.appendChild(headLeft);
-        headWrap.appendChild(status);
+        headWrap.appendChild(statusBadge);
 
         const meta2 = document.createElement('div');
         meta2.className='meta';
@@ -226,9 +262,7 @@ export default async function mount({ root, lang }){
         const body=document.createElement('div'); body.className='hidden';
         body.style.marginTop='.5rem';
         body.setAttribute('data-doc', x.docNo);
-        body.innerHTML = `<div class="skeleton-bar" style="height:14px;margin:.35rem 0;width:60%"></div>
-                          <div class="skeleton-bar" style="height:14px;margin:.35rem 0;width:40%"></div>
-                          <div class="skeleton-bar" style="height:14px;margin:.35rem 0;width:70%"></div>`;
+        // NOTE: no skeleton here until expanded
 
         headClick.addEventListener('click', async ()=>{
           const isOpen = !body.classList.contains('hidden');
@@ -242,10 +276,23 @@ export default async function mount({ root, lang }){
           headClick.querySelector('.meta').textContent = (lang==='th'?'ซ่อนรายละเอียด':'Hide details');
           headClick.lastElementChild.textContent = '⌄';
 
+          // show a compact loading row only after expanding
+          body.innerHTML = `<div class="skeleton-row" style="min-height:40px"></div>`;
+
           try{
             const lines = await apiGet('pur_DocLines', {payload:{docNo:x.docNo}}, {cacheTtlMs: 10*1000});
+            const content = document.createElement('div');
+
+            // Status editor
+            const editor = renderStatusEditor(x.docNo, x.status, lang, (newStatus)=>{
+              statusBadge.textContent = newStatus;
+              statusBadge.className = `badge ${statusColor(newStatus)}`;
+            });
+            content.appendChild(editor);
+
+            // Lines table
             const tbl = document.createElement('table'); tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
-            tbl.innerHTML='<thead><tr><th style="text-align:left;padding:.25rem 0;">รายการ</th><th style="text-align:left;padding:.25rem 0;">จำนวน</th></tr></thead>';
+            tbl.innerHTML = '<thead><tr><th style="text-align:left;padding:.25rem 0;">รายการ</th><th style="text-align:left;padding:.25rem 0;">จำนวน</th></tr></thead>';
             const tb=document.createElement('tbody');
             (lines||[]).forEach(li=>{
               const tr=document.createElement('tr');
@@ -253,8 +300,10 @@ export default async function mount({ root, lang }){
               tb.appendChild(tr);
             });
             tbl.appendChild(tb);
-            body.replaceChildren(tbl);
-          }catch(e){
+            content.appendChild(tbl);
+
+            body.replaceChildren(content);
+          }catch{
             body.innerHTML = `<div class="meta" style="color:#b91c1c">${lang==='th'?'โหลดไม่สำเร็จ':'Failed to load'}</div>`;
           }
         });
@@ -282,7 +331,7 @@ export default async function mount({ root, lang }){
           }
         };
       }
-    }catch(e){
+    }catch{
       holder.innerHTML = `<div class="rowitem"><div class="meta" style="color:#b91c1c">${lang==='th'?'ไม่สามารถโหลดข้อมูลได้':'Unable to load data'}</div></div>`;
     }
   }

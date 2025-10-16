@@ -1,9 +1,10 @@
 // tabs/out.js
-// Material OUT screen with speed-dial FAB (“Add Item” + “Submit Form”) replacing bottom toolbar.
+// Material OUT screen with speed-dial FAB (“Add Item” + “Submit Form”).
+// Removed Reset button as requested.
 
 import {
   $, $$, STR, bindPickerInputs, openPicker,
-  apiGet, apiPost, setBtnLoading, esc, toast, todayStr
+  apiPost, setBtnLoading, esc, toast, todayStr
 } from '../js/shared.js';
 
 function OutLine(lang){
@@ -18,7 +19,7 @@ function OutLine(lang){
   const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>card.remove();
   actions.appendChild(rm);
   card.appendChild(grid); card.appendChild(actions);
-  name.addEventListener('click', ()=>openPicker(name,'materials'));
+  name.addEventListener('click', ()=>openPicker(name,'materials', lang));
   return card;
 }
 
@@ -71,23 +72,23 @@ export default async function mount({ root, lang }){
         </div>
       </div>
       <div class="lines" id="outLines"></div>
-      <div class="row" style="justify-content:flex-end; gap:.6rem">
-        <button class="btn" id="resetBtnOut" type="button">
-          <span class="btn-label">${S.btnReset}</span>
-          <span class="btn-spinner"><span class="spinner"></span></span>
-        </button>
-      </div>
     </section>
 
     <!-- Speed-Dial FAB -->
     <div class="fab" id="fab">
       <div class="mini" id="fabSubmitWrap" aria-hidden="true">
         <div class="label">${S.btnSubmit}</div>
-        <button class="btn small primary" id="fabSubmitBtn" type="button"><span class="btn-label">✓</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+        <button class="btn small primary" id="fabSubmitBtn" type="button">
+          <span class="btn-label">💾</span>
+          <span class="btn-spinner"><span class="spinner"></span></span>
+        </button>
       </div>
       <div class="mini" id="fabAddWrap" aria-hidden="true">
         <div class="label">${S.btnAdd}</div>
-        <button class="btn small" id="fabAddBtn" type="button"><span class="btn-label">＋</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+        <button class="btn small" id="fabAddBtn" type="button">
+          <span class="btn-label">＋</span>
+          <span class="btn-spinner"><span class="spinner"></span></span>
+        </button>
       </div>
       <button class="fab-main" id="fabMain" aria-expanded="false" aria-controls="fab">
         <span class="icon">＋</span>
@@ -96,11 +97,10 @@ export default async function mount({ root, lang }){
   `;
 
   const lines = $('#outLines', root);
-  const resetBtn = $('#resetBtnOut', root);
 
   function addLine(){ lines.appendChild(OutLine(lang)); bindPickerInputs(root, lang); }
 
-  function hardReset(){
+  function clearForm(){
     lines.innerHTML=''; addLine();
     $('#Note', root).value='';
     $('#OutDate', root).value=todayStr();
@@ -108,15 +108,6 @@ export default async function mount({ root, lang }){
     $('#ContractorInput', root).value='';
     $('#RequesterInput', root).value='';
   }
-
-  resetBtn.addEventListener('click', async ()=>{
-    try{
-      setBtnLoading(resetBtn, true);
-      hardReset();
-    } finally {
-      setBtnLoading(resetBtn, false);
-    }
-  });
 
   // FAB behavior
   const fab = $('#fab', root);
@@ -129,11 +120,7 @@ export default async function mount({ root, lang }){
     fabMain.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   }
   fabMain.addEventListener('click', toggleFab);
-
-  fabAdd.addEventListener('click', ()=>{
-    addLine();
-    // keep expanded for chaining, or collapse? We'll keep open.
-  });
+  fabAdd.addEventListener('click', ()=>{ addLine(); });
 
   fabSubmit.addEventListener('click', async ()=>{
     setBtnLoading(fabSubmit, true);
@@ -151,15 +138,14 @@ export default async function mount({ root, lang }){
       const res = await apiPost('submitMovementBulk', p);
       if(res && res.ok){
         toast((lang==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||''));
-        hardReset();
+        clearForm();
       } else {
         toast((res && res.message) || 'Error');
       }
-    } catch(e){
+    } catch{
       toast(lang==='th'?'เกิดข้อผิดพลาดในการบันทึก':'Failed to submit');
     } finally {
       setBtnLoading(fabSubmit, false);
-      // collapse FAB after submit
       fab.classList.remove('expanded');
       fabMain.setAttribute('aria-expanded','false');
     }

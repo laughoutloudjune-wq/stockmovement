@@ -1,11 +1,31 @@
-import { $, $$, STR, bindPickerInputs, openPicker, apiGet, apiPost, setBtnLoading, clampList, esc, toast, todayStr } from '../js/shared.js';
+// tabs/purchase.js
+// Purchasing tab with status pill badge, smooth loading, robust error handling,
+// and auto-refresh of lookups after successful submit.
 
+import {
+  $, $$, STR, bindPickerInputs, openPicker,
+  apiGet, apiPost, setBtnLoading, clampList,
+  esc, toast, todayStr, preloadLookups
+} from '../js/shared.js';
+
+/* ------------ helpers ------------ */
 function setSubmitState(btn, count, lang){
   const lbl = (lang==='th' ? STR.th.save : STR.en.save);
-  btn.querySelector('.btn-label').textContent = `${lbl} (${count})`;
+  const labelEl = btn.querySelector('.btn-label');
+  if (labelEl) labelEl.textContent = `${lbl} (${count})`;
   btn.disabled = count<=0;
 }
 function countLines(root){ return $$('.line', root).length; }
+
+function statusColor(status){
+  if(!status) return '';
+  const s = String(status).toLowerCase();
+  if (s.includes('approve') || s.includes('อนุมัติ')) return 'green';
+  if (s.includes('wait') || s.includes('รอ') || s.includes('order')) return 'yellow';
+  if (s.includes('reject') || s.includes('cancel') || s.includes('ยกเลิก') || s.includes('ไม่อนุมัติ')) return 'red';
+  if (s.includes('receive') || s.includes('รับ')) return 'green';
+  return '';
+}
 
 function purLine(lang){
   const card=document.createElement('div'); card.className='line';
@@ -22,6 +42,19 @@ function purLine(lang){
   return card;
 }
 
+function collectLines(root){
+  const out=[];
+  $$('.line', root).forEach(c=>{
+    const nameEl=c.querySelector('input[data-picker="materials"]');
+    const qtyEl=c.querySelector('input[type="number"]');
+    const name=nameEl?nameEl.value.trim():'';
+    const qty=Number(qtyEl?qtyEl.value:0)||0;
+    if (name) out.push({name:name, qty:qty});
+  });
+  return out;
+}
+
+/* ------------ main mount ------------ */
 export default async function mount({ root, lang }){
   const S = STR[lang];
   root.innerHTML = `
@@ -109,28 +142,25 @@ export default async function mount({ root, lang }){
       needBy: $('#PurNeedBy').value.trim(),
       priority: $('#PurPriority').value,
       note: $('#PurNote').value.trim(),
-      lines: collectLines()
+      lines: collectLines(root)
     };
     if (!p.lines.length){ setBtnLoading(btnSubmit,false); return toast(lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); }
     try{
       const res = await apiPost('submitPurchaseRequest', p);
-      if(res && res.ok){ toast((lang==='th'?'ส่งคำขอแล้ว • ':'Request sent • ')+(res.docNo||'')); hardReset(); loadOlder(); }
+      if(res && res.ok){
+        toast((lang==='th'?'ส่งคำขอแล้ว • ':'Request sent • ')+(res.docNo||''));
+        // Refresh lookups so new data appears immediately in pickers
+        try { await preloadLookups(); } catch {}
+        hardReset();
+        loadOlder();
+      }
       else toast((res && res.message) || 'Error');
+    } catch(e){
+      toast(lang==='th'?'เกิดข้อผิดพลาดในการส่งคำขอ':'Failed to submit request');
     } finally { setBtnLoading(btnSubmit, false); }
   });
 
-  function collectLines(){
-    const out=[];
-    $$('.line', root).forEach(c=>{
-      const nameEl=c.querySelector('input[data-picker="materials"]');
-      const qtyEl=c.querySelector('input[type="number"]');
-      const name=nameEl?nameEl.value.trim():'';
-      const qty=Number(qtyEl?qtyEl.value:0)||0;
-      if (name) out.push({name:name, qty:qty});
-    });
-    return out;
-  }
-
+  // Older list with STATUS BADGE in summary + expandable details
   async function loadOlder(){
     const holder = $('#purOlderList', root);
     holder.innerHTML='';
@@ -140,24 +170,66 @@ export default async function mount({ root, lang }){
       const rows = await apiGet('pur_History', null, {cacheTtlMs: 20*1000});
       holder.innerHTML='';
       (rows||[]).forEach(x=>{
-        const acc=document.createElement('div'); acc.className='rowitem';
-        acc.style.flexDirection='column'; acc.style.alignItems='stretch';
-        const head=document.createElement('div');
-        head.style.display='flex'; head.style.justifyContent='space-between'; head.style.cursor='pointer';
-        head.innerHTML = `<span>${esc(x.docNo)} • ${esc(x.project||'-')} • ${esc(x.ts)}</span><span>›</span>`;
+        const card=document.createElement('div'); card.className='rowitem';
+        card.style.flexDirection='column'; card.style.alignItems='stretch';
+
+        const headWrap = document.createElement('div');
+        headWrap.style.display='flex';
+        headWrap.style.justifyContent='space-between';
+        headWrap.style.alignItems='center';
+        headWrap.style.flexWrap='wrap';
+        headWrap.style.gap='.5rem';
+
+        const headLeft = document.createElement('div');
+        headLeft.innerHTML = `
+          <div><strong>${esc(x.docNo)} • ${esc(x.project||'-')}</strong></div>
+          <div class="meta">${esc(x.ts)} • ${(lang==='th'?'ต้องการภายใน ':'NeedBy ')}${esc(x.needBy||'-')}</div>
+          <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
+        `;
+
+        const status = document.createElement('span');
+        status.className = `badge ${statusColor(x.status)}`;
+        status.textContent = esc(x.status || '-');
+
+        headWrap.appendChild(headLeft);
+        headWrap.appendChild(status);
+
+        const meta2 = document.createElement('div');
+        meta2.className='meta';
+        meta2.innerHTML = `
+          ${(lang==='th'?'รายการ ':'Lines ')}${esc(x.lines)} •
+          ${(lang==='th'?'จำนวน ':'Qty ')}${esc(x.totalQty)} •
+          ${(lang==='th'?'ความสำคัญ ':'Priority ')}${esc(x.priority||'-')}
+        `;
+
+        const headClick = document.createElement('div');
+        headClick.className='rowhead';
+        headClick.style.display='flex';
+        headClick.style.justifyContent='space-between';
+        headClick.style.alignItems='center';
+        headClick.style.cursor='pointer';
+        headClick.style.marginTop='.35rem';
+        headClick.innerHTML = `<span class="meta">${lang==='th'?'แสดงรายละเอียด':'Show details'}</span><span>›</span>`;
 
         const body=document.createElement('div'); body.className='hidden';
-        body.innerHTML = `
-          <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
-          <div class="meta">${lang==='th'?'ต้องการภายใน':'NeedBy'} ${esc(x.needBy||'-')} • ${lang==='th'?'สถานะ':'Status'}: <strong>${esc(x.status||'-')}</strong></div>
-          <div id="doc-${esc(x.docNo)}">${lang==='th'?'กำลังโหลด…':'Loading…'}</div>
-        `;
-        head.addEventListener('click', async ()=>{
+        body.style.marginTop='.5rem';
+        body.setAttribute('data-doc', x.docNo);
+        body.innerHTML = `<div class="skeleton-bar" style="height:14px;margin:.35rem 0;width:60%"></div>
+                          <div class="skeleton-bar" style="height:14px;margin:.35rem 0;width:40%"></div>
+                          <div class="skeleton-bar" style="height:14px;margin:.35rem 0;width:70%"></div>`;
+
+        headClick.addEventListener('click', async ()=>{
           const isOpen = !body.classList.contains('hidden');
-          if (isOpen){ body.classList.add('hidden'); return; }
-          const holderEl = body.querySelector(`#doc-${CSS.escape(x.docNo)}`);
-          holderEl.innerHTML = ''; 
-          for(let i=0;i<3;i++){ const sk=document.createElement('div'); sk.className='skeleton-bar'; sk.style.height='14px'; sk.style.margin='8px 0'; holderEl.appendChild(sk); }
+          if (isOpen){
+            body.classList.add('hidden');
+            headClick.querySelector('.meta').textContent = (lang==='th'?'แสดงรายละเอียด':'Show details');
+            headClick.lastElementChild.textContent = '›';
+            return;
+          }
+          body.classList.remove('hidden');
+          headClick.querySelector('.meta').textContent = (lang==='th'?'ซ่อนรายละเอียด':'Hide details');
+          headClick.lastElementChild.textContent = '⌄';
+
           try{
             const lines = await apiGet('pur_DocLines', {payload:{docNo:x.docNo}}, {cacheTtlMs: 10*1000});
             const tbl = document.createElement('table'); tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
@@ -169,43 +241,48 @@ export default async function mount({ root, lang }){
               tb.appendChild(tr);
             });
             tbl.appendChild(tb);
-            holderEl.replaceWith(tbl);
+            body.replaceChildren(tbl);
           }catch(e){
-            holderEl.innerHTML = `<div class="meta" style="color:#b91c1c">${lang==='th'?'โหลดไม่สำเร็จ':'Failed to load'}</div>`;
+            body.innerHTML = `<div class="meta" style="color:#b91c1c">${lang==='th'?'โหลดไม่สำเร็จ':'Failed to load'}</div>`;
           }
-          body.classList.remove('hidden');
         });
-        acc.appendChild(head); acc.appendChild(body);
-        holder.appendChild(acc);
+
+        card.appendChild(headWrap);
+        card.appendChild(meta2);
+        card.appendChild(headClick);
+        card.appendChild(body);
+        holder.appendChild(card);
       });
       clampList(holder);
+
+      const tbtn = root.querySelector('.toggle button[data-toggle="#purOlderList"]');
+      if (tbtn){
+        tbtn.onclick = ()=>{
+          const expanded = holder.dataset.expanded === 'true';
+          if (expanded){
+            clampList(holder);
+            holder.dataset.expanded = 'false';
+            tbtn.textContent = STR[lang].showMore;
+          } else {
+            Array.from(holder.children).forEach(el=> el.style.display='');
+            holder.dataset.expanded = 'true';
+            tbtn.textContent = STR[lang].showLess;
+          }
+        };
+      }
     }catch(e){
       holder.innerHTML = `<div class="rowitem"><div class="meta" style="color:#b91c1c">${lang==='th'?'ไม่สามารถโหลดข้อมูลได้':'Unable to load data'}</div></div>`;
-    }
-
-    // Proper toggle
-    const tbtn = root.querySelector('.toggle button[data-toggle="#purOlderList"]');
-    if (tbtn){
-      tbtn.onclick = ()=>{
-        const expanded = holder.dataset.expanded === 'true';
-        if (expanded){
-          clampList(holder);
-          holder.dataset.expanded = 'false';
-          tbtn.textContent = STR[lang].showMore;
-        } else {
-          Array.from(holder.children).forEach(el=> el.style.display='');
-          holder.dataset.expanded = 'true';
-          tbtn.textContent = STR[lang].showLess;
-        }
-      };
     }
   }
 
   // Bind pickers
   bindPickerInputs(root);
-  $('#PurProject').addEventListener('click', ()=>openPicker($('#PurProject'),'projects'));
-  $('#PurContractor').addEventListener('click', ()=>openPicker($('#PurContractor'),'contractors'));
+  $('#PurProject', root).addEventListener('click', ()=>openPicker($('#PurProject', root),'projects'));
+  $('#PurContractor', root).addEventListener('click', ()=>openPicker($('#PurContractor', root),'contractors'));
 
-  hardReset();
+  // Init defaults and data
+  $('#PurNeedBy', root).value=todayStr();
+  addLine();
+  updateSubmit();
   loadOlder();
 }

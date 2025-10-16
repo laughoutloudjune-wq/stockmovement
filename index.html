@@ -22,8 +22,7 @@
       --shadow-s: 0 2px 6px rgba(0,0,0,.06);
       --shadow-m: 0 6px 16px rgba(0,0,0,.10);
       --shadow-l: 0 12px 26px rgba(0,0,0,.12);
-      --container-max: 72rem;
-      --pad-x: max(4vw, 1rem);
+      --container-max: 72rem; --pad-x: max(4vw, 1rem);
 
       --input-bg: #ffffff;
       --input-border: rgba(0,0,0,0.12);
@@ -66,7 +65,7 @@
     .subtle{ color:#5a6573; font-size:var(--fs-xs) }
     .spacer{ flex:1 }
 
-    .lang{ display:flex; gap:.5rem }
+    .lang{ display:flex; gap:.5rem; align-items:center }
     .lang button{
       padding:.5rem 1rem; border-radius:var(--radius-pill); border:1px solid rgba(0,0,0,.08);
       background:#fff; color:#111; font-weight:800; font-size:var(--fs-sm); cursor:pointer;
@@ -100,12 +99,10 @@
     .card{ padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
     .card h3{ margin:0; font-size:var(--fs-md); font-weight:900; letter-spacing:.2px }
 
-    /* Dashboard grid */
     .dashboard-grid{ display:grid; gap:1rem; grid-template-columns: 1fr; }
     @media (min-width: 48rem){ .dashboard-grid{ grid-template-columns: 1fr 1fr; } }
     @media (min-width: 75rem){ .dashboard-grid{ grid-template-columns: 2fr 1fr 1fr; } .span-2{ grid-column: span 2; } }
 
-    /* Inputs & common */
     .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
     .row > *{ flex:1 1 14rem }
     label{ font-size:var(--fs-xs); color:#2e3a48; font-weight:800; letter-spacing:.15px }
@@ -122,11 +119,11 @@
       transform: translateY(-0.5px);
     }
 
-    /* 1) Date input width fix (works everywhere, especially iOS) */
+    /* date input width fix */
     input[type="date"]{
       -webkit-appearance: none; appearance: none;
-      min-width: 12.5rem;  /* readable default */
-      max-width: 100%;     /* still responsive inside a grid cell */
+      min-width: 12.5rem;
+      max-width: 100%;
       background-color:#fff;
     }
 
@@ -170,14 +167,12 @@
     .btn.primary .spinner{ border-color: rgba(255,255,255,.35); border-top-color:#fff }
     @keyframes spin { to { transform: rotate(360deg) } }
 
-    /* smoother skeleton, no “glitch” */
     .skeleton-row{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.75rem 1rem; border-radius:14px; border:1px solid var(--border-weak); background:#f5f7fb; box-shadow: var(--shadow-s); animation: pulse 1.2s ease-in-out infinite; min-height: 52px; }
     .skeleton-bar{ height:12px; width:50%; border-radius:8px; background:#e7ebf5 }
     .skeleton-badge{ width:36px; height:20px; border-radius:9999px; background:#e7ebf5 }
     @keyframes pulse { 0% { opacity:.7; } 50% { opacity:1; } 100% { opacity:.7; } }
     @media (prefers-reduced-motion: reduce){ .spinner, .skeleton-row{ animation: none } }
 
-    /* OUT floating toolbar (truly floating, pill) */
     .toolbar{
       position: fixed; left: 50%;
       bottom: calc(env(safe-area-inset-bottom) + 1rem);
@@ -193,7 +188,6 @@
     .toast{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.6rem); transform:translateX(-50%); background:#111; color:#fff; padding:.7rem 1rem; border-radius:var(--radius-pill); display:none; z-index:2500; font-size:var(--fs-sm); box-shadow: var(--shadow-m) }
     .toast.show{ display:block }
 
-    /* Picker overlay */
     #pickerOverlay{ position:fixed; inset:0; z-index:2000; display:none; align-items:center; justify-content:center; background:rgba(15,18,23,0.15); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); pointer-events:none; }
     #pickerOverlay.open{ display:flex; pointer-events:auto; }
     #pickerBox{ background:rgba(255,255,255,.98); border:1px solid var(--border); border-radius:18px; box-shadow: var(--shadow-l); display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; }
@@ -218,6 +212,7 @@
     <div class="lang">
       <button id="lang-th" class="active" type="button">ไทย</button>
       <button id="lang-en" type="button">EN</button>
+      <button id="refreshDataBtn" class="btn small" type="button" style="margin-left:.5rem">↻ Refresh Data</button>
     </div>
   </header>
 

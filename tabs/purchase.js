@@ -1,5 +1,6 @@
 // tabs/purchase.js
-// Purchasing tab with status pill badge, smooth loading, robust error handling,
+// Purchasing tab with speed-dial FAB (“Add Item” + “Submit Form”),
+// status badge in history, smooth loading, robust error handling,
 // and auto-refresh of lookups after successful submit.
 
 import {
@@ -9,14 +10,6 @@ import {
 } from '../js/shared.js';
 
 /* ------------ helpers ------------ */
-function setSubmitState(btn, count, lang){
-  const lbl = (lang==='th' ? STR.th.save : STR.en.save);
-  const labelEl = btn.querySelector('.btn-label');
-  if (labelEl) labelEl.textContent = `${lbl} (${count})`;
-  btn.disabled = count<=0;
-}
-function countLines(root){ return $$('.line', root).length; }
-
 function statusColor(status){
   if(!status) return '';
   const s = String(status).toLowerCase();
@@ -33,12 +26,10 @@ function purLine(lang){
   const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
   const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
   const actions=document.createElement('div'); actions.className='actions';
-  const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>{ card.remove(); card.dispatchEvent(new CustomEvent('linechange',{bubbles:true})); };
+  const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>card.remove();
   actions.appendChild(rm);
   card.appendChild(grid); card.appendChild(actions);
-  name.addEventListener('click', ()=>openPicker(name,'materials'));
-  qty.addEventListener('input', ()=>card.dispatchEvent(new CustomEvent('linechange',{bubbles:true})));
-  name.addEventListener('input', ()=>card.dispatchEvent(new CustomEvent('linechange',{bubbles:true})));
+  name.addEventListener('click', ()=>openPicker(name,'materials', lang));
   return card;
 }
 
@@ -49,7 +40,7 @@ function collectLines(root){
     const qtyEl=c.querySelector('input[type="number"]');
     const name=nameEl?nameEl.value.trim():'';
     const qty=Number(qtyEl?qtyEl.value:0)||0;
-    if (name) out.push({name:name, qty:qty});
+    if (name) out.push({name, qty});
   });
   return out;
 }
@@ -57,6 +48,7 @@ function collectLines(root){
 /* ------------ main mount ------------ */
 export default async function mount({ root, lang }){
   const S = STR[lang];
+
   root.innerHTML = `
     <section class="card glass">
       <h3 id="t_pur_title">${S.purTitle}</h3>
@@ -92,9 +84,7 @@ export default async function mount({ root, lang }){
         </div>
       </div>
       <div class="row" style="justify-content:flex-end; gap:.6rem">
-        <button class="btn" id="addLineBtnPur" type="button"><span class="btn-label">${S.btnAdd}</span><span class="btn-spinner"><span class="spinner"></span></span></button>
         <button class="btn" id="resetBtnPur" type="button"><span class="btn-label">${S.btnReset}</span><span class="btn-spinner"><span class="spinner"></span></span></button>
-        <button class="btn primary" id="submitBtnPur" type="button" disabled><span class="btn-label">${S.btnSubmit} (0)</span><span class="btn-spinner"><span class="spinner"></span></span></button>
       </div>
     </section>
 
@@ -103,53 +93,71 @@ export default async function mount({ root, lang }){
       <div class="list" id="purOlderList" data-limit="10"></div>
       <div class="toggle"><button type="button" data-toggle="#purOlderList">${S.showMore}</button></div>
     </section>
+
+    <!-- Speed-Dial FAB -->
+    <div class="fab" id="fab">
+      <div class="mini" id="fabSubmitWrap" aria-hidden="true">
+        <div class="label">${S.btnSubmit}</div>
+        <button class="btn small primary" id="fabSubmitBtn" type="button"><span class="btn-label">✓</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+      </div>
+      <div class="mini" id="fabAddWrap" aria-hidden="true">
+        <div class="label">${S.btnAdd}</div>
+        <button class="btn small" id="fabAddBtn" type="button"><span class="btn-label">＋</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+      </div>
+      <button class="fab-main" id="fabMain" aria-expanded="false" aria-controls="fab">
+        <span class="icon">＋</span>
+      </button>
+    </div>
   `;
 
   const lines = $('#purLines', root);
-  const btnAdd = $('#addLineBtnPur', root);
   const btnReset = $('#resetBtnPur', root);
-  const btnSubmit = $('#submitBtnPur', root);
-
-  function updateSubmit(){
-    const c = countLines(root);
-    setSubmitState(btnSubmit, c, lang);
-  }
 
   function addLine(){
     const ln = purLine(lang);
     lines.appendChild(ln);
-    bindPickerInputs(root);
-    ln.dispatchEvent(new Event('linechange', {bubbles:true}));
-    updateSubmit();
+    bindPickerInputs(root, lang);
   }
   function hardReset(){
     lines.innerHTML=''; addLine();
-    $('#PurNote').value=''; $('#PurContractor').value='';
-    $('#PurNeedBy').value=todayStr();
-    updateSubmit();
+    $('#PurNote', root).value=''; $('#PurContractor', root).value=''; $('#PurProject', root).value='';
+    $('#PurNeedBy', root).value=todayStr();
   }
 
-  btnAdd.addEventListener('click', addLine);
-  btnReset.addEventListener('click', hardReset);
-  root.addEventListener('linechange', updateSubmit);
+  btnReset.addEventListener('click', async ()=>{
+    try { setBtnLoading(btnReset, true); hardReset(); }
+    finally { setBtnLoading(btnReset, false); }
+  });
 
-  btnSubmit.addEventListener('click', async ()=>{
-    setBtnLoading(btnSubmit, true);
+  // FAB behavior
+  const fab = $('#fab', root);
+  const fabMain = $('#fabMain', root);
+  const fabAdd = $('#fabAddBtn', root);
+  const fabSubmit = $('#fabSubmitBtn', root);
+
+  function toggleFab(){
+    const expanded = fab.classList.toggle('expanded');
+    fabMain.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  }
+  fabMain.addEventListener('click', toggleFab);
+  fabAdd.addEventListener('click', addLine);
+
+  fabSubmit.addEventListener('click', async ()=>{
+    setBtnLoading(fabSubmit, true);
     const p = {
       type:'PURCHASE',
-      project: $('#PurProject').value.trim(),
-      contractor: $('#PurContractor').value.trim(),
-      needBy: $('#PurNeedBy').value.trim(),
-      priority: $('#PurPriority').value,
-      note: $('#PurNote').value.trim(),
+      project: $('#PurProject', root).value.trim(),
+      contractor: $('#PurContractor', root).value.trim(),
+      needBy: $('#PurNeedBy', root).value.trim(),
+      priority: $('#PurPriority', root).value,
+      note: $('#PurNote', root).value.trim(),
       lines: collectLines(root)
     };
-    if (!p.lines.length){ setBtnLoading(btnSubmit,false); return toast(lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); }
+    if (!p.lines.length){ setBtnLoading(fabSubmit,false); return toast(lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); }
     try{
       const res = await apiPost('submitPurchaseRequest', p);
       if(res && res.ok){
         toast((lang==='th'?'ส่งคำขอแล้ว • ':'Request sent • ')+(res.docNo||''));
-        // Refresh lookups so new data appears immediately in pickers
         try { await preloadLookups(); } catch {}
         hardReset();
         loadOlder();
@@ -157,10 +165,14 @@ export default async function mount({ root, lang }){
       else toast((res && res.message) || 'Error');
     } catch(e){
       toast(lang==='th'?'เกิดข้อผิดพลาดในการส่งคำขอ':'Failed to submit request');
-    } finally { setBtnLoading(btnSubmit, false); }
+    } finally {
+      setBtnLoading(fabSubmit, false);
+      fab.classList.remove('expanded');
+      fabMain.setAttribute('aria-expanded','false');
+    }
   });
 
-  // Older list with STATUS BADGE in summary + expandable details
+  // Older list with status badge + expandable details
   async function loadOlder(){
     const holder = $('#purOlderList', root);
     holder.innerHTML='';
@@ -276,13 +288,12 @@ export default async function mount({ root, lang }){
   }
 
   // Bind pickers
-  bindPickerInputs(root);
-  $('#PurProject', root).addEventListener('click', ()=>openPicker($('#PurProject', root),'projects'));
-  $('#PurContractor', root).addEventListener('click', ()=>openPicker($('#PurContractor', root),'contractors'));
+  bindPickerInputs(root, lang);
+  $('#PurProject', root).addEventListener('click', ()=>openPicker($('#PurProject', root),'projects', lang));
+  $('#PurContractor', root).addEventListener('click', ()=>openPicker($('#PurContractor', root),'contractors', lang));
 
   // Init defaults and data
   $('#PurNeedBy', root).value=todayStr();
   addLine();
-  updateSubmit();
   loadOlder();
 }

@@ -1,9 +1,9 @@
 // js/main.js
-// Mount tabs only after lookups are preloaded. Adds cache cleanup and manual refresh.
+// Adds cache cleanup, refresh button spinner, proper dashboard mounting, and tab routing.
 
 import {
   $, $$, STR, applyLangTexts, preloadLookups, bindPickerInputs,
-  toast, currentLang, cleanOldCache
+  toast, currentLang, cleanOldCache, setBtnLoading
 } from './shared.js';
 
 // Lazy import tab modules
@@ -58,9 +58,11 @@ async function init() {
   applyLangTexts(LANG);
   bindPickerInputs(document, LANG);
 
-  // 3) Manual refresh button (if present)
-  $('#refreshDataBtn')?.addEventListener('click', async ()=>{
+  // 3) Manual refresh button with spinner
+  const refreshBtn = $('#refreshDataBtn');
+  refreshBtn?.addEventListener('click', async ()=>{
     try {
+      setBtnLoading(refreshBtn, true);
       // remove only our cached keys
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -76,6 +78,8 @@ async function init() {
       await mountTab(currentTab);
     } catch {
       toast(LANG==='th' ? 'รีเฟรชไม่สำเร็จ' : 'Refresh failed');
+    } finally {
+      setBtnLoading(refreshBtn, false);
     }
   });
 

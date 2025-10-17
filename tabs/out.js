@@ -1,35 +1,108 @@
 // tabs/out.js
 // Material OUT screen with speed-dial FAB (“Add Item” + “Submit Form”).
-// Unit field removed per request.
+// Unit field removed. Restores "Current Stock" badge per line.
 
 import {
   $, $$, STR, bindPickerInputs, openPicker,
-  apiPost, setBtnLoading, esc, toast, todayStr
+  apiGet, apiPost, setBtnLoading, esc, toast, todayStr, stockBadge
 } from '../js/shared.js';
 
 function OutLine(lang){
-  const card=document.createElement('div'); card.className='line';
+  const card=document.createElement('div'); 
+  card.className='line';
+
+  // Inputs
   const name=document.createElement('input');
   name.placeholder=(lang==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…');
-  name.readOnly=true; name.setAttribute('data-picker','materials');
+  name.readOnly=true; 
+  name.setAttribute('data-picker','materials');
 
   const qty=document.createElement('input');
-  qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+  qty.type='number'; 
+  qty.min='0'; 
+  qty.step='any'; 
+  qty.placeholder='0'; 
+  qty.inputMode='decimal';
 
   const note=document.createElement('input');
   note.placeholder=(lang==='th'?'หมายเหตุ (ถ้ามี)':'Note (optional)');
 
-  const grid=document.createElement('div'); grid.className='grid';
+  // Grid (name, qty, note)
+  const grid=document.createElement('div'); 
+  grid.className='grid';
   grid.appendChild(name);
   grid.appendChild(qty);
   grid.appendChild(note);
 
-  const actions=document.createElement('div'); actions.className='actions';
-  const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>card.remove();
+  // Meta row: Stock badge
+  const meta=document.createElement('div'); 
+  meta.className='rowitem'; 
+  meta.style.justifyContent='flex-start';
+
+  const label=document.createElement('span'); 
+  label.className='meta'; 
+  label.textContent = (lang==='th' ? 'คงเหลือ: ' : 'Stock: ');
+
+  // start as "-" badge
+  let badge = document.createElement('span'); 
+  badge.className='badge'; 
+  badge.textContent='-';
+
+  meta.appendChild(label); 
+  meta.appendChild(badge);
+
+  // Row actions
+  const actions=document.createElement('div'); 
+  actions.className='actions';
+  const rm=document.createElement('button'); 
+  rm.type='button'; 
+  rm.className='btn small'; 
+  rm.textContent='×'; 
+  rm.onclick=()=>card.remove();
   actions.appendChild(rm);
 
-  card.appendChild(grid); card.appendChild(actions);
+  // Compose line
+  card.appendChild(grid); 
+  card.appendChild(meta); 
+  card.appendChild(actions);
+
+  // Open picker
   name.addEventListener('click', ()=>openPicker(name,'materials', lang));
+
+  // After selection, fetch current stock and update badge
+  name.addEventListener('change', async ()=>{
+    const v = name.value.trim();
+    if (!v) { 
+      const bNew = document.createElement('span');
+      bNew.className='badge'; 
+      bNew.textContent='-';
+      meta.replaceChild(bNew, badge);
+      badge = bNew;
+      return;
+    }
+    // show tiny spinner while fetching
+    const spin = document.createElement('span');
+    spin.className = 'badge';
+    spin.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span>';
+    meta.replaceChild(spin, badge);
+    badge = spin;
+
+    try{
+      const res = await apiGet('getCurrentStock', { material: v });
+      const n  = (res && res.ok) ? Number(res.stock) : null;
+      const mn = (res && res.ok) ? Number(res.min||0) : null;
+      const bNew = stockBadge(n, mn); // uses shared color logic (red/yellow/green)
+      meta.replaceChild(bNew, badge);
+      badge = bNew;
+    }catch(e){
+      const bErr = document.createElement('span');
+      bErr.className='badge red';
+      bErr.textContent='!';
+      meta.replaceChild(bErr, badge);
+      badge = bErr;
+    }
+  });
+
   return card;
 }
 
@@ -106,10 +179,14 @@ export default async function mount({ root, lang }){
 
   const lines = $('#outLines', root);
 
-  function addLine(){ lines.appendChild(OutLine(lang)); bindPickerInputs(root, lang); }
+  function addLine(){ 
+    lines.appendChild(OutLine(lang)); 
+    bindPickerInputs(root, lang); 
+  }
 
   function clearForm(){
-    lines.innerHTML=''; addLine();
+    lines.innerHTML=''; 
+    addLine();
     $('#Note', root).value='';
     $('#OutDate', root).value=todayStr();
     $('#ProjectInput', root).value='';
@@ -128,7 +205,7 @@ export default async function mount({ root, lang }){
     fabMain.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   }
   fabMain.addEventListener('click', toggleFab);
-  fabAdd.addEventListener('click', ()=>{ addLine(); });
+  fabAdd.addEventListener('click', addLine);
 
   fabSubmit.addEventListener('click', async ()=>{
     setBtnLoading(fabSubmit, true);
@@ -141,7 +218,10 @@ export default async function mount({ root, lang }){
       date: $('#OutDate', root).value.trim(),
       lines: collectLines('#outLines')
     };
-    if (!p.lines.length){ setBtnLoading(fabSubmit,false); return toast(lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); }
+    if (!p.lines.length){
+      setBtnLoading(fabSubmit,false); 
+      return toast(lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line');
+    }
     try{
       const res = await apiPost('submitMovementBulk', p);
       if(res && res.ok){

@@ -27,6 +27,9 @@ function injectStyles(){
   .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem;align-items:end}
   @media (max-width: 834px){ .line-grid{grid-template-columns:1fr 1fr auto} }
   @media (max-width: 430px){ .line-grid{grid-template-columns:1fr} .line-grid>div:last-child{justify-content:flex-start} }
+
+  /* Ensure pickers are visible above cards/overlays */
+  .picker-popover, .picker-menu, .autocomplete-panel, .picker-dropdown { position: fixed; z-index: 5001; }
 `;
   const st=document.createElement('style'); st.id='adjust-tab-styles'; st.textContent=css; document.head.appendChild(st);
 }
@@ -54,7 +57,8 @@ function lineRow({name='', delta=''}={}){
 
 export function addLineUI(root){
   $('#adjLines',root).insertAdjacentHTML('beforeend', lineRow({}));
-  bindPickerInputs(root, currentLang()); // spreadsheet autocomplete for materials
+  bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang()); // spreadsheet autocomplete for materials
   $$('#adjLines .btnRem',root).forEach(b=> b.onclick=()=> b.closest('.line')?.remove());
 }
 
@@ -91,5 +95,6 @@ export default async function mountAdjust({root}){
   injectStyles();
   root.innerHTML = viewTemplate();
   bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang());
   addLineUI(root);
 }

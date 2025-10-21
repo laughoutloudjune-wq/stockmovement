@@ -189,8 +189,13 @@
     .toast.show{ display:block }
 
     /* Picker overlay */
-    #pickerOverlay{ position:fixed; inset:0; z-index:2000; display:none; align-items:center; justify-content:center; background:rgba(15,18,23,0.15); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); pointer-events:none; }
-    #pickerOverlay.open{ display:flex; pointer-events:auto; }
+#pickerOverlay{
+  position:fixed; inset:0; z-index:4000; /* was 2000 */
+  display:none; align-items:center; justify-content:center;
+  background:rgba(15,18,23,0.35);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+#pickerOverlay.open{ display:flex }
     #pickerBox{ background:rgba(255,255,255,.98); border:1px solid var(--border); border-radius:18px; box-shadow: var(--shadow-l); display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; }
     .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid var(--border-weak); background:#fff }
     .picker-header input{ flex:1; padding:1rem 1.05rem; font-size:16px; border:1px solid var(--input-border); border-radius:14px; outline:none; background:var(--input-bg); box-shadow:var(--input-shadow) }

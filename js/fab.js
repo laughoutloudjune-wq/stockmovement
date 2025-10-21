@@ -1,16 +1,5 @@
-// js/fab.js — Global FAB in Shadow DOM (icons & alignment bulletproof)
+// js/fab.js — Global FAB (Shadow DOM) with robust null-guards
 let host, shadow, sdEl, mainBtn;
-function ensureHost(){
-  // Re-attach FAB host if something removed it
-  if (host && !document.body.contains(host)) {
-    document.body.appendChild(host);
-
-  // Watch for accidental removal and re-attach
-  const mo = new MutationObserver(ensureHost);
-  mo.observe(document.body, { childList: true, subtree: False });
-  }
-}
-
 
 const ICONS = {
   plus:  '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
@@ -59,10 +48,6 @@ function templateHTML(){
     .main button:active { transform: translateY(1px); }
     svg { display: block; width: 22px; height: 22px; stroke: currentColor; fill: none;
           stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    @media (prefers-reduced-motion: reduce) {
-      .sd { transition: none; }
-      .main button { transition: none; }
-    }
   </style>
   <div class="fab">
     <div class="sd" role="menu" aria-label="เมนูด่วน"></div>
@@ -70,57 +55,64 @@ function templateHTML(){
   </div>`;
 }
 
-export function mountGlobalFab(){
-  if (host) return host;
+function build(){
   host = document.createElement('div');
   host.id = 'global-fab';
   host.style.all = 'initial';
   host.style.position = 'fixed';
   host.style.inset = '0 0 auto auto';
   host.style.zIndex = '42000';
+  host.style.opacity = '1';
+  host.style.pointerEvents = 'auto';
 
   shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = templateHTML();
   document.body.appendChild(host);
 
-  // Watch for accidental removal and re-attach
-  const mo = new MutationObserver(ensureHost);
-  mo.observe(document.body, { childList: true, subtree: False });
-
   sdEl = shadow.querySelector('.sd');
   mainBtn = shadow.getElementById('fabMain');
 
   const root = shadow.querySelector('.fab');
-  const toggle = () => {
-    const exp = root.classList.toggle('expanded');
-    mainBtn.setAttribute('aria-expanded', exp ? 'true' : 'false');
-  };
-  mainBtn.addEventListener('click', toggle);
-
-  document.addEventListener('click', (e)=>{
-    if (!host.contains(e.target)) {
-      root.classList.remove('expanded');
-      mainBtn.setAttribute('aria-expanded','false');
-    }
-  });
+  if (mainBtn) {
+    const toggle = () => {
+      const exp = root.classList.toggle('expanded');
+      mainBtn.setAttribute('aria-expanded', exp ? 'true' : 'false');
+    };
+    mainBtn.addEventListener('click', toggle);
+  }
+  // Close on ESC / outside
   document.addEventListener('keydown', (e)=>{
-    if (e.key === 'Escape') {
-      root.classList.remove('expanded');
-      mainBtn.setAttribute('aria-expanded','false');
-    }
+    if (e.key === 'Escape') root.classList.remove('expanded');
   });
+  document.addEventListener('click', (e)=>{
+    if (!host.contains(e.target)) root.classList.remove('expanded');
+  });
+}
+
+export function mountGlobalFab(){
+  if (!document.body) return null;
+  if (!host || !shadow || !shadow.querySelector('.fab')) {
+    build();
+  } else if (!document.body.contains(host)) {
+    document.body.appendChild(host);
+  }
   return host;
 }
 
 export function setFab(actions){
   mountGlobalFab();
+  if (!shadow) return;
   const root = shadow.querySelector('.fab');
+  if (!root) return;
+
   root.classList.remove('expanded');
-  mainBtn.setAttribute('aria-expanded','false');
+  if (mainBtn) mainBtn.setAttribute('aria-expanded','false');
+
+  sdEl = shadow.querySelector('.sd');
+  if (!sdEl) return;
 
   sdEl.innerHTML = '';
   if (!actions || !actions.length){
-    // Keep host mounted but hidden to avoid 'disappearing' reports
     host.style.opacity = '0';
     host.style.pointerEvents = 'none';
     return;
@@ -154,6 +146,7 @@ export function setFab(actions){
 
 export function hideFab(){
   mountGlobalFab();
+  if (!host) return;
   host.style.opacity = '0';
   host.style.pointerEvents = 'none';
 }

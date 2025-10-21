@@ -1,11 +1,11 @@
-// tabs/out.js — responsive + themed overlays + iOS FAB icons + history preview + stock loading
+// tabs/out.js — OUT tab with stable, body-level FAB (iOS icons), consistent with other tabs
 import {
   $, $$, esc, todayStr,
   apiGet, apiPost,
   bindPickerInputs, toast, setBtnLoading, currentLang, stockBadge
 } from '../js/shared.js';
 
-/* Inject tab-scoped CSS for mobile safety, overlays, and icons */
+/* ---------- Tab-scoped CSS: layout, overlays, and FAB (consistent + low-glitch) ---------- */
 function injectStyles(){
   if (document.getElementById('out-tab-styles')) return;
   const css = `
@@ -28,8 +28,21 @@ function injectStyles(){
   .overlay-sticky{position:sticky;bottom:0;background:var(--card);padding-top:.25rem;border-top:1px solid var(--border-weak)}
   .overlay-backdrop.edit{z-index:4600}
 
-  .fab .btn.small svg{display:inline-block;width:20px;height:20px;vertical-align:middle}
-  .fab-main .icon svg{display:block;width:24px;height:24px}
+  /* Stable FAB: one body-level node, simple fade/slide, no 3D transforms */
+  .fab-out{position:fixed; right:16px; bottom:18px; z-index:4200; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; pointer-events:none}
+  .fab-out .sd{display:flex; flex-direction:column; gap:.5rem; transform:translateY(6px); opacity:0; pointer-events:none; transition:opacity .12s ease, transform .12s ease}
+  .fab-out.expanded .sd{transform:translateY(0); opacity:1; pointer-events:auto}
+  .fab-out .sd .action{display:flex; align-items:center; gap:.5rem; background:var(--card); border:1px solid var(--border-weak); border-radius:12px; padding:.35rem .5rem; box-shadow:0 4px 16px rgba(0,0,0,.08)}
+  .fab-out .sd .action .btn.small{min-width:36px; height:36px; display:inline-grid; place-items:center}
+  .fab-out .sd .label{font:inherit; font-size:.9rem; color:var(--text-muted)}
+  .fab-out .main{pointer-events:auto}
+  .fab-out .main button{width:56px; height:56px; border-radius:50%; display:inline-grid; place-items:center; background:var(--accent, #2563eb); color:#fff; border:none; box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .fab-out .main button:active{transform:translateY(1px)}
+  .fab-out svg{width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round}
+  @media (prefers-reduced-motion: reduce){
+    .fab-out .sd{transition:none}
+    .fab-out .main button{transition:none}
+  }
 
   .lnStock{border:1px solid var(--border-weak); border-radius:10px; padding:.35rem .5rem; min-height:32px}
   .lnStock.loading{display:flex;align-items:center;gap:.5rem}
@@ -42,13 +55,14 @@ function injectStyles(){
   document.head.appendChild(style);
 }
 
-/* iOS-like stroke icons */
+/* iOS-like outline icons */
 const ICONS = {
-  save: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5h16M6.5 5h11A2.5 2.5 0 0 1 20 7.5v10A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-10A2.5 2.5 0 0 1 6.5 5Z"/><path d="M8 12h8m-8 4h5"/></svg>`,
-  plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
-  clock:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.5 2"/></svg>`
+  plus: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
+  save: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14M8 12h8m-8 4h6"/><rect x="4.5" y="5" width="15" height="15" rx="2.5"/></svg>`,
+  clock:`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.5 2"/></svg>`
 };
 
+/* ---------- View (UNCHANGED content; FAB removed from markup) ---------- */
 function viewTemplate(){
   return `
   <div class="outWrap">
@@ -65,15 +79,8 @@ function viewTemplate(){
     </section>
   </div>
 
-  <div class="fab" id="fab">
-    <div class="mini"><span class="label">ประวัติ</span><button class="btn small" id="fabHistory" type="button" title="ค้นหาประวัติ">${ICONS.clock}</button></div>
-    <div class="mini"><span class="label">เพิ่มบรรทัด</span><button class="btn small" id="fabAdd" type="button" title="เพิ่มบรรทัด">${ICONS.plus}</button></div>
-    <div class="mini"><span class="label">บันทึก</span><button class="btn small primary" id="fabSubmit" type="button" title="บันทึก"><span class="btn-label" style="display:inline-flex;align-items:center;gap:.4rem">${ICONS.save}<span>บันทึก</span></span><span class="btn-spinner"><span class="spinner"></span></span></button></div>
-    <button class="fab-main" id="fabMain" type="button" aria-label="เมนูด่วน"><span class="icon">${ICONS.plus}</span></button>
-  </div>
-
-  <div id="histOverlay" class="overlay-backdrop">
-    <div class="overlay-panel card glass">
+  <div id="histOverlay" class="overlay-backdrop" aria-hidden="true">
+    <div class="overlay-panel card glass" role="dialog" aria-modal="true" aria-label="ประวัติการจ่ายออก">
       <div style="padding:.9rem 1rem;border-bottom:1px solid var(--border-weak);display:flex;gap:.5rem;align-items:center;flex:0 0 auto;background:var(--card)">
         <strong style="font-size:1.05rem">ค้นหาประวัติการจ่ายออก</strong>
         <span class="spacer"></span>
@@ -97,7 +104,7 @@ function viewTemplate(){
   `;
 }
 
-/* OUT line row: Material + Qty, delete aligned */
+/* ---------- Line helpers ---------- */
 function lineRow({name="", qty=""}={}){
   return `
   <div class="line">
@@ -128,7 +135,7 @@ function collectLines(root){
   return rows;
 }
 
-/* History renderer: grouped by doc with a small materials preview */
+/* ---------- History renderer with preview ---------- */
 function renderResults(listEl, rows){
   const map = new Map();
   for (const r of rows||[]){
@@ -159,6 +166,7 @@ function renderResults(listEl, rows){
   listEl.innerHTML = cards.join('');
 }
 
+/* ---------- API actions ---------- */
 async function doSearch(root, page=0){
   const q = {
     type: 'OUT',
@@ -291,6 +299,7 @@ async function saveEdit(overlayRoot, docNo){
   }
 }
 
+/* ---------- Stock helpers ---------- */
 function attachStockHandlers(scope){
   $$('.lnName', scope).forEach(inp => {
     const show = async ()=>{
@@ -328,7 +337,7 @@ function addLineUI(root){
 }
 
 async function submitOut(root){
-  const btn = $('#fabSubmit', root);
+  const btn = document.getElementById('fabOutSubmit');
   setBtnLoading(btn, true);
   try{
     const lines = collectLines(root);
@@ -354,19 +363,65 @@ async function submitOut(root){
   }
 }
 
+/* ---------- FAB (body-level, shared feel) ---------- */
+function mountFab(root){
+  // Remove any existing OUT FAB to avoid duplicates
+  $('#fab-out')?.remove();
+
+  const fab = document.createElement('div');
+  fab.id = 'fab-out';
+  fab.className = 'fab-out';
+  fab.innerHTML = `
+    <div class="sd" role="menu" aria-label="เมนูด่วน OUT">
+      <div class="action"><span class="label">ประวัติ</span><button class="btn small" id="fabOutHistory" type="button" title="ค้นหาประวัติ" aria-haspopup="dialog">${ICONS.clock}</button></div>
+      <div class="action"><span class="label">เพิ่มบรรทัด</span><button class="btn small" id="fabOutAdd" type="button" title="เพิ่มบรรทัด">${ICONS.plus}</button></div>
+      <div class="action"><span class="label">บันทึก</span><button class="btn small primary" id="fabOutSubmit" type="button" title="บันทึก" aria-label="บันทึก">${ICONS.save}</button></div>
+    </div>
+    <div class="main"><button id="fabOutMain" type="button" aria-expanded="false" aria-label="เมนูด่วน">${ICONS.plus}</button></div>
+  `;
+  document.body.appendChild(fab);
+
+  const main = $('#fabOutMain');
+  const sd   = fab.querySelector('.sd');
+
+  const close = ()=>{ fab.classList.remove('expanded'); main.setAttribute('aria-expanded','false'); };
+  const open  = ()=>{ fab.classList.add('expanded'); main.setAttribute('aria-expanded','true'); };
+
+  main.addEventListener('click', ()=> fab.classList.contains('expanded') ? close() : open());
+
+  // Close on outside click / Esc
+  document.addEventListener('click', (e)=>{
+    if (!fab.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape') close();
+  });
+
+  // Wire actions
+  $('#fabOutHistory').addEventListener('click', ()=>{
+    close();
+    openHist(root);
+  });
+  $('#fabOutAdd').addEventListener('click', ()=>{
+    addLineUI(root);
+  });
+  $('#fabOutSubmit').addEventListener('click', ()=>{
+    submitOut(root);
+  });
+}
+
 export default async function mountOut({root}){
   injectStyles();
   root.innerHTML = viewTemplate();
   bindPickerInputs(root, currentLang());
   addLineUI(root);
 
-  const fab = $('#fab', root);
-  $('#fabMain', root).addEventListener('click', ()=> fab.classList.toggle('expanded'));
-  $('#fabAdd', root).addEventListener('click', ()=> addLineUI(root));
-  $('#fabSubmit', root).addEventListener('click', ()=> submitOut(root));
-  $('#fabHistory', root).addEventListener('click', ()=> openHist(root));
+  // Mount stable FAB once for this tab
+  mountFab(root);
 
+  // History overlay open/close
   $('#btnCloseHist', root).addEventListener('click', ()=> closeHist(root));
+  // History search + paginate + open editor
   $('#btnSearch', root).addEventListener('click', ()=> doSearch(root, 0));
   $('#btnMore', root).addEventListener('click', (e)=>{ const next = Number(e.currentTarget.dataset.page||1); doSearch(root, next); });
   $('#histBody', root).addEventListener('click', (e)=>{

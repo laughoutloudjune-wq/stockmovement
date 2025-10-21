@@ -1,4 +1,4 @@
-// tabs/out.js (overlay version)
+// tabs/out.js — OUT with FAB + scrollable overlays
 import {
   $, $$, esc, todayStr,
   apiGet, apiPost,
@@ -8,12 +8,7 @@ import {
 function viewTemplate(){
   return `
   <section class="card glass">
-    <div style="display:flex; align-items:center; gap:.75rem">
-      <h3 style="margin:0">จ่ายออก / OUT</h3>
-      <span class="spacer"></span>
-      <button class="btn small" id="btnOpenHistory">ประวัติ</button>
-    </div>
-
+    <h3 style="margin:0 0 .25rem 0">จ่ายออก / OUT</h3>
     <div class="row" id="outHeader">
       <div>
         <label>วันที่</label>
@@ -39,25 +34,45 @@ function viewTemplate(){
 
     <div class="lines" id="outLines"></div>
 
+    <!-- We keep a small add-line button inline for desktop users -->
     <div class="row">
       <button class="btn" id="btnAddLine">＋ เพิ่มบรรทัด</button>
       <span class="spacer"></span>
-      <button class="btn primary" id="btnSubmitOut">
+      <!-- No normal submit button here; use FAB -->
+    </div>
+  </section>
+
+  <!-- FAB (Speed Dial) -->
+  <div class="fab" id="fab">
+    <div class="mini">
+      <span class="label">ประวัติ</span>
+      <button class="btn small" id="fabHistory" type="button">เปิด</button>
+    </div>
+    <div class="mini">
+      <span class="label">เพิ่มบรรทัด</span>
+      <button class="btn small" id="fabAdd" type="button">＋</button>
+    </div>
+    <div class="mini">
+      <span class="label">บันทึก</span>
+      <button class="btn small primary" id="fabSubmit" type="button">
         <span class="btn-label">บันทึก</span>
         <span class="btn-spinner"><span class="spinner"></span></span>
       </button>
     </div>
-  </section>
+    <button class="fab-main" id="fabMain" type="button" aria-label="เมนูด่วน">
+      <span class="icon">＋</span>
+    </button>
+  </div>
 
-  <!-- History overlay -->
+  <!-- History overlay (scrollable) -->
   <div id="histOverlay" style="position:fixed; inset:0; z-index:4500; display:none; background:rgba(15,18,23,0.35); backdrop-filter:blur(3px)">
-    <div style="margin:5vh auto; width:min(960px, 94%); background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:18px; box-shadow:0 18px 36px rgba(0,0,0,.18); display:flex; flex-direction:column; overflow:hidden">
-      <div style="padding:.9rem 1rem; border-bottom:1px solid rgba(0,0,0,.08); display:flex; gap:.5rem; align-items:center">
+    <div style="margin:5vh auto; width:min(980px, 94%); max-height:90vh; background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:18px; box-shadow:0 18px 36px rgba(0,0,0,.18); display:flex; flex-direction:column; overflow:hidden">
+      <div style="padding:.9rem 1rem; border-bottom:1px solid rgba(0,0,0,.08); display:flex; gap:.5rem; align-items:center; flex:0 0 auto">
         <strong style="font-size:1.05rem">ค้นหาประวัติการจ่ายออก</strong>
         <span class="spacer"></span>
-        <button class="btn small" id="btnCloseHist">ปิด</button>
+        <button class="btn small" id="btnCloseHist" type="button">ปิด</button>
       </div>
-      <div style="padding:1rem; display:flex; flex-direction:column; gap:.75rem">
+      <div id="histBody" style="padding:1rem; display:flex; flex-direction:column; gap:.75rem; overflow:auto; -webkit-overflow-scrolling:touch; flex:1 1 auto">
         <div class="row" id="searchHeader">
           <div><label>จากวันที่</label><input id="sFrom" type="date"></div>
           <div><label>ถึงวันที่</label><input id="sTo" type="date"></div>
@@ -66,10 +81,12 @@ function viewTemplate(){
           <div><label>ผู้ขอเบิก</label><input id="sReq" data-picker="requesters" placeholder="—"></div>
           <div><label>วัสดุ</label><input id="sMat" data-picker="materials" placeholder="—"></div>
           <div style="flex:1 1 100%"><label>ค้นหาคำ</label><input id="sText" placeholder="พิมพ์คำค้น…"></div>
-          <div><label>&nbsp;</label><button class="btn" id="btnSearch"><span class="btn-label">ค้นหา</span><span class="btn-spinner"><span class="spinner"></span></span></button></div>
+          <div><label>&nbsp;</label><button class="btn" id="btnSearch" type="button"><span class="btn-label">ค้นหา</span><span class="btn-spinner"><span class="spinner"></span></span></button></div>
         </div>
         <div class="list" id="sResults" data-limit="10"></div>
-        <div class="toggle"><button id="btnMore" type="button" style="display:none">ดูเพิ่มเติม</button></div>
+        <div class="toggle" style="position:sticky; bottom:0; background:#fff; padding-top:.25rem">
+          <button id="btnMore" type="button" style="display:none">ดูเพิ่มเติม</button>
+        </div>
       </div>
     </div>
   </div>
@@ -87,7 +104,7 @@ function lineRow({name="", qty="", spec=""}={}){
       </div>
       <div><label>จำนวน</label><input class="lnQty" type="number" min="0" step="0.01" value="${esc(qty)}"></div>
       <div><label>รายละเอียด (ถ้ามี)</label><input class="lnSpec" placeholder="—" value="${esc(spec)}"></div>
-      <div style="display:flex; align-items:flex-end"><button class="btn small btnRem">ลบ</button></div>
+      <div style="display:flex; align-items:flex-end"><button class="btn small btnRem" type="button">ลบ</button></div>
     </div>
   </div>`;
 }
@@ -114,7 +131,7 @@ function renderResults(listEl, rows){
         <div class="meta">${esc(r.ts)} • ${esc(r.item)} × ${esc(r.qty)} ${r.spec? '• '+esc(r.spec):''}</div>
       </div>
       <div style="display:flex; gap:.5rem">
-        <button class="btn small" data-open="${esc(r.doc)}">แก้ไข</button>
+        <button class="btn small" data-open="${esc(r.doc)}" type="button">แก้ไข</button>
       </div>
     </div>`;
   }).join('');
@@ -156,28 +173,32 @@ function openHist(root){
   ov.style.display = 'block';
   bindPickerInputs(ov, currentLang());
   $('#sResults', root).innerHTML = '';
+  // prevent background scroll on iOS while overlay open
+  document.body.style.overflow = 'hidden';
 }
 
 function closeHist(root){
   $('#histOverlay', root).style.display = 'none';
+  document.body.style.overflow = '';
 }
 
-function openEdit(root, docNo){
-  // reuse the history overlay body area for editing: show a sub-modal stacked? keep simple: open a lightweight editor window
+function openEdit(docNo){
   const edit = document.createElement('div');
   edit.id = 'editOverlay';
   edit.style.cssText = 'position:fixed; inset:0; z-index:4600; background:rgba(15,18,23,.35); backdrop-filter:blur(3px)';
   edit.innerHTML = `
-    <div style="margin:6vh auto; max-width:860px; width:92%; background:#fff; border-radius:18px; border:1px solid rgba(0,0,0,.08); box-shadow:0 18px 36px rgba(0,0,0,.18); overflow:hidden">
-      <div style="padding:1rem; border-bottom:1px solid rgba(0,0,0,.06); display:flex; align-items:center; gap:.5rem">
+    <div style="margin:6vh auto; max-width:860px; width:92%; max-height:88vh; background:#fff; border-radius:18px; border:1px solid rgba(0,0,0,.08); box-shadow:0 18px 36px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column">
+      <div style="padding:1rem; border-bottom:1px solid rgba(0,0,0,.06); display:flex; align-items:center; gap:.5rem; flex:0 0 auto">
         <strong id="eTitle" style="font-size:1.1rem">เอกสาร: ${esc(docNo)}</strong>
         <span class="spacer"></span>
-        <button class="btn small" id="eClose">ปิด</button>
+        <button class="btn small" id="eClose" type="button">ปิด</button>
       </div>
-      <div style="padding:1rem" id="eBody"><div class="skeleton-row"><div class="skeleton-bar" style="width:70%"></div></div></div>
-      <div style="padding:1rem; border-top:1px solid rgba(0,0,0,.06); display:flex; gap:.5rem; justify-content:flex-end">
-        <button class="btn" id="eReload">รีเฟรช</button>
-        <button class="btn primary" id="eSave"><span class="btn-label">บันทึกการแก้ไข</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+      <div id="eBody" style="padding:1rem; overflow:auto; -webkit-overflow-scrolling:touch; flex:1 1 auto">
+        <div class="skeleton-row"><div class="skeleton-bar" style="width:70%"></div></div>
+      </div>
+      <div style="padding:1rem; border-top:1px solid rgba(0,0,0,.06); display:flex; gap:.5rem; justify-content:flex-end; flex:0 0 auto">
+        <button class="btn" id="eReload" type="button">รีเฟรช</button>
+        <button class="btn primary" id="eSave" type="button"><span class="btn-label">บันทึกการแก้ไข</span><span class="btn-spinner"><span class="spinner"></span></span></button>
       </div>
     </div>`;
   document.body.appendChild(edit);
@@ -203,7 +224,7 @@ async function loadDoc(overlayRoot, docNo){
       <div class="lines" id="eLines">
         ${d.lines.map(li => lineRow({name:li.item, qty:li.qty, spec:li.spec})).join('')}
       </div>
-      <div><button class="btn" id="eAddLine">＋ เพิ่มบรรทัด</button></div>
+      <div><button class="btn" id="eAddLine" type="button">＋ เพิ่มบรรทัด</button></div>
     `;
     $('#eBody', overlayRoot).innerHTML = html;
     bindPickerInputs($('#eBody', overlayRoot), currentLang());
@@ -274,10 +295,8 @@ function attachStockHandlers(scope){
         box.innerHTML = '<span class="meta">โหลดคงเหลือไม่สำเร็จ</span>';
       }
     };
-    // fetch when focused or changed
     inp.addEventListener('change', show);
     inp.addEventListener('blur', show);
-    // also on first mount if value exists
     if (inp.value) show();
   });
 }
@@ -290,7 +309,7 @@ function addLineUI(root){
 }
 
 async function submitOut(root){
-  const btn = $('#btnSubmitOut', root);
+  const btn = $('#fabSubmit', root);
   setBtnLoading(btn, true);
   try{
     const lines = collectLines(root);
@@ -321,12 +340,17 @@ export default async function mountOut({root}){
   bindPickerInputs(root, currentLang());
   addLineUI(root);
 
-  // OUT actions
-  $('#btnAddLine', root).addEventListener('click', ()=> addLineUI(root));
-  $('#btnSubmitOut', root).addEventListener('click', ()=> submitOut(root));
+  // Inline add line
+  $('#btnAddLine', root)?.addEventListener('click', ()=> addLineUI(root));
+
+  // FAB behaviour
+  const fab = $('#fab', root);
+  $('#fabMain', root).addEventListener('click', ()=> fab.classList.toggle('expanded'));
+  $('#fabAdd', root).addEventListener('click', ()=> addLineUI(root));
+  $('#fabSubmit', root).addEventListener('click', ()=> submitOut(root));
+  $('#fabHistory', root).addEventListener('click', ()=> openHist(root));
 
   // History overlay open/close
-  $('#btnOpenHistory', root).addEventListener('click', ()=> openHist(root));
   $('#btnCloseHist', root).addEventListener('click', ()=> closeHist(root));
   // History search + paginate + open editor
   $('#btnSearch', root).addEventListener('click', ()=> doSearch(root, 0));
@@ -334,8 +358,8 @@ export default async function mountOut({root}){
     const next = Number(e.currentTarget.dataset.page||1);
     doSearch(root, next);
   });
-  $('#sResults', root).addEventListener('click', (e)=>{
+  $('#histBody', root).addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-open]'); if(!btn) return;
-    openEdit(root, btn.getAttribute('data-open'));
+    openEdit(btn.getAttribute('data-open'));
   });
 }

@@ -1,12 +1,7 @@
-// tabs/out.js — OUT tab with shared global FAB actions
-import {
-  $, $$, esc, todayStr,
-  apiGet, apiPost,
-  bindPickerInputs, toast, setBtnLoading, currentLang, stockBadge
-} from '../js/shared.js';
+// tabs/out.js — uses global FAB; ensures stock loading + overlay + responsive
+import { $, $$, esc, todayStr, apiGet, apiPost, bindPickerInputs, toast, setBtnLoading, currentLang, stockBadge } from '../js/shared.js';
 import { FabIcons } from '../js/fab.js';
 
-/* Styles: responsive layout + overlays + stock loading */
 function injectStyles(){
   if (document.getElementById('out-tab-styles')) return;
   const css = `
@@ -17,18 +12,15 @@ function injectStyles(){
   .col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-12{grid-column:1/-1}
   .out-grid input{width:100%;min-width:0}
   .out-grid input[type="date"], .overlay-body input[type="date"]{height:var(--control-h,42px);line-height:var(--control-h,42px);padding:0 .65rem}
-
   .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem}
   @media (max-width: 720px){ .line-grid{grid-template-columns:1fr 1fr auto} }
   @media (max-width: 520px){ .line-grid{grid-template-columns:1fr;gap:.5rem} .line-grid>div:last-child{justify-content:flex-start} }
   .line-grid .btnRem{align-self:end}
-
   .overlay-backdrop{position:fixed;inset:0;z-index:4500;display:none;background:rgba(15,18,23,.28);backdrop-filter:blur(6px)}
   .overlay-panel{margin:5vh auto;width:min(980px,94%);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
   .overlay-body{padding:1rem;display:flex;flex-direction:column;gap:.75rem;overflow:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto}
   .overlay-sticky{position:sticky;bottom:0;background:var(--card);padding-top:.25rem;border-top:1px solid var(--border-weak)}
   .overlay-backdrop.edit{z-index:4600}
-
   .lnStock{border:1px solid var(--border-weak); border-radius:10px; padding:.35rem .5rem; min-height:32px}
   .lnStock.loading{display:flex;align-items:center;gap:.5rem}
   .lnStock .stock-spinner{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;opacity:.8}
@@ -104,9 +96,7 @@ function collectLines(root){
   $$('#outLines .line', root).forEach(line=>{
     const name = $('.lnName', line).value.trim();
     const qty  = Number($('.lnQty', line).value);
-    if (name && isFinite(qty) && qty>0){
-      rows.push({name, qty});
-    }
+    if (name && isFinite(qty) && qty>0){ rows.push({name, qty}); }
   });
   return rows;
 }
@@ -310,8 +300,7 @@ function addLineUI(root){
 }
 
 async function submitOut(root){
-  const btnSelector = '#global-fab .sd .action .btn.primary';
-  const btn = document.querySelector(btnSelector);
+  const btn = document.querySelector('#global-fab .sd .action .btn.primary');
   if (btn) setBtnLoading(btn, true);
   try{
     const lines = collectLines(root);
@@ -337,7 +326,6 @@ async function submitOut(root){
   }
 }
 
-/* Exported for main.js to build global FAB actions */
 export function fabActions({root}){
   return [
     { label: 'ประวัติ', icon: FabIcons.clock, onClick: ()=> openHist(root) },
@@ -352,12 +340,10 @@ export default async function mountOut({root}){
   bindPickerInputs(root, currentLang());
   addLineUI(root);
 
-  // History overlay open/close
-  $('#btnCloseHist', root).addEventListener('click', ()=> closeHist(root));
-  // History search + paginate + open editor
-  $('#btnSearch', root).addEventListener('click', ()=> doSearch(root, 0));
-  $('#btnMore', root).addEventListener('click', (e)=>{ const next = Number(e.currentTarget.dataset.page||1); doSearch(root, next); });
-  $('#histBody', root).addEventListener('click', (e)=>{
+  document.getElementById('btnCloseHist')?.addEventListener('click', ()=> closeHist(root));
+  document.getElementById('btnSearch')?.addEventListener('click', ()=> doSearch(root, 0));
+  document.getElementById('btnMore')?.addEventListener('click', (e)=>{ const next = Number(e.currentTarget.dataset.page||1); doSearch(root, next); });
+  document.getElementById('histBody')?.addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-open]'); if(!btn) return;
     openEdit(btn.getAttribute('data-open'));
   });

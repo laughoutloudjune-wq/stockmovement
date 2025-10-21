@@ -27,6 +27,9 @@ function injectStyles(){
   .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem;align-items:end}
   @media (max-width: 834px){ .line-grid{grid-template-columns:1fr 1fr auto} }
   @media (max-width: 430px){ .line-grid{grid-template-columns:1fr} .line-grid>div:last-child{justify-content:flex-start} }
+
+  /* Ensure pickers are visible above cards/overlays */
+  .picker-popover, .picker-menu, .autocomplete-panel, .picker-dropdown { position: fixed; z-index: 5001; }
 `;
   const st=document.createElement('style');
   st.id='purchase-tab-styles';
@@ -60,7 +63,8 @@ function lineRow({name='', qty=''}={}){
 
 export function addLineUI(root){
   $('#poLines',root).insertAdjacentHTML('beforeend', lineRow({}));
-  bindPickerInputs(root, currentLang()); // spreadsheet-driven autocomplete for project/contractor/requester/materials
+  bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang()); // spreadsheet-driven autocomplete for project/contractor/requester/materials
   $$('#poLines .btnRem',root).forEach(b=> b.onclick=()=> b.closest('.line')?.remove());
 }
 
@@ -104,5 +108,6 @@ export default async function mountPurchase({root}){
   injectStyles();
   root.innerHTML = viewTemplate();
   bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang());
   addLineUI(root);
 }

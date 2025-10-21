@@ -1,5 +1,5 @@
-// tabs/purchase.js — Purchase tab, wired to global FAB
-import { $, $$, esc, todayStr, apiPost, bindPickerInputs, toast, currentLang } from '../js/shared.js';
+// tabs/purchase.js — Purchase tab (projects, contractors, requesters, remark; no unit) using global FAB
+import { $, $$, esc, apiPost, bindPickerInputs, toast, currentLang } from '../js/shared.js';
 import { FabIcons } from '../js/fab.js';
 
 function injectStyles(){
@@ -9,10 +9,9 @@ function injectStyles(){
   .po-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--space-3)}
   @media (max-width:980px){.po-grid{grid-template-columns:repeat(6,1fr)}}
   @media (max-width:640px){.po-grid{grid-template-columns:1fr}}
-  .col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-6{grid-column:span 6}.col-12{grid-column:1/-1}
-  .po-grid input[type="date"]{height:var(--control-h,42px);line-height:var(--control-h,42px);padding:0 .65rem}
-  .line-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.75rem}
-  @media (max-width:720px){.line-grid{grid-template-columns:1fr 1fr 1fr auto}}
+  .col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-12{grid-column:1/-1}
+  .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem}
+  @media (max-width:720px){.line-grid{grid-template-columns:1fr 1fr auto}}
   @media (max-width:520px){.line-grid{grid-template-columns:1fr}}`;
   const st=document.createElement('style'); st.id='purchase-tab-styles'; st.textContent=css; document.head.appendChild(st);
 }
@@ -23,9 +22,9 @@ function viewTemplate(){
     <section class="card glass">
       <h3 style="margin:0 0 .5rem 0">สั่งซื้อ / Purchase</h3>
       <div class="row po-grid">
-        <div class="col-3"><label>วันที่</label><input id="poDate" type="date" value="${todayStr()}"></div>
-        <div class="col-3"><label>ผู้ขาย</label><input id="poVendor" data-picker="vendors" placeholder="เลือกจากรายการ…"></div>
-        <div class="col-3"><label>โครงการ</label><input id="poProject" data-picker="projects" placeholder="เลือกจากรายการ…"></div>
+        <div class="col-4"><label>โครงการ</label><input id="poProject" data-picker="projects" placeholder="ค้นหาโครงการ…"></div>
+        <div class="col-4"><label>ผู้รับเหมา</label><input id="poContractor" data-picker="contractors" placeholder="ค้นหาผู้รับเหมา…"></div>
+        <div class="col-4"><label>ผู้ขอเบิก</label><input id="poRequester" data-picker="requesters" placeholder="ค้นหาผู้ขอเบิก…"></div>
         <div class="col-12"><label>หมายเหตุ</label><input id="poNote" placeholder="…"></div>
       </div>
       <div id="poLines"></div>
@@ -33,18 +32,17 @@ function viewTemplate(){
   </div>`;
 }
 
-function lineRow({name='', qty='', unit=''}={}){
+function lineRow({name='', qty=''}={}){
   return `<div class="line"><div class="line-grid">
-    <div><label>วัสดุ</label><input class="lnName" data-picker="materials" placeholder="เลือก…" value="${esc(name)}"></div>
-    <div><label>จำนวน</label><input class="lnQty" type="number" min="0" step="0.01" value="${esc(qty)}"></div>
-    <div><label>หน่วย</label><input class="lnUnit" data-picker="units" value="${esc(unit)}"></div>
+    <div><label>วัสดุ</label><input class="lnName" data-picker="materials" placeholder="ค้นหาวัสดุ…" value="\${esc(name)}"></div>
+    <div><label>จำนวน</label><input class="lnQty" type="number" min="0" step="0.01" value="\${esc(qty)}"></div>
     <div style="display:flex;align-items:flex-end"><button class="btn small btnRem" type="button">ลบ</button></div>
   </div></div>`;
 }
 
-function addLineUI(root){
+export function addLineUI(root){
   $('#poLines',root).insertAdjacentHTML('beforeend', lineRow({}));
-  bindPickerInputs(root, currentLang());
+  bindPickerInputs(root, currentLang()); // spreadsheet-driven autocomplete for project/contractor/requester/materials
   $$('#poLines .btnRem',root).forEach(b=> b.onclick=()=> b.closest('.line')?.remove());
 }
 
@@ -53,21 +51,20 @@ function collectLines(root){
   $$('#poLines .line',root).forEach(line=>{
     const name=$('.lnName',line).value.trim();
     const qty=Number($('.lnQty',line).value);
-    const unit=$('.lnUnit',line).value.trim() || undefined;
-    if(name && isFinite(qty) && qty>0) rows.push({name, qty, unit});
+    if(name && isFinite(qty) && qty>0) rows.push({name, qty});
   });
   return rows;
 }
 
-async function submitPO(root){
+export async function submitPO(root){
   try{
     const lines=collectLines(root);
     if(!lines.length){ toast('เพิ่มรายการก่อน'); return; }
     const body={
       type:'PURCHASE',
-      date: $('#poDate',root).value || undefined,
-      vendor: $('#poVendor',root).value || undefined,
       project: $('#poProject',root).value || undefined,
+      contractor: $('#poContractor',root).value || undefined,
+      requester: $('#poRequester',root).value || undefined,
       note: $('#poNote',root).value || undefined,
       lines
     };

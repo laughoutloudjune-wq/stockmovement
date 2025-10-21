@@ -1,63 +1,103 @@
-// js/main.js
-import { $, $$, STR, applyLangTexts, preloadLookups, bindPickerInputs, toast, currentLang, cleanOldCache, setBtnLoading } from './shared.js';
+// js/main.js — App router + global FAB integration
+import {
+  $, $$, STR, applyLangTexts, preloadLookups, bindPickerInputs,
+  toast, currentLang, cleanOldCache, setBtnLoading
+} from './shared.js';
+import { mountGlobalFab, setFab, hideFab } from './fab.js';
 
+// Lazy-load tab modules
 const TAB_MODULES = {
-  dashboard: () => import('../tabs/dashboard.js').catch(()=>({default: async ({root})=> root.innerHTML='<section class="card glass"><h3>Dashboard</h3><p>Coming soon</p></section>' })),
+  dashboard: () => import('../tabs/dashboard.js'),
   out:       () => import('../tabs/out.js'),
-  in:        () => import('../tabs/in.js').catch(()=>({default: async ({root})=> root.innerHTML='<section class="card glass"><h3>IN</h3><p>Coming soon</p></section>' })),
-  adjust:    () => import('../tabs/adjust.js').catch(()=>({default: async ({root})=> root.innerHTML='<section class="card glass"><h3>Adjust</h3><p>Coming soon</p></section>' })),
-  purchase:  () => import('../tabs/purchase.js').catch(()=>({default: async ({root})=> root.innerHTML='<section class="card glass"><h3>Purchase</h3><p>Coming soon</p></section>' })),
+  in:        () => import('../tabs/in.js'),
+  adjust:    () => import('../tabs/adjust.js'),
+  purchase:  () => import('../tabs/purchase.js'),
 };
 
-let LANG = 'th';
-let currentTab = 'out'; // focus our tab
-const viewEl = () => $('#view');
+let LANG = currentLang();
+let currentTab = 'dashboard';
+
+function viewEl(){ return $('#view'); }
 
 async function mountTab(tab){
   currentTab = tab;
-  // set active class
   $$('.tabs button').forEach(b=> b.classList.toggle('active', b.getAttribute('data-tab')===tab));
-  // show skeleton
-  viewEl().innerHTML = `<section class="card glass"><div class="skeleton-row"><div class="skeleton-bar"></div><div class="skeleton-badge"></div></div></section>`;
+
+  const root = viewEl();
+  root.innerHTML = `<section class="card glass">
+    <div class="skeleton-row"><div class="skeleton-bar"></div><div class="skeleton-badge"></div></div>
+  </section>`;
+
   try{
     const mod = await TAB_MODULES[tab]();
-    await (mod.default)({root: viewEl(), lang: LANG});
+    await mod.default({ root, lang: LANG });
+    // Global FAB: update actions for this tab
+    mountGlobalFab();
+    if (typeof mod.fabActions === 'function'){
+      const actions = mod.fabActions({ root, lang: LANG });
+      setFab(actions);
+    } else {
+      hideFab();
+    }
   }catch(e){
-    viewEl().innerHTML = `<section class="card glass"><h3>Error</h3><p>${(e && e.message) || e}</p></section>`;
+    root.innerHTML = `<section class="card glass"><h3>Error</h3><p>${(e && e.message) || e}</p></section>`;
+    hideFab();
   }
 }
 
 async function init(){
   cleanOldCache();
 
-  // set lang from <html lang> if present
-  LANG = currentLang();
-
-  // Language switches
-  $('#lang-th')?.addEventListener('click', ()=>{ document.documentElement.lang='th'; onLangChange(); });
-  $('#lang-en')?.addEventListener('click', ()=>{ document.documentElement.lang='en'; onLangChange(); });
+  // Language toggle
+  $('#lang-en')?.addEventListener('click', ()=>{ LANG='en'; document.documentElement.lang='en'; onLangChange(); });
+  $('#lang-th')?.addEventListener('click', ()=>{ LANG='th'; document.documentElement.lang='th'; onLangChange(); });
 
   // Tabs
-  $$('.tabs button').forEach(btn => btn.addEventListener('click', ()=> mountTab(btn.dataset.tab)));
-
-  // Preload lookups
-  try{ await preloadLookups(); }catch{ toast(LANG==='th' ? 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ' : 'Failed to load lookups'); }
-
-  // Refresh button: rebuild caches server-side
-  const refreshBtn = $('#refreshDataBtn');
-  refreshBtn?.addEventListener('click', async ()=>{
-    setBtnLoading(refreshBtn, true);
-    try{ await fetch((window.API_URL||'')+'?fn=admin_RebuildCache').then(r=>r.text()); toast(LANG==='th' ? 'รีเฟรชแคชแล้ว' : 'Cache refreshed'); }
-    catch{ toast(LANG==='th' ? 'รีเฟรชไม่สำเร็จ' : 'Refresh failed'); }
-    finally{ setBtnLoading(refreshBtn, false); }
+  $$('.tabs button').forEach((btn)=>{
+    btn.addEventListener('click', async ()=>{
+      const key = btn.getAttribute('data-tab');
+      if (!key) return;
+      await mountTab(key);
+    });
   });
 
-  // mount default
+  // Preload lookups before first mount
+  try{
+    await preloadLookups();
+  }catch{
+    toast(LANG==='th' ? 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ ใช้ข้อมูลเก่า' : 'Failed to load lookups; using cached data');
+  }
+
+  // Language texts
+  applyLangTexts(LANG);
+  bindPickerInputs(document, LANG);
+
+  // Refresh button (top right)
+  const refreshBtn = $('#refreshDataBtn');
+  refreshBtn?.addEventListener('click', async ()=>{
+    try {
+      setBtnLoading(refreshBtn, true);
+      // clear caches
+      const keys = [];
+      for (let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if (k && k.startsWith('cache:')) keys.push(k);
+      }
+      keys.forEach(k=>localStorage.removeItem(k));
+      await preloadLookups();
+      toast(LANG==='th' ? 'รีเฟรชข้อมูลแล้ว' : 'Data refreshed');
+      await mountTab(currentTab);
+    }catch{
+      toast(LANG==='th' ? 'รีเฟรชไม่สำเร็จ' : 'Refresh failed');
+    }finally{
+      setBtnLoading(refreshBtn, false);
+    }
+  });
+
   await mountTab(currentTab);
 }
 
 function onLangChange(){
-  LANG = currentLang();
   applyLangTexts(LANG);
   bindPickerInputs(document, LANG);
   mountTab(currentTab);

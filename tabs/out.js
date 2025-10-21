@@ -1,119 +1,96 @@
-// tabs/out.js — Out tab wired to global FAB (icons + alignment guaranteed)
+// tabs/out.js — refined UI, proportional boxes, qty inline with material
 import {
   $, $$, esc, todayStr,
   apiGet, apiPost,
-  bindPickerInputs, toast, setBtnLoading, currentLang, stockBadge
+  bindPickerInputs, toast, currentLang, stockBadge
 } from '../js/shared.js';
 import { FabIcons } from '../js/fab.js';
 
-/* ------------ Styles (layout, overlay, stock spinner) ------------ */
+/* ------------ Styles: fluid grid + consistent control sizes ------------ */
 function injectStyles(){
   if (document.getElementById('out-tab-styles')) return;
   const css = `
-  .outWrap{max-width:1100px;margin:0 auto;padding-inline:min(3vw,16px)}
-  .out-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--space-3)}
-  /* iPad landscape (≈1024px), Pixel Fold/tablet */
-  @media (max-width: 1024px){ .out-grid{grid-template-columns:repeat(8,1fr)} }
-  /* iPad portrait / large phones in landscape (≈834px–820px) */
-  @media (max-width: 834px){ .out-grid{grid-template-columns:repeat(6,1fr)} }
-  /* Typical Android phones (≈600px and down) */
-  @media (max-width: 600px){ .out-grid{grid-template-columns:repeat(4,1fr)} }
-  /* iPhone 14/15 Pro Max width 430, and smaller iPhones */
-  @media (max-width: 430px){ .out-grid{grid-template-columns:1fr} }
-
-  .col-2{grid-column:span 2}.col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-6{grid-column:span 6}.col-8{grid-column:span 8}.col-12{grid-column:1/-1}
-
-  /* Normalize and prevent overflow */
-  .out-grid > *{min-width:0}
-  .out-grid input,
-  .overlay-body input,
-  .line-grid input{width:100%;min-width:0;box-sizing:border-box;height:var(--control-h,42px);line-height:var(--control-h,42px);padding:0 .65rem}
-
-  .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem;align-items:end}
-  @media (max-width: 834px){ .line-grid{grid-template-columns:1fr 1fr auto} }
-  @media (max-width: 430px){ .line-grid{grid-template-columns:1fr} .line-grid>div:last-child{justify-content:flex-start} }
-
-  .overlay-backdrop{position:fixed;inset:0;z-index:4500;display:none;background:rgba(15,18,23,.28);backdrop-filter:blur(6px)}
-  .overlay-panel{margin:5vh auto;width:min(980px,94%);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
-  .overlay-body{padding:1rem;display:flex;flex-direction:column;gap:.75rem;overflow:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto}
-  .overlay-sticky{position:sticky;bottom:0;background:var(--card);padding-top:.25rem;border-top:1px solid var(--border-weak)}
-  .overlay-backdrop.edit{z-index:4600}
-  .lnStock{border:1px solid var(--border-weak); border-radius:10px; padding:.35rem .5rem; min-height:32px}
-  .lnStock.loading{display:flex;align-items:center;gap:.5rem}
-  .lnStock .stock-spinner{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;opacity:.8}
+  :root{ --space-3:12px; --control-h:42px; }
+  .outWrap{max-width:1100px;margin:0 auto;padding:16px}
+  .tab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-3)}
+  .line-grid{display:grid;grid-template-columns:minmax(320px,2fr) minmax(140px,.9fr) auto;gap:.75rem;align-items:end}
+  @media (max-width:700px){ .line-grid{grid-template-columns:1fr 1fr auto} }
+  @media (max-width:460px){ .line-grid{grid-template-columns:1fr} .line-actions{justify-content:flex-start} }
+  input[type="text"],input[type="number"],input[type="date"]{width:100%;height:var(--control-h);line-height:var(--control-h);box-sizing:border-box;padding:0 .65rem;min-width:0}
+  label{display:block;margin:.15rem 0 .35rem .1rem;font-size:.9rem;opacity:.8}
+  .lnStock{display:flex;align-items:center;gap:.45rem;margin-top:.35rem;border:1px solid var(--border-weak,#e5e7eb);border-radius:10px;padding:.3rem .5rem;min-height:32px}
+  .lnStock.loading{opacity:.8}
+  .lnStock .stock-spinner{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-
-  /* Ensure pickers are visible above cards/overlays */
-  .picker-popover, .picker-menu, .autocomplete-panel, .picker-dropdown { position: fixed; z-index: 5001; }
-  .overlay-panel{ overflow: visible }
-`;
-  const st = document.createElement('style');
-  st.id = 'out-tab-styles';
-  st.textContent = css;
-  document.head.appendChild(st);
+  .line-actions{display:flex;align-items:flex-end}
+  `;
+  const st = document.createElement('style'); st.id = 'out-tab-styles'; st.textContent = css; document.head.appendChild(st);
 }
 
 /* ------------ Template ------------ */
 function viewTemplate(){
   return `
   <div class="outWrap">
-    <section class="card glass" style="max-width:100%;overflow:hidden">
-      <h3 style="margin:0 0 .5rem 0">จ่ายออก / OUT</h3>
-      <div class="row out-grid" id="outHeader">
-        <div class="col-3"><label>วันที่</label><input id="outDate" type="date" value="${todayStr()}"></div>
-        <div class="col-3"><label>โครงการ</label><input id="outProject" data-picker="projects" placeholder="เลือกจากรายการ…"></div>
-        <div class="col-3"><label>ผู้รับเหมา</label><input id="outContractor" data-picker="contractors" placeholder="เลือกจากรายการ…"></div>
-        <div class="col-3"><label>ผู้ขอเบิก</label><input id="outRequester" data-picker="requesters" placeholder="เลือกจากรายการ…"></div>
-        <div class="col-12"><label>หมายเหตุ</label><input id="outNote" placeholder="…"></div>
+    <section class="card glass" style="overflow:hidden">
+      <h3 style="margin:0 0 .75rem 0">จ่ายออก / OUT</h3>
+      <div class="tab-grid" id="outHeader">
+        <div><label>วันที่</label><input id="outDate" type="date" value="${todayStr()}"></div>
+        <div><label>โครงการ</label><input id="outProject" data-picker="projects" placeholder="ค้นหาโครงการ…"></div>
+        <div><label>ผู้รับเหมา</label><input id="outContractor" data-picker="contractors" placeholder="ค้นหาผู้รับเหมา…"></div>
+        <div><label>ผู้ขอเบิก</label><input id="outRequester" data-picker="requesters" placeholder="ค้นหาผู้ขอเบิก…"></div>
+        <div style="grid-column:1/-1"><label>หมายเหตุ</label><input id="outNote" placeholder="…"></div>
       </div>
-      <div class="lines" id="outLines"></div>
+
+      <div id="outLines"></div>
     </section>
   </div>
 
   <!-- History overlay -->
-  <div id="histOverlay" class="overlay-backdrop">
-    <div class="overlay-panel card glass">
+  <div id="histOverlay" class="overlay-backdrop" style="position:fixed;inset:0;z-index:4500;display:none;background:rgba(15,18,23,.28);backdrop-filter:blur(6px)">
+    <div class="overlay-panel card glass" style="margin:5vh auto;width:min(980px,94%);max-height:90vh;display:flex;flex-direction:column;overflow:visible">
       <div style="padding:.9rem 1rem;border-bottom:1px solid var(--border-weak);display:flex;gap:.5rem;align-items:center;flex:0 0 auto;background:var(--card)">
         <strong style="font-size:1.05rem">ค้นหาประวัติการจ่ายออก</strong>
         <span class="spacer"></span>
         <button class="btn small" id="btnCloseHist" type="button">ปิด</button>
       </div>
-      <div id="histBody" class="overlay-body">
-        <div class="row out-grid" id="searchHeader">
-          <div class="col-3"><label>จากวันที่</label><input id="sFrom" type="date"></div>
-          <div class="col-3"><label>ถึงวันที่</label><input id="sTo" type="date"></div>
-          <div class="col-3"><label>โครงการ</label><input id="sProj" data-picker="projects"></div>
-          <div class="col-3"><label>ผู้รับเหมา</label><input id="sCont" data-picker="contractors"></div>
-          <div class="col-3"><label>ผู้ขอเบิก</label><input id="sReq" data-picker="requesters"></div>
-          <div class="col-3"><label>วัสดุ</label><input id="sMat" data-picker="materials"></div>
-          <div class="col-3" style="align-self:end">
+      <div id="histBody" style="padding:1rem;display:flex;flex-direction:column;gap:.75rem;overflow:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto">
+        <div class="tab-grid" id="searchHeader">
+          <div><label>จากวันที่</label><input id="sFrom" type="date"></div>
+          <div><label>ถึงวันที่</label><input id="sTo" type="date"></div>
+          <div><label>โครงการ</label><input id="sProj" data-picker="projects"></div>
+          <div><label>ผู้รับเหมา</label><input id="sCont" data-picker="contractors"></div>
+          <div><label>ผู้ขอเบิก</label><input id="sReq" data-picker="requesters"></div>
+          <div><label>วัสดุ</label><input id="sMat" data-picker="materials"></div>
+          <div>
             <button class="btn" id="btnSearch" type="button">
-              <span class="btn-label">ค้นหา</span><span class="btn-spinner"><span class="spinner"></span></span>
+              <span class="btn-label">ค้นหา</span><span class="btn-spinner" style="display:none"><span class="spinner"></span></span>
             </button>
           </div>
         </div>
         <div class="list" id="sResults"></div>
-        <div class="overlay-sticky"><button id="btnMore" type="button" style="display:none">ดูเพิ่มเติม</button></div>
+        <div style="position:sticky;bottom:0;background:var(--card);padding-top:.25rem;border-top:1px solid var(--border-weak)">
+          <button id="btnMore" type="button" style="display:none">ดูเพิ่มเติม</button>
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-/* ------------ Helpers ------------ */
+/* ------------ Line UI ------------ */
 function lineRow({name="", qty=""}={}) {
   return `
   <div class="line">
     <div class="line-grid">
       <div>
         <label>วัสดุ</label>
-        <input class="lnName" data-picker="materials" placeholder="เลือก…" value="${esc(name)}">
-        <div class="lnStock" style="margin-top:.35rem;display:flex;gap:.5rem;align-items:center"></div>
+        <input class="lnName" data-picker="materials" placeholder="ค้นหาวัสดุ…" value="${esc(name)}">
+        <div class="lnStock"></div>
       </div>
       <div>
         <label>จำนวน</label>
         <input class="lnQty" type="number" min="0" step="0.01" value="${esc(qty)}">
       </div>
-      <div style="display:flex;align-items:flex-end"><button class="btn small btnRem" type="button">ลบ</button></div>
+      <div class="line-actions"><button class="btn small btnRem" type="button">ลบ</button></div>
     </div>
   </div>`;
 }
@@ -198,25 +175,23 @@ async function doSearch(root, page=0){
     limit: 50, offset: page*50
   };
   const btn = $('#btnSearch',root);
-  setBtnLoading(btn,true);
+  btn && btn.querySelector('.btn-spinner') && (btn.querySelector('.btn-spinner').style.display='inline-flex');
   try{
     const res = await apiGet('out_SearchHistory', q, {retries:1});
-    if (!res || res.ok===false) throw new Error(res && res.message || 'Search failed');
-    renderResults($('#sResults',root), res.rows||[]);
+    renderResults($('#sResults',root), (res && res.rows) || []);
     const more = $('#btnMore',root);
-    const moreVisible = res.total > (q.offset + (res.rows||[]).length);
+    const moreVisible = res && res.total > (q.offset + ((res.rows||[]).length));
     more.style.display = moreVisible ? '' : 'none';
     more.dataset.page = String(page+1);
-    if ((res.rows||[]).length===0) toast('ไม่พบรายการ');
-  }catch(e){ toast(e.message); }
-  finally{ setBtnLoading(btn,false); }
+    if (!res || (res.rows||[]).length===0) toast('ไม่พบรายการ');
+  }catch(e){ toast(e.message || 'ค้นหาล้มเหลว'); }
+  finally{ btn && btn.querySelector('.btn-spinner') && (btn.querySelector('.btn-spinner').style.display='none'); }
 }
 
 function openHist(root){
   const ov = $('#histOverlay',root);
   ov.style.display = 'block';
   bindPickerInputs(ov, currentLang());
-  bindPickerInputs(document, currentLang());
   $('#sResults',root).innerHTML='';
   document.body.style.overflow = 'hidden';
 }
@@ -229,7 +204,6 @@ function closeHist(root){
 function addLineUI(root){
   $('#outLines',root).insertAdjacentHTML('beforeend', lineRow({}));
   bindPickerInputs(root, currentLang());
-  bindPickerInputs(document, currentLang());
   attachStockHandlers(root);
   $$('#outLines .btnRem',root).forEach(btn => btn.onclick = ()=> btn.closest('.line')?.remove());
 }
@@ -252,10 +226,10 @@ async function submitOut(root){
     toast('บันทึกเอกสารแล้ว: '+ (res.docNo||''));
     $('#outLines', root).innerHTML = '';
     addLineUI(root);
-  }catch(e){ toast(e.message); }
+  }catch(e){ toast(e.message || 'บันทึกล้มเหลว'); }
 }
 
-/* ------------ Global FAB actions for this tab ------------ */
+/* ------------ FAB actions for this tab ------------ */
 export function fabActions({root}){
   return [
     { label:'ประวัติ',   icon: FabIcons.clock, onClick: ()=> openHist(root) },
@@ -269,7 +243,6 @@ export default async function mountOut({root}){
   injectStyles();
   root.innerHTML = viewTemplate();
   bindPickerInputs(root, currentLang());
-  bindPickerInputs(document, currentLang());
   addLineUI(root);
 
   $('#btnCloseHist',root).addEventListener('click', ()=> closeHist(root));

@@ -1,17 +1,18 @@
-// tabs/out.js
+// tabs/out.js (overlay version)
 import {
   $, $$, esc, todayStr,
   apiGet, apiPost,
-  getLookups, preloadLookups,
   bindPickerInputs, toast, setBtnLoading, currentLang, stockBadge
 } from '../js/shared.js';
-
-function h(str){ return str.trim(); }
 
 function viewTemplate(){
   return `
   <section class="card glass">
-    <h3>จ่ายออก / OUT</h3>
+    <div style="display:flex; align-items:center; gap:.75rem">
+      <h3 style="margin:0">จ่ายออก / OUT</h3>
+      <span class="spacer"></span>
+      <button class="btn small" id="btnOpenHistory">ประวัติ</button>
+    </div>
 
     <div class="row" id="outHeader">
       <div>
@@ -48,38 +49,27 @@ function viewTemplate(){
     </div>
   </section>
 
-  <section class="card glass">
-    <h3>ค้นหาประวัติการจ่ายออก</h3>
-    <div class="row" id="searchHeader">
-      <div><label>จากวันที่</label><input id="sFrom" type="date"></div>
-      <div><label>ถึงวันที่</label><input id="sTo" type="date"></div>
-      <div><label>โครงการ</label><input id="sProj" data-picker="projects" placeholder="—"></div>
-      <div><label>ผู้รับเหมา</label><input id="sCont" data-picker="contractors" placeholder="—"></div>
-      <div><label>ผู้ขอเบิก</label><input id="sReq" data-picker="requesters" placeholder="—"></div>
-      <div><label>วัสดุ</label><input id="sMat" data-picker="materials" placeholder="—"></div>
-      <div style="flex:1 1 100%"><label>ค้นหาคำ</label><input id="sText" placeholder="พิมพ์คำค้น…"></div>
-      <div><label>&nbsp;</label><button class="btn" id="btnSearch"><span class="btn-label">ค้นหา</span><span class="btn-spinner"><span class="spinner"></span></span></button></div>
-    </div>
-
-    <div class="list" id="sResults" data-limit="10"></div>
-
-    <div class="toggle">
-      <button id="btnMore" type="button">ดูเพิ่มเติม</button>
-    </div>
-  </section>
-
-  <!-- Edit modal -->
-  <div id="editOverlay" style="display:none; position:fixed; inset:0; z-index:5000; background:rgba(15,18,23,.35); backdrop-filter:blur(3px);">
-    <div style="margin:5vh auto; max-width:860px; width:92%; background:#fff; border-radius:18px; border:1px solid rgba(0,0,0,.08); box-shadow:0 18px 36px rgba(0,0,0,.18); overflow:hidden">
-      <div style="padding:1rem; border-bottom:1px solid rgba(0,0,0,.06); display:flex; align-items:center; gap:.5rem">
-        <strong id="eTitle" style="font-size:1.1rem"></strong>
+  <!-- History overlay -->
+  <div id="histOverlay" style="position:fixed; inset:0; z-index:4500; display:none; background:rgba(15,18,23,0.35); backdrop-filter:blur(3px)">
+    <div style="margin:5vh auto; width:min(960px, 94%); background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:18px; box-shadow:0 18px 36px rgba(0,0,0,.18); display:flex; flex-direction:column; overflow:hidden">
+      <div style="padding:.9rem 1rem; border-bottom:1px solid rgba(0,0,0,.08); display:flex; gap:.5rem; align-items:center">
+        <strong style="font-size:1.05rem">ค้นหาประวัติการจ่ายออก</strong>
         <span class="spacer"></span>
-        <button class="btn small" id="eClose">ปิด</button>
+        <button class="btn small" id="btnCloseHist">ปิด</button>
       </div>
-      <div style="padding:1rem" id="eBody"></div>
-      <div style="padding:1rem; border-top:1px solid rgba(0,0,0,.06); display:flex; gap:.5rem; justify-content:flex-end">
-        <button class="btn" id="eReload">รีเฟรช</button>
-        <button class="btn primary" id="eSave"><span class="btn-label">บันทึกการแก้ไข</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+      <div style="padding:1rem; display:flex; flex-direction:column; gap:.75rem">
+        <div class="row" id="searchHeader">
+          <div><label>จากวันที่</label><input id="sFrom" type="date"></div>
+          <div><label>ถึงวันที่</label><input id="sTo" type="date"></div>
+          <div><label>โครงการ</label><input id="sProj" data-picker="projects" placeholder="—"></div>
+          <div><label>ผู้รับเหมา</label><input id="sCont" data-picker="contractors" placeholder="—"></div>
+          <div><label>ผู้ขอเบิก</label><input id="sReq" data-picker="requesters" placeholder="—"></div>
+          <div><label>วัสดุ</label><input id="sMat" data-picker="materials" placeholder="—"></div>
+          <div style="flex:1 1 100%"><label>ค้นหาคำ</label><input id="sText" placeholder="พิมพ์คำค้น…"></div>
+          <div><label>&nbsp;</label><button class="btn" id="btnSearch"><span class="btn-label">ค้นหา</span><span class="btn-spinner"><span class="spinner"></span></span></button></div>
+        </div>
+        <div class="list" id="sResults" data-limit="10"></div>
+        <div class="toggle"><button id="btnMore" type="button" style="display:none">ดูเพิ่มเติม</button></div>
       </div>
     </div>
   </div>
@@ -90,7 +80,11 @@ function lineRow({name="", qty="", spec=""}={}){
   return `
   <div class="line">
     <div class="grid">
-      <div><label>วัสดุ</label><input class="lnName" data-picker="materials" placeholder="เลือก…" value="${esc(name)}"></div>
+      <div>
+        <label>วัสดุ</label>
+        <input class="lnName" data-picker="materials" placeholder="เลือก…" value="${esc(name)}">
+        <div class="lnStock" style="margin-top:.35rem; font-size:.9rem; display:flex; gap:.5rem; align-items:center"></div>
+      </div>
       <div><label>จำนวน</label><input class="lnQty" type="number" min="0" step="0.01" value="${esc(qty)}"></div>
       <div><label>รายละเอียด (ถ้ามี)</label><input class="lnSpec" placeholder="—" value="${esc(spec)}"></div>
       <div style="display:flex; align-items:flex-end"><button class="btn small btnRem">ลบ</button></div>
@@ -145,8 +139,10 @@ async function doSearch(root, page=0){
     const res = await apiGet('out_SearchHistory', q, {retries:1});
     if (!res || res.ok===false) throw new Error(res && res.message || 'Search failed');
     renderResults($('#sResults', root), res.rows||[]);
-    $('#btnMore', root).style.display = (res.total> (q.offset + (res.rows||[]).length)) ? '' : 'none';
-    $('#btnMore', root).dataset.page = String(page+1);
+    const more = $('#btnMore', root);
+    const moreVisible = res.total> (q.offset + (res.rows||[]).length);
+    more.style.display = moreVisible ? '' : 'none';
+    more.dataset.page = String(page+1);
     if ((res.rows||[]).length===0) toast('ไม่พบรายการ');
   }catch(e){
     toast(e.message);
@@ -155,14 +151,43 @@ async function doSearch(root, page=0){
   }
 }
 
-function openEdit(root, docNo){
-  $('#editOverlay', root).style.display = 'block';
-  $('#eTitle', root).textContent = 'เอกสาร: ' + docNo;
-  $('#eBody', root).innerHTML = '<div class="skeleton-row"><div class="skeleton-bar" style="width:70%"></div></div>';
-  loadDoc(root, docNo);
+function openHist(root){
+  const ov = $('#histOverlay', root);
+  ov.style.display = 'block';
+  bindPickerInputs(ov, currentLang());
+  $('#sResults', root).innerHTML = '';
 }
 
-async function loadDoc(root, docNo){
+function closeHist(root){
+  $('#histOverlay', root).style.display = 'none';
+}
+
+function openEdit(root, docNo){
+  // reuse the history overlay body area for editing: show a sub-modal stacked? keep simple: open a lightweight editor window
+  const edit = document.createElement('div');
+  edit.id = 'editOverlay';
+  edit.style.cssText = 'position:fixed; inset:0; z-index:4600; background:rgba(15,18,23,.35); backdrop-filter:blur(3px)';
+  edit.innerHTML = `
+    <div style="margin:6vh auto; max-width:860px; width:92%; background:#fff; border-radius:18px; border:1px solid rgba(0,0,0,.08); box-shadow:0 18px 36px rgba(0,0,0,.18); overflow:hidden">
+      <div style="padding:1rem; border-bottom:1px solid rgba(0,0,0,.06); display:flex; align-items:center; gap:.5rem">
+        <strong id="eTitle" style="font-size:1.1rem">เอกสาร: ${esc(docNo)}</strong>
+        <span class="spacer"></span>
+        <button class="btn small" id="eClose">ปิด</button>
+      </div>
+      <div style="padding:1rem" id="eBody"><div class="skeleton-row"><div class="skeleton-bar" style="width:70%"></div></div></div>
+      <div style="padding:1rem; border-top:1px solid rgba(0,0,0,.06); display:flex; gap:.5rem; justify-content:flex-end">
+        <button class="btn" id="eReload">รีเฟรช</button>
+        <button class="btn primary" id="eSave"><span class="btn-label">บันทึกการแก้ไข</span><span class="btn-spinner"><span class="spinner"></span></span></button>
+      </div>
+    </div>`;
+  document.body.appendChild(edit);
+  loadDoc(edit, docNo);
+  edit.addEventListener('click', (e)=> { if (e.target===edit) edit.remove(); });
+  $('#eClose', edit).addEventListener('click', ()=> edit.remove());
+  $('#eReload', edit).addEventListener('click', ()=> loadDoc(edit, docNo));
+}
+
+async function loadDoc(overlayRoot, docNo){
   try{
     const r = await apiGet('out_GetDoc', {docNo});
     if (!r || r.ok===false) throw new Error(r && r.message || 'Load failed');
@@ -180,30 +205,31 @@ async function loadDoc(root, docNo){
       </div>
       <div><button class="btn" id="eAddLine">＋ เพิ่มบรรทัด</button></div>
     `;
-    $('#eBody', root).innerHTML = html;
-    bindPickerInputs($('#eBody', root), currentLang());
-    // wire remove + add
-    $$('#eLines .btnRem', root).forEach(btn => btn.addEventListener('click', ()=> {
-      const box = btn.closest('.line'); box?.remove();
-    }));
-    $('#eAddLine', root).addEventListener('click', ()=>{
-      $('#eLines', root).insertAdjacentHTML('beforeend', lineRow({}));
-      bindPickerInputs($('#eBody', root), currentLang());
-      $$('#eLines .btnRem', root).forEach(btn => btn.onclick = ()=> btn.closest('.line')?.remove());
+    $('#eBody', overlayRoot).innerHTML = html;
+    bindPickerInputs($('#eBody', overlayRoot), currentLang());
+    // stock hook for each line
+    attachStockHandlers($('#eBody', overlayRoot));
+    // remove + add
+    $$('#eLines .btnRem', overlayRoot).forEach(btn => btn.addEventListener('click', ()=> btn.closest('.line')?.remove()));
+    $('#eAddLine', overlayRoot).addEventListener('click', ()=>{
+      $('#eLines', overlayRoot).insertAdjacentHTML('beforeend', lineRow({}));
+      bindPickerInputs($('#eBody', overlayRoot), currentLang());
+      attachStockHandlers($('#eBody', overlayRoot));
+      $$('#eLines .btnRem', overlayRoot).forEach(btn => btn.onclick = ()=> btn.closest('.line')?.remove());
     });
     // save handler
-    $('#eSave', root).onclick = () => saveEdit(root, d.docNo);
+    $('#eSave', overlayRoot).onclick = () => saveEdit(overlayRoot, d.docNo);
   }catch(e){
     toast(e.message);
   }
 }
 
-async function saveEdit(root, docNo){
-  const btn = $('#eSave', root);
+async function saveEdit(overlayRoot, docNo){
+  const btn = $('#eSave', overlayRoot);
   setBtnLoading(btn, true);
   try{
     const lines = [];
-    $$('#eLines .line', root).forEach(line=>{
+    $$('#eLines .line', overlayRoot).forEach(line=>{
       const name = $('.lnName', line).value.trim();
       const qty  = Number($('.lnQty', line).value);
       const spec = $('.lnSpec', line).value.trim();
@@ -211,21 +237,17 @@ async function saveEdit(root, docNo){
     });
     const p = {
       docNo,
-      date: $('#eDate', root).value || undefined,
-      project: $('#eProj', root).value || undefined,
-      contractor: $('#eCont', root).value || undefined,
-      requester: $('#eReq', root).value || undefined,
-      note: $('#eNote', root).value || undefined,
+      date: $('#eDate', overlayRoot).value || undefined,
+      project: $('#eProj', overlayRoot).value || undefined,
+      contractor: $('#eCont', overlayRoot).value || undefined,
+      requester: $('#eReq', overlayRoot).value || undefined,
+      note: $('#eNote', overlayRoot).value || undefined,
       lines
     };
     const res = await apiPost('out_UpdateDoc', p);
     if (!res || res.ok===false) throw new Error(res && res.message || 'Save failed');
     toast('บันทึกการแก้ไขแล้ว');
-    $('#editOverlay', root).style.display = 'none';
-    // refresh last search page
-    const more = $('#btnMore', root);
-    const page = Number(more.dataset.page||1)-1;
-    await doSearch(root, Math.max(0,page));
+    overlayRoot.remove();
   }catch(e){
     toast(e.message);
   }finally{
@@ -233,9 +255,37 @@ async function saveEdit(root, docNo){
   }
 }
 
+function attachStockHandlers(scope){
+  $$('.lnName', scope).forEach(inp => {
+    const show = async ()=>{
+      const name = inp.value.trim();
+      const box = inp.parentElement.querySelector('.lnStock');
+      if (!name){ box.innerHTML=''; return; }
+      try{
+        const r = await apiGet('getCurrentStock', { material:name }, { cacheTtlMs: 4000 });
+        if (!r || r.ok===false){ box.innerHTML = '<span class="meta">ไม่พบคงเหลือ</span>'; return; }
+        box.innerHTML = '';
+        box.appendChild(stockBadge(Number(r.stock||0), Number(r.min||0)));
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = ` คงเหลือ / Min: ${r.stock ?? '-'} / ${r.min ?? '-'}`;
+        box.appendChild(meta);
+      }catch{
+        box.innerHTML = '<span class="meta">โหลดคงเหลือไม่สำเร็จ</span>';
+      }
+    };
+    // fetch when focused or changed
+    inp.addEventListener('change', show);
+    inp.addEventListener('blur', show);
+    // also on first mount if value exists
+    if (inp.value) show();
+  });
+}
+
 function addLineUI(root){
   $('#outLines', root).insertAdjacentHTML('beforeend', lineRow({}));
   bindPickerInputs(root, currentLang());
+  attachStockHandlers(root);
   $$('#outLines .btnRem', root).forEach(btn => btn.onclick = ()=> btn.closest('.line')?.remove());
 }
 
@@ -271,22 +321,21 @@ export default async function mountOut({root}){
   bindPickerInputs(root, currentLang());
   addLineUI(root);
 
-  // events
+  // OUT actions
   $('#btnAddLine', root).addEventListener('click', ()=> addLineUI(root));
   $('#btnSubmitOut', root).addEventListener('click', ()=> submitOut(root));
+
+  // History overlay open/close
+  $('#btnOpenHistory', root).addEventListener('click', ()=> openHist(root));
+  $('#btnCloseHist', root).addEventListener('click', ()=> closeHist(root));
+  // History search + paginate + open editor
   $('#btnSearch', root).addEventListener('click', ()=> doSearch(root, 0));
-  $('#btnMore', root).addEventListener('click', (e)=> {
+  $('#btnMore', root).addEventListener('click', (e)=>{
     const next = Number(e.currentTarget.dataset.page||1);
     doSearch(root, next);
   });
-
   $('#sResults', root).addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-open]'); if(!btn) return;
     openEdit(root, btn.getAttribute('data-open'));
-  });
-  $('#eClose', root).addEventListener('click', ()=> $('#editOverlay', root).style.display='none');
-  $('#eReload', root).addEventListener('click', ()=> {
-    const doc = $('#eTitle', root).textContent.replace('เอกสาร: ','').trim();
-    if (doc) loadDoc(root, doc);
   });
 }

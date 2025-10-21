@@ -1,326 +1,93 @@
-// tabs/purchase.js
-// Purchasing tab with speed-dial FAB (“Add Item” + “Submit Form”),
-// changeable status in history (inside expanded details),
-// no preloaded skeleton inside collapsed items (only show after expand),
-// and auto-refresh of lookups after submit.
+// tabs/purchase.js — Purchase tab, wired to global FAB
+import { $, $$, esc, todayStr, apiPost, bindPickerInputs, toast, currentLang } from '../js/shared.js';
+import { FabIcons } from '../js/fab.js';
 
-import {
-  $, $$, STR, bindPickerInputs, openPicker,
-  apiGet, apiPost, setBtnLoading, clampList,
-  esc, toast, todayStr, preloadLookups
-} from '../js/shared.js';
-
-/* ------------ helpers ------------ */
-function statusColor(status){
-  if(!status) return '';
-  const s = String(status).toLowerCase();
-  if (s.includes('approve') || s.includes('อนุมัติ')) return 'green';
-  if (s.includes('wait') || s.includes('รอ') || s.includes('order')) return 'yellow';
-  if (s.includes('reject') || s.includes('cancel') || s.includes('ยกเลิก') || s.includes('ไม่อนุมัติ')) return 'red';
-  if (s.includes('receive') || s.includes('รับ')) return 'green';
-  return '';
+function injectStyles(){
+  if (document.getElementById('purchase-tab-styles')) return;
+  const css = `
+  .poWrap{max-width:1100px;margin:0 auto;padding-inline:min(3vw,16px)}
+  .po-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--space-3)}
+  @media (max-width:980px){.po-grid{grid-template-columns:repeat(6,1fr)}}
+  @media (max-width:640px){.po-grid{grid-template-columns:1fr}}
+  .col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-6{grid-column:span 6}.col-12{grid-column:1/-1}
+  .po-grid input[type="date"]{height:var(--control-h,42px);line-height:var(--control-h,42px);padding:0 .65rem}
+  .line-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.75rem}
+  @media (max-width:720px){.line-grid{grid-template-columns:1fr 1fr 1fr auto}}
+  @media (max-width:520px){.line-grid{grid-template-columns:1fr}}`;
+  const st=document.createElement('style'); st.id='purchase-tab-styles'; st.textContent=css; document.head.appendChild(st);
 }
 
-function purLine(lang){
-  const card=document.createElement('div'); card.className='line';
-  const name=document.createElement('input'); name.placeholder=(lang==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
-  const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
-  const grid=document.createElement('div'); grid.className='grid'; grid.appendChild(name); grid.appendChild(qty);
-  const actions=document.createElement('div'); actions.className='actions';
-  const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>card.remove();
-  actions.appendChild(rm);
-  card.appendChild(grid); card.appendChild(actions);
-  name.addEventListener('click', ()=>openPicker(name,'materials', lang));
-  return card;
+function viewTemplate(){
+  return `
+  <div class="poWrap">
+    <section class="card glass">
+      <h3 style="margin:0 0 .5rem 0">สั่งซื้อ / Purchase</h3>
+      <div class="row po-grid">
+        <div class="col-3"><label>วันที่</label><input id="poDate" type="date" value="${todayStr()}"></div>
+        <div class="col-3"><label>ผู้ขาย</label><input id="poVendor" data-picker="vendors" placeholder="เลือกจากรายการ…"></div>
+        <div class="col-3"><label>โครงการ</label><input id="poProject" data-picker="projects" placeholder="เลือกจากรายการ…"></div>
+        <div class="col-12"><label>หมายเหตุ</label><input id="poNote" placeholder="…"></div>
+      </div>
+      <div id="poLines"></div>
+    </section>
+  </div>`;
+}
+
+function lineRow({name='', qty='', unit=''}={}){
+  return `<div class="line"><div class="line-grid">
+    <div><label>วัสดุ</label><input class="lnName" data-picker="materials" placeholder="เลือก…" value="${esc(name)}"></div>
+    <div><label>จำนวน</label><input class="lnQty" type="number" min="0" step="0.01" value="${esc(qty)}"></div>
+    <div><label>หน่วย</label><input class="lnUnit" data-picker="units" value="${esc(unit)}"></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn small btnRem" type="button">ลบ</button></div>
+  </div></div>`;
+}
+
+function addLineUI(root){
+  $('#poLines',root).insertAdjacentHTML('beforeend', lineRow({}));
+  bindPickerInputs(root, currentLang());
+  $$('#poLines .btnRem',root).forEach(b=> b.onclick=()=> b.closest('.line')?.remove());
 }
 
 function collectLines(root){
-  const out=[];
-  $$('.line', root).forEach(c=>{
-    const nameEl=c.querySelector('input[data-picker="materials"]');
-    const qtyEl=c.querySelector('input[type="number"]');
-    const name=nameEl?nameEl.value.trim():'';
-    const qty=Number(qtyEl?qtyEl.value:0)||0;
-    if (name) out.push({name, qty});
+  const rows=[];
+  $$('#poLines .line',root).forEach(line=>{
+    const name=$('.lnName',line).value.trim();
+    const qty=Number($('.lnQty',line).value);
+    const unit=$('.lnUnit',line).value.trim() || undefined;
+    if(name && isFinite(qty) && qty>0) rows.push({name, qty, unit});
   });
-  return out;
+  return rows;
 }
 
-function renderStatusEditor(docNo, currentStatus, lang, onSaved){
-  const wrap = document.createElement('div');
-  wrap.style.display='flex'; wrap.style.gap='.5rem'; wrap.style.alignItems='center'; wrap.style.margin='.5rem 0';
-  const label = document.createElement('label');
-  label.style.minWidth='7rem';
-  label.textContent = (lang==='th'?'เปลี่ยนสถานะ':'Change status');
-  const sel = document.createElement('select');
-  sel.innerHTML = `
-    <option value="Requested">Requested</option>
-    <option value="Approved">Approved</option>
-    <option value="Ordered">Ordered</option>
-    <option value="Received">Received</option>
-    <option value="Cancelled">Cancelled</option>
-  `;
-  sel.value = currentStatus || 'Requested';
-  const save = document.createElement('button'); save.className='btn small'; save.type='button';
-  save.innerHTML = `<span class="btn-label">${lang==='th'?'บันทึก':'Save'} </span><span class="btn-spinner"><span class="spinner"></span></span>`;
-  save.addEventListener('click', async ()=>{
-    setBtnLoading(save, true);
-    try{
-      const res = await apiPost('pur_UpdateStatus', {docNo, status: sel.value});
-      if (res && res.ok){
-        toast(lang==='th'?'อัปเดตสถานะแล้ว':'Status updated');
-        onSaved?.(sel.value);
-      } else {
-        toast((res && res.message) || 'Error');
-      }
-    } catch {
-      toast(lang==='th'?'ไม่สามารถอัปเดตสถานะได้':'Failed to update status');
-    } finally {
-      setBtnLoading(save, false);
-    }
-  });
-  wrap.appendChild(label); wrap.appendChild(sel); wrap.appendChild(save);
-  return wrap;
-}
-
-/* ------------ main mount ------------ */
-export default async function mount({ root, lang }){
-  const S = STR[lang];
-
-  root.innerHTML = `
-    <section class="card glass">
-      <h3 id="t_pur_title">${S.purTitle}</h3>
-      <div class="row">
-        <div>
-          <label id="t_pur_project">${S.purProj}</label>
-          <input id="PurProject" data-picker="projects" placeholder="${S.pick}" readonly />
-        </div>
-        <div>
-          <label id="t_pur_needby">${S.purNeedBy}</label>
-          <input type="date" id="PurNeedBy" />
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label id="t_pur_contractor">${S.purContractor}</label>
-          <input id="PurContractor" data-picker="contractors" placeholder="${S.pickAdd}" readonly />
-        </div>
-        <div>
-          <label id="t_pur_priority">${S.purPriority}</label>
-          <select id="PurPriority">
-            <option value="Normal">${lang==='th'?'ปกติ':'Normal'}</option>
-            <option value="Urgent">${lang==='th'?'ด่วน':'Urgent'}</option>
-            <option value="Critical">${lang==='th'?'วิกฤติ':'Critical'}</option>
-          </select>
-        </div>
-      </div>
-      <div class="lines" id="purLines"></div>
-      <div class="row">
-        <div>
-          <label id="t_pur_note">${S.purNote}</label>
-          <input id="PurNote" placeholder="${lang==='th'?'บันทึกเพิ่มเติม (ถ้ามี)':'Optional note'}" />
-        </div>
-      </div>
-    </section>
-
-    <section class="card glass" style="margin-top:.25rem">
-      <h3>${lang==='th'?'คำขอก่อนหน้า':'Previous Requests'}</h3>
-      <div class="list" id="purOlderList" data-limit="10"></div>
-      <div class="toggle"><button type="button" data-toggle="#purOlderList">${S.showMore}</button></div>
-    </section>
-
-  const lines = $('#purLines', root);
-
-  function addLine(){
-    const ln = purLine(lang);
-    lines.appendChild(ln);
-    bindPickerInputs(root, lang);
-  }
-  function clearForm(){
-    lines.innerHTML=''; addLine();
-    $('#PurNote', root).value=''; $('#PurContractor', root).value=''; $('#PurProject', root).value='';
-    $('#PurNeedBy', root).value=todayStr();
-  }
-
-  // FAB behavior
-  const fab = $('#fab', root);
-  const fabMain = $('#fabMain', root);
-  const fabAdd = $('#fabAddBtn', root);
-  const fabSubmit = $('#fabSubmitBtn', root);
-
-  function toggleFab(){
-    const expanded = fab.classList.toggle('expanded');
-    fabMain.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-  }
-  fabMain.addEventListener('click', toggleFab);
-  fabAdd.addEventListener('click', addLine);
-
-  fabSubmit.addEventListener('click', async ()=>{
-    setBtnLoading(fabSubmit, true);
-    const p = {
+async function submitPO(root){
+  try{
+    const lines=collectLines(root);
+    if(!lines.length){ toast('เพิ่มรายการก่อน'); return; }
+    const body={
       type:'PURCHASE',
-      project: $('#PurProject', root).value.trim(),
-      contractor: $('#PurContractor', root).value.trim(),
-      needBy: $('#PurNeedBy', root).value.trim(),
-      priority: $('#PurPriority', root).value,
-      note: $('#PurNote', root).value.trim(),
-      lines: collectLines(root)
+      date: $('#poDate',root).value || undefined,
+      vendor: $('#poVendor',root).value || undefined,
+      project: $('#poProject',root).value || undefined,
+      note: $('#poNote',root).value || undefined,
+      lines
     };
-    if (!p.lines.length){ setBtnLoading(fabSubmit,false); return toast(lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line'); }
-    try{
-      const res = await apiPost('submitPurchaseRequest', p);
-      if(res && res.ok){
-        toast((lang==='th'?'ส่งคำขอแล้ว • ':'Request sent • ')+(res.docNo||''));
-        try { await preloadLookups(); } catch {}
-        clearForm();
-        loadOlder(); // refresh history panel
-      }
-      else toast((res && res.message) || 'Error');
-    } catch{
-      toast(lang==='th'?'เกิดข้อผิดพลาดในการส่งคำขอ':'Failed to submit request');
-    } finally {
-      setBtnLoading(fabSubmit, false);
-      fab.classList.remove('expanded');
-      fabMain.setAttribute('aria-expanded','false');
-    }
-  });
+    const r = await apiPost('submitMovementBulk', body);
+    if(!r || r.ok===false) throw new Error(r && r.message || 'Save failed');
+    toast('บันทึกใบสั่งซื้อแล้ว: '+(r.docNo||''));
+    $('#poLines',root).innerHTML=''; addLineUI(root);
+  }catch(e){ toast(e.message); }
+}
 
-  // Previous requests (no internal skeleton until expanded rows are opened)
-  async function loadOlder(){
-    const holder = $('#purOlderList', root);
-    holder.innerHTML='';
-    // show list-level skeletons only
-    for(let i=0;i<5;i++){ const r=document.createElement('div'); r.className='skeleton-row'; holder.appendChild(r); }
+export function fabActions({root}){
+  return [
+    { label:'เพิ่มบรรทัด', icon: FabIcons.plus, onClick:()=> addLineUI(root) },
+    { label:'บันทึก', icon: FabIcons.save, variant:'primary', onClick:()=> submitPO(root) },
+  ];
+}
 
-    try{
-      const rows = await apiGet('pur_History', null, {cacheTtlMs: 20*1000});
-      holder.innerHTML='';
-      (rows||[]).forEach(x=>{
-        const card=document.createElement('div'); card.className='rowitem';
-        card.style.flexDirection='column'; card.style.alignItems='stretch';
-
-        const headWrap = document.createElement('div');
-        headWrap.style.display='flex';
-        headWrap.style.justifyContent='space-between';
-        headWrap.style.alignItems='center';
-        headWrap.style.flexWrap='wrap';
-        headWrap.style.gap='.5rem';
-
-        const headLeft = document.createElement('div');
-        headLeft.innerHTML = `
-          <div><strong>${esc(x.docNo)} • ${esc(x.project||'-')}</strong></div>
-          <div class="meta">${esc(x.ts)} • ${(lang==='th'?'ต้องการภายใน ':'NeedBy ')}${esc(x.needBy||'-')}</div>
-          <div class="meta">👷 ${esc(x.contractor||'-')} • 🙋 ${esc(x.requester||'-')}</div>
-        `;
-
-        const statusBadge = document.createElement('span');
-        statusBadge.className = `badge ${statusColor(x.status)}`;
-        statusBadge.textContent = esc(x.status || '-');
-
-        headWrap.appendChild(headLeft);
-        headWrap.appendChild(statusBadge);
-
-        const meta2 = document.createElement('div');
-        meta2.className='meta';
-        meta2.innerHTML = `
-          ${(lang==='th'?'รายการ ':'Lines ')}${esc(x.lines)} •
-          ${(lang==='th'?'จำนวน ':'Qty ')}${esc(x.totalQty)} •
-          ${(lang==='th'?'ความสำคัญ ':'Priority ')}${esc(x.priority||'-')}
-        `;
-
-        const headClick = document.createElement('div');
-        headClick.className='rowhead';
-        headClick.style.display='flex';
-        headClick.style.justifyContent='space-between';
-        headClick.style.alignItems='center';
-        headClick.style.cursor='pointer';
-        headClick.style.marginTop='.35rem';
-        headClick.innerHTML = `<span class="meta">${lang==='th'?'แสดงรายละเอียด':'Show details'}</span><span>›</span>`;
-
-        const body=document.createElement('div'); body.className='hidden';
-        body.style.marginTop='.5rem';
-        body.setAttribute('data-doc', x.docNo);
-        // NOTE: no skeleton here until expanded
-
-        headClick.addEventListener('click', async ()=>{
-          const isOpen = !body.classList.contains('hidden');
-          if (isOpen){
-            body.classList.add('hidden');
-            headClick.querySelector('.meta').textContent = (lang==='th'?'แสดงรายละเอียด':'Show details');
-            headClick.lastElementChild.textContent = '›';
-            return;
-          }
-          body.classList.remove('hidden');
-          headClick.querySelector('.meta').textContent = (lang==='th'?'ซ่อนรายละเอียด':'Hide details');
-          headClick.lastElementChild.textContent = '⌄';
-
-          // show a compact loading row only after expanding
-          body.innerHTML = `<div class="skeleton-row" style="min-height:40px"></div>`;
-
-          try{
-            const lines = await apiGet('pur_DocLines', {payload:{docNo:x.docNo}}, {cacheTtlMs: 10*1000});
-            const content = document.createElement('div');
-
-            // Status editor
-            const editor = renderStatusEditor(x.docNo, x.status, lang, (newStatus)=>{
-              statusBadge.textContent = newStatus;
-              statusBadge.className = `badge ${statusColor(newStatus)}`;
-            });
-            content.appendChild(editor);
-
-            // Lines table
-            const tbl = document.createElement('table'); tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
-            tbl.innerHTML = '<thead><tr><th style="text-align:left;padding:.25rem 0;">รายการ</th><th style="text-align:left;padding:.25rem 0;">จำนวน</th></tr></thead>';
-            const tb=document.createElement('tbody');
-            (lines||[]).forEach(li=>{
-              const tr=document.createElement('tr');
-              tr.innerHTML=`<td style="padding:.25rem 0;">${esc(li.item)}</td><td style="padding:.25rem 0;">${esc(li.qty)}</td>`;
-              tb.appendChild(tr);
-            });
-            tbl.appendChild(tb);
-            content.appendChild(tbl);
-
-            body.replaceChildren(content);
-          }catch{
-            body.innerHTML = `<div class="meta" style="color:#b91c1c">${lang==='th'?'โหลดไม่สำเร็จ':'Failed to load'}</div>`;
-          }
-        });
-
-        card.appendChild(headWrap);
-        card.appendChild(meta2);
-        card.appendChild(headClick);
-        card.appendChild(body);
-        holder.appendChild(card);
-      });
-      clampList(holder);
-
-      const tbtn = root.querySelector('.toggle button[data-toggle="#purOlderList"]');
-      if (tbtn){
-        tbtn.onclick = ()=>{
-          const expanded = holder.dataset.expanded === 'true';
-          if (expanded){
-            clampList(holder);
-            holder.dataset.expanded = 'false';
-            tbtn.textContent = STR[lang].showMore;
-          } else {
-            Array.from(holder.children).forEach(el=> el.style.display='');
-            holder.dataset.expanded = 'true';
-            tbtn.textContent = STR[lang].showLess;
-          }
-        };
-      }
-    }catch{
-      holder.innerHTML = `<div class="rowitem"><div class="meta" style="color:#b91c1c">${lang==='th'?'ไม่สามารถโหลดข้อมูลได้':'Unable to load data'}</div></div>`;
-    }
-  }
-
-  // Bind pickers
-  bindPickerInputs(root, lang);
-  $('#PurProject', root).addEventListener('click', ()=>openPicker($('#PurProject', root),'projects', lang));
-  $('#PurContractor', root).addEventListener('click', ()=>openPicker($('#PurContractor', root),'contractors', lang));
-
-  // Init defaults and data
-  $('#PurNeedBy', root).value=todayStr();
-  addLine();
-  loadOlder();
+export default async function mountPurchase({root}){
+  injectStyles();
+  root.innerHTML = viewTemplate();
+  bindPickerInputs(root, currentLang());
+  addLineUI(root);
 }

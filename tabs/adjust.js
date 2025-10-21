@@ -42,28 +42,6 @@ export default async function mount({ root, lang }){
       <div class="lines" id="adjLines"></div>
     </section>
 
-    <!-- Speed-Dial FAB -->
-    <div class="fab" id="fab">
-      <div class="mini" id="fabSubmitWrap" aria-hidden="true">
-        <div class="label">${S.btnSubmit}</div>
-        <button class="btn small primary" id="fabSubmitBtn" type="button">
-          <span class="btn-label">💾</span>
-          <span class="btn-spinner"><span class="spinner"></span></span>
-        </button>
-      </div>
-      <div class="mini" id="fabAddWrap" aria-hidden="true">
-        <div class="label">${S.btnAdd}</div>
-        <button class="btn small" id="fabAddBtn" type="button">
-          <span class="btn-label">＋</span>
-          <span class="btn-spinner"><span class="spinner"></span></span>
-        </button>
-      </div>
-      <button class="fab-main" id="fabMain" aria-expanded="false" aria-controls="fab">
-        <span class="icon">＋</span>
-      </button>
-    </div>
-  `;
-
   const lines = $('#adjLines', root);
 
   function addLine(){ lines.appendChild(AdjLine(lang)); bindPickerInputs(root, lang); }

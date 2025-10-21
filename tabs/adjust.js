@@ -1,4 +1,4 @@
-// tabs/adjust.js — Adjust tab, wired to global FAB
+// tabs/adjust.js — Adjust tab (date + material list only, no unit) using global FAB
 import { $, $$, esc, todayStr, apiPost, bindPickerInputs, toast, currentLang } from '../js/shared.js';
 import { FabIcons } from '../js/fab.js';
 
@@ -9,10 +9,10 @@ function injectStyles(){
   .adj-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--space-3)}
   @media (max-width:980px){.adj-grid{grid-template-columns:repeat(6,1fr)}}
   @media (max-width:640px){.adj-grid{grid-template-columns:1fr}}
-  .col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-6{grid-column:span 6}.col-12{grid-column:1/-1}
+  .col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-12{grid-column:1/-1}
   .adj-grid input[type="date"]{height:var(--control-h,42px);line-height:var(--control-h,42px);padding:0 .65rem}
-  .line-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.75rem}
-  @media (max-width:720px){.line-grid{grid-template-columns:1fr 1fr 1fr auto}}
+  .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem}
+  @media (max-width:720px){.line-grid{grid-template-columns:1fr 1fr auto}}
   @media (max-width:520px){.line-grid{grid-template-columns:1fr}}`;
   const st=document.createElement('style'); st.id='adjust-tab-styles'; st.textContent=css; document.head.appendChild(st);
 }
@@ -24,8 +24,6 @@ function viewTemplate(){
       <h3 style="margin:0 0 .5rem 0">ปรับยอด / Adjust</h3>
       <div class="row adj-grid">
         <div class="col-3"><label>วันที่</label><input id="adjDate" type="date" value="${todayStr()}"></div>
-        <div class="col-6"><label>สาเหตุ</label><input id="adjReason" placeholder="เช่น นับสต๊อก/ชำรุด/อื่นๆ"></div>
-        <div class="col-12"><label>หมายเหตุ</label><input id="adjNote" placeholder="…"></div>
       </div>
       <div id="adjLines"></div>
     </section>
@@ -34,16 +32,15 @@ function viewTemplate(){
 
 function lineRow({name='', delta=''}={}){
   return `<div class="line"><div class="line-grid">
-    <div><label>วัสดุ</label><input class="lnName" data-picker="materials" placeholder="เลือก…" value="${esc(name)}"></div>
-    <div><label>เพิ่ม/ลด</label><input class="lnDelta" type="number" step="0.01" value="${esc(delta)}"></div>
-    <div><label>หน่วย</label><input class="lnUnit" data-picker="units" placeholder="—"></div>
+    <div><label>วัสดุ</label><input class="lnName" data-picker="materials" placeholder="ค้นหาวัสดุ…" value="\${esc(name)}"></div>
+    <div><label>ปรับ (+/−)</label><input class="lnDelta" type="number" step="0.01" value="\${esc(delta)}"></div>
     <div style="display:flex;align-items:flex-end"><button class="btn small btnRem" type="button">ลบ</button></div>
   </div></div>`;
 }
 
-function addLineUI(root){
+export function addLineUI(root){
   $('#adjLines',root).insertAdjacentHTML('beforeend', lineRow({}));
-  bindPickerInputs(root, currentLang());
+  bindPickerInputs(root, currentLang()); // spreadsheet autocomplete for materials
   $$('#adjLines .btnRem',root).forEach(b=> b.onclick=()=> b.closest('.line')?.remove());
 }
 
@@ -52,21 +49,18 @@ function collectLines(root){
   $$('#adjLines .line',root).forEach(line=>{
     const name=$('.lnName',line).value.trim();
     const delta=Number($('.lnDelta',line).value);
-    const unit=$('.lnUnit',line).value.trim() || undefined;
-    if(name && delta){ rows.push({name, delta, unit}); }
+    if(name && delta){ rows.push({name, delta}); }
   });
   return rows;
 }
 
-async function submitAdjust(root){
+export async function submitAdjust(root){
   try{
     const lines=collectLines(root);
     if(!lines.length){ toast('เพิ่มรายการก่อน'); return; }
     const body={
       type:'ADJUST',
       date: $('#adjDate',root).value || undefined,
-      reason: $('#adjReason',root).value || undefined,
-      note: $('#adjNote',root).value || undefined,
       lines
     };
     const r = await apiPost('submitMovementBulk', body);

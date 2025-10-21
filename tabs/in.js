@@ -27,6 +27,9 @@ function injectStyles(){
   .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem;align-items:end}
   @media (max-width: 834px){ .line-grid{grid-template-columns:1fr 1fr auto} }
   @media (max-width: 430px){ .line-grid{grid-template-columns:1fr} .line-grid>div:last-child{justify-content:flex-start} }
+
+  /* Ensure pickers are visible above cards/overlays */
+  .picker-popover, .picker-menu, .autocomplete-panel, .picker-dropdown { position: fixed; z-index: 5001; }
 `;
   const st=document.createElement('style'); st.id='in-tab-styles'; st.textContent=css; document.head.appendChild(st);
 }
@@ -54,7 +57,8 @@ function lineRow({name='', qty=''}={}){
 
 export function addLineUI(root){
   $('#inLines',root).insertAdjacentHTML('beforeend', lineRow({}));
-  bindPickerInputs(root, currentLang()); // hooks spreadsheet-driven autocomplete for materials
+  bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang()); // hooks spreadsheet-driven autocomplete for materials
   $$('#inLines .btnRem',root).forEach(b=> b.onclick=()=> b.closest('.line')?.remove());
 }
 
@@ -91,5 +95,6 @@ export default async function mountIn({root}){
   injectStyles();
   root.innerHTML = viewTemplate();
   bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang());
   addLineUI(root);
 }

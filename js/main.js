@@ -44,6 +44,7 @@ async function mountTab(tab){
     else hideFab();
 
     bindPickerInputs(root, LANG);
+    bindPickerInputs(document, LANG);
   }catch(e){
     root.innerHTML = '<section class="card glass"><h3>Load error</h3><p>' + ((e && e.message) || e) + '</p></section>';
     hideFab();

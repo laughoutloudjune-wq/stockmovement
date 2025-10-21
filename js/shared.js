@@ -255,3 +255,11 @@ export function stockBadge(stock=0, min=0){
   el.append(dot, txt);
   return el;
 }
+
+
+/* Small utility used by tabs: limit array length safely */
+export function clampList(list, max = 100){
+  if (!Array.isArray(list)) return [];
+  const m = Number.isFinite(max) && max > 0 ? Math.floor(max) : 100;
+  return list.slice(0, m);
+}

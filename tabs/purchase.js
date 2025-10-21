@@ -1,52 +1,32 @@
-// tabs/purchase.js — Purchase tab (projects, contractors, requesters, remark; no unit) using global FAB
+// tabs/purchase.js — refined UI, proportional boxes
 import { $, $$, esc, apiPost, bindPickerInputs, toast, currentLang } from '../js/shared.js';
 import { FabIcons } from '../js/fab.js';
 
 function injectStyles(){
   if (document.getElementById('purchase-tab-styles')) return;
   const css = `
-  .poWrap{max-width:1100px;margin:0 auto;padding-inline:min(3vw,16px)}
-  .po-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--space-3)}
-  /* iPad landscape (≈1024px), Pixel Fold/tablet */
-  @media (max-width: 1024px){ .po-grid{grid-template-columns:repeat(8,1fr)} }
-  /* iPad portrait / large phones in landscape (≈834px–820px) */
-  @media (max-width: 834px){ .po-grid{grid-template-columns:repeat(6,1fr)} }
-  /* Typical Android phones (≈600px and down) */
-  @media (max-width: 600px){ .po-grid{grid-template-columns:repeat(4,1fr)} }
-  /* iPhone 14/15 Pro Max width 430, and smaller iPhones */
-  @media (max-width: 430px){ .po-grid{grid-template-columns:1fr} }
-
-  .col-2{grid-column:span 2} .col-3{grid-column:span 3} .col-4{grid-column:span 4} .col-6{grid-column:span 6} .col-8{grid-column:span 8} .col-12{grid-column:1/-1}
-
-  /* Prevent overflow and normalize control sizing */
-  .po-grid > *{min-width:0}
-  .po-grid input,
-  .line-grid input{width:100%;min-width:0;box-sizing:border-box;height:var(--control-h,42px);line-height:var(--control-h,42px);padding:0 .65rem}
-
-  /* Line grid responsiveness */
-  .line-grid{display:grid;grid-template-columns:2fr 1fr auto;gap:.75rem;align-items:end}
-  @media (max-width: 834px){ .line-grid{grid-template-columns:1fr 1fr auto} }
-  @media (max-width: 430px){ .line-grid{grid-template-columns:1fr} .line-grid>div:last-child{justify-content:flex-start} }
-
-  /* Ensure pickers are visible above cards/overlays */
-  .picker-popover, .picker-menu, .autocomplete-panel, .picker-dropdown { position: fixed; z-index: 5001; }
-`;
-  const st=document.createElement('style');
-  st.id='purchase-tab-styles';
-  st.textContent=css;
-  document.head.appendChild(st);
+  :root{ --space-3:12px; --control-h:42px; }
+  .poWrap{max-width:1100px;margin:0 auto;padding:16px}
+  .tab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-3)}
+  .line-grid{display:grid;grid-template-columns:minmax(320px,2fr) minmax(140px,.9fr) auto;gap:.75rem;align-items:end}
+  @media (max-width:700px){ .line-grid{grid-template-columns:1fr 1fr auto} }
+  @media (max-width:460px){ .line-grid{grid-template-columns:1fr} .line-actions{justify-content:flex-start} }
+  input[type="text"],input[type="number"],input[type="date"]{width:100%;height:var(--control-h);line-height:var(--control-h);box-sizing:border-box;padding:0 .65rem;min-width:0}
+  label{display:block;margin:.15rem 0 .35rem .1rem;font-size:.9rem;opacity:.8}
+  `;
+  const st=document.createElement('style'); st.id='purchase-tab-styles'; st.textContent=css; document.head.appendChild(st);
 }
 
 function viewTemplate(){
   return `
   <div class="poWrap">
     <section class="card glass">
-      <h3 style="margin:0 0 .5rem 0">สั่งซื้อ / Purchase</h3>
-      <div class="row po-grid">
-        <div class="col-4"><label>โครงการ</label><input id="poProject" data-picker="projects" placeholder="ค้นหาโครงการ…"></div>
-        <div class="col-4"><label>ผู้รับเหมา</label><input id="poContractor" data-picker="contractors" placeholder="ค้นหาผู้รับเหมา…"></div>
-        <div class="col-4"><label>ผู้ขอเบิก</label><input id="poRequester" data-picker="requesters" placeholder="ค้นหาผู้ขอเบิก…"></div>
-        <div class="col-12"><label>หมายเหตุ</label><input id="poNote" placeholder="…"></div>
+      <h3 style="margin:0 0 .75rem 0">สั่งซื้อ / Purchase</h3>
+      <div class="tab-grid">
+        <div><label>โครงการ</label><input id="poProject" data-picker="projects" placeholder="ค้นหาโครงการ…"></div>
+        <div><label>ผู้รับเหมา</label><input id="poContractor" data-picker="contractors" placeholder="ค้นหาผู้รับเหมา…"></div>
+        <div><label>ผู้ขอเบิก</label><input id="poRequester" data-picker="requesters" placeholder="ค้นหาผู้ขอเบิก…"></div>
+        <div style="grid-column:1/-1"><label>หมายเหตุ</label><input id="poNote" placeholder="…"></div>
       </div>
       <div id="poLines"></div>
     </section>
@@ -57,14 +37,13 @@ function lineRow({name='', qty=''}={}){
   return `<div class="line"><div class="line-grid">
     <div><label>วัสดุ</label><input class="lnName" data-picker="materials" placeholder="ค้นหาวัสดุ…" value="${esc(name)}"></div>
     <div><label>จำนวน</label><input class="lnQty" type="number" min="0" step="0.01" value="${esc(qty)}"></div>
-    <div style="display:flex;align-items:flex-end"><button class="btn small btnRem" type="button">ลบ</button></div>
+    <div class="line-actions"><button class="btn small btnRem" type="button">ลบ</button></div>
   </div></div>`;
 }
 
 export function addLineUI(root){
   $('#poLines',root).insertAdjacentHTML('beforeend', lineRow({}));
   bindPickerInputs(root, currentLang());
-  bindPickerInputs(document, currentLang()); // spreadsheet-driven autocomplete for project/contractor/requester/materials
   $$('#poLines .btnRem',root).forEach(b=> b.onclick=()=> b.closest('.line')?.remove());
 }
 
@@ -108,6 +87,5 @@ export default async function mountPurchase({root}){
   injectStyles();
   root.innerHTML = viewTemplate();
   bindPickerInputs(root, currentLang());
-  bindPickerInputs(document, currentLang());
   addLineUI(root);
 }

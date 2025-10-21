@@ -42,6 +42,10 @@ function injectStyles(){
   .lnStock.loading{display:flex;align-items:center;gap:.5rem}
   .lnStock .stock-spinner{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;opacity:.8}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Ensure pickers are visible above cards/overlays */
+  .picker-popover, .picker-menu, .autocomplete-panel, .picker-dropdown { position: fixed; z-index: 5001; }
+  .overlay-panel{ overflow: visible }
 `;
   const st = document.createElement('style');
   st.id = 'out-tab-styles';
@@ -212,6 +216,7 @@ function openHist(root){
   const ov = $('#histOverlay',root);
   ov.style.display = 'block';
   bindPickerInputs(ov, currentLang());
+  bindPickerInputs(document, currentLang());
   $('#sResults',root).innerHTML='';
   document.body.style.overflow = 'hidden';
 }
@@ -224,6 +229,7 @@ function closeHist(root){
 function addLineUI(root){
   $('#outLines',root).insertAdjacentHTML('beforeend', lineRow({}));
   bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang());
   attachStockHandlers(root);
   $$('#outLines .btnRem',root).forEach(btn => btn.onclick = ()=> btn.closest('.line')?.remove());
 }
@@ -263,6 +269,7 @@ export default async function mountOut({root}){
   injectStyles();
   root.innerHTML = viewTemplate();
   bindPickerInputs(root, currentLang());
+  bindPickerInputs(document, currentLang());
   addLineUI(root);
 
   $('#btnCloseHist',root).addEventListener('click', ()=> closeHist(root));

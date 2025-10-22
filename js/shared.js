@@ -1,189 +1,353 @@
-// js/shared.js (wired to backend)
-/* ===== ENV ===== */
-export const API_URL = (window.API_URL || '').trim(); // e.g., "https://script.google.com/macros/s/AKfy.../exec"
-if (!API_URL) console.warn('[shared] API_URL is empty. Set window.API_URL before loading main.js');
+// js/shared.js
+// Robust API helpers, i18n, picker, caching, preload for lookups, and smart cache cleanup.
 
-/* ===== Small DOM helpers ===== */
+export const API_URL =
+  window.API_URL ||
+  "https://script.google.com/macros/s/AKfycbwEJDNfo63e0LjEZa-bhXmX3aY2PUs96bUBGz186T-pVlphV4NGNYxGT2tcx1DWgbDI/exec";
+
 export const $  = (q, r = document) => r.querySelector(q);
-export const $$ = (q, r = document) => Array.from(r.querySelectorAll(q));
-export const on = (el, ev, fn, opts) => el && el.addEventListener(ev, fn, opts);
-export const esc = (v) => v == null ? "" : String(v).replace(/[&<>"']/g,(m)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+export const $$ = (q, r = document) => Array.prototype.slice.call(r.querySelectorAll(q));
+export const esc = (v) =>
+  v == null ? "" : String(v).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+export const todayStr = () => new Date().toISOString().split("T")[0];
 
-/* ===== i18n ===== */
+/* ================= API core with timeout + retry + cache ================= */
+
+const safeJson = (t) => {
+  try { return JSON.parse(t); } catch { return { ok: false, error: "Bad JSON" }; }
+};
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function withTimeout(fetcher, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort("timeout"), ms);
+  return fetcher(ctrl.signal).finally(() => clearTimeout(t));
+}
+
+function norm(data) {
+  if (data && Object.prototype.hasOwnProperty.call(data, "result")) return data.result;
+  return data;
+}
+
+function cacheKey(fn, payload) { return `cache:${fn}:${payload ? JSON.stringify(payload) : ""}`; }
+function getCache(key, ttlMs) {
+  if (!ttlMs) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > ttlMs) return null;
+    return data;
+  } catch { return null; }
+}
+function setCache(key, data) {
+  try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+// Generic GET with retries and optional cache
+export async function apiGet(fn, payload = null, { cacheTtlMs = 0, timeoutMs = 12000, retries = 2, backoffMs = 500 } = {}) {
+  const key = cacheTtlMs ? cacheKey(fn, payload) : null;
+  const hit = key ? getCache(key, cacheTtlMs) : null;
+  if (hit != null) return hit;
+
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const qs = new URLSearchParams({ fn });
+      if (payload && Object.keys(payload).length) {
+        qs.set("payload", JSON.stringify(payload.payload || payload));
+      }
+      const resText = await withTimeout(
+        (signal) => fetch(`${API_URL}?${qs.toString()}`, { method: "GET", signal }),
+        timeoutMs
+      ).then((r) => r.text());
+
+      const data = norm(safeJson(resText));
+      if (cacheTtlMs && data != null) setCache(key, data);
+      return data;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < retries) await sleep(backoffMs * Math.pow(2, attempt));
+    }
+  }
+  if (key) {
+    const stale = getCache(key, Number.MAX_SAFE_INTEGER);
+    if (stale != null) return stale;
+  }
+  throw lastErr || new Error("GET failed");
+}
+
+export async function apiPost(fn, body, { timeoutMs = 15000 } = {}) {
+  const resText = await withTimeout(
+    (signal) =>
+      fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        signal,
+        body: JSON.stringify({ fn, payload: body || {} }),
+      }),
+    timeoutMs
+  ).then((r) => r.text());
+  return norm(safeJson(resText));
+}
+
+/* ================= UI bits ================= */
+
+export function toast(m) {
+  const t = $("#toast"); if (!t) return;
+  t.textContent = m;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 4200);
+}
+
 export const STR = {
   th: {
-    tabs: { dash:'สรุป', out:'จ่ายออก', in:'รับเข้า', adj:'ปรับปรุง', pur:'ขอจัดซื้อ' },
-    out: {
-      title: 'ประวัติการจ่ายออก',
-      filters: 'ค้นหา/กรอง',
-      project: 'โครงการ', contractor: 'ผู้รับเหมา', requester: 'ผู้ขอเบิก',
-      daterange: 'ช่วงวันที่', from:'จาก', to:'ถึง',
-      material:'วัสดุ', search:'ค้นหา', reset:'ล้าง', result:'ผลลัพธ์',
-      doc:'เลขที่เอกสาร', date:'วันที่', qty:'จำนวน', unit:'หน่วย', location:'สถานที่', note:'หมายเหตุ',
-      actions:'การทำงาน', edit:'แก้ไข', save:'บันทึก', cancel:'ยกเลิก', noData:'ไม่พบข้อมูล',
-      edited:'บันทึกการแก้ไขแล้ว', invalid:'กรุณากรอกข้อมูลให้ครบ'
-    },
-    picker:{ placeholder:'ค้นหา…', add:'เพิ่ม' },
-    ui:{ refresh:'รีเฟรชข้อมูลแล้ว', failed:'ผิดพลาด' }
+    title: "ระบบสต็อกวัสดุ",
+    sub: "ระบบเบา เร็ว และใช้ง่าย",
+    tabs: { dash: "สรุป", out: "จ่ายออก", in: "รับเข้า", adj: "ปรับปรุง", pur: "ขอจัดซื้อ" },
+    searchPh: "พิมพ์เพื่อค้นหา…", pick: "ค้นหาหรือเลือก", pickAdd: "เลือกหรือเพิ่มใหม่",
+    proj: "โครงการ / สถานที่", contractor: "ผู้รับเหมา", requester: "ผู้ขอเบิก", note: "หมายเหตุ",
+    outTitle: "จ่ายออก", outDate: "วันที่", inTitle: "รับเข้า", inDate: "วันที่รับ", adjTitle: "ปรับปรุงสต็อก",
+    btnAdd: "＋ เพิ่ม", btnReset: "ล้าง", btnSubmit: "บันทึก", save: "บันทึก",
+    dashLow: "สต็อกใกล้หมด", dashTopContract: "ผู้รับเหมาใช้บ่อย", dashTopItems: "วัสดุใช้บ่อย", dashRecent: "ความเคลื่อนไหวล่าสุด",
+    purTitle: "ขอจัดซื้อ", purProj: "โครงการ / สถานที่", purNeedBy: "ต้องการภายใน (วันที่)", purContractor: "ผู้รับเหมา",
+    purPriority: "ความเร่งด่วน", purNote: "หมายเหตุคำขอ", purOlder: "ขอจัดซื้อก่อนหน้า",
+    showMore: "ดูเพิ่มเติม", showLess: "ย่อ", noLow: "ไม่มีรายการใกล้หมด 🎉",
+    stock: "คงเหลือ: ", prev: "คงเหลือก่อนหน้า: ",
+    emptyList: "ไม่มีข้อมูล",
+    retry: "ลองอีกครั้ง",
   },
   en: {
-    tabs: { dash:'Dashboard', out:'Out', in:'In', adj:'Adjust', pur:'Purchase' },
-    out: {
-      title: 'Material Out History',
-      filters: 'Filters',
-      project: 'Project', contractor: 'Contractor', requester: 'Requester',
-      daterange: 'Date range', from:'From', to:'To',
-      material:'Material', search:'Search', reset:'Reset', result:'Results',
-      doc:'Doc No', date:'Date', qty:'Qty', unit:'Unit', location:'Location', note:'Note',
-      actions:'Actions', edit:'Edit', save:'Save', cancel:'Cancel', noData:'No data',
-      edited:'Saved changes', invalid:'Please complete required fields'
-    },
-    picker:{ placeholder:'Search…', add:'Add' },
-    ui:{ refresh:'Data refreshed', failed:'Failed' }
-  }
+    title: "Inventory",
+    sub: "Lightweight, fast, and friendly",
+    tabs: { dash: "Dashboard", out: "OUT", in: "IN", adj: "ADJUST", pur: "PURCHASING" },
+    searchPh: "Type to search…", pick: "Search or pick", pickAdd: "Pick or add",
+    proj: "Project / Location", contractor: "Contractor", requester: "Requester", note: "Note",
+    outTitle: "Material OUT", outDate: "Date", inTitle: "Material IN", inDate: "Date received", adjTitle: "Adjust",
+    btnAdd: "＋ Add", btnReset: "Reset", btnSubmit: "Submit", save: "Save",
+    dashLow: "Low stock", dashTopContract: "Top contractors (usage)", dashTopItems: "Top items", dashRecent: "Recent movements",
+    purTitle: "Purchasing Request", purProj: "Project / Location", purNeedBy: "Need by (date)", purContractor: "Contractor",
+    purPriority: "Priority", purNote: "Request note", purOlder: "Older Requests",
+    showMore: "Show more", showLess: "Show less", noLow: "No low stock 🎉",
+    stock: "Stock: ", prev: "Prev: ",
+    emptyList: "No data",
+    retry: "Retry",
+  },
 };
-export function currentLang(){ const s = localStorage.getItem('lang'); return s || (navigator.language?.startsWith('th') ? 'th':'th'); }
-export function applyLangTexts(lang){ localStorage.setItem('lang', lang); }
 
-/* ===== Toast ===== */
-export function toast(msg){
-  let el = document.getElementById('toast');
-  if (!el){ el = document.createElement('div'); el.id='toast'; el.className='toast'; document.body.appendChild(el); }
-  el.textContent = msg; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'), 2000);
-}
-export function setBtnLoading(btn, on){ if (!btn) return; btn.disabled=!!on; btn.classList.toggle('loading', !!on); }
-export function cleanOldCache(){ /* no-op for now */ }
-
-/* ===== Modal & Picker (overlay already in index.html) ===== */
-export function openModal(html, { onOpen } = {}){
-  const ov = document.createElement('div');
-  ov.className = 'modal-ov';
-  ov.innerHTML = `<div class="modal glass">${html}</div>`;
-  Object.assign(ov.style,{position:'fixed',inset:'0',background:'rgba(0,0,0,.35)',zIndex:4100,display:'grid',placeItems:'center'});
-  document.body.appendChild(ov);
-  const close = ()=>ov.remove();
-  ov.addEventListener('click', e=>{ if (e.target===ov) close(); });
-  onOpen && onOpen(ov, close);
-  return { close, el: ov };
-}
-
-export function bindPickerInputs(root=document, lang='th'){
-  const S = STR[lang];
-  root.querySelectorAll('input[data-src]').forEach(inp => {
-    inp.addEventListener('focus', () => showPicker(inp.getAttribute('data-src'), inp, lang));
-  });
-
-  function showPicker(source, target, lang){
-    const list = (LOOKUPS[source]) || [];
-    const ov = document.getElementById('pickerOverlay');
-    const box = document.getElementById('pickerBox');
-    const listBox = document.getElementById('pickerList');
-    const search = document.getElementById('pickerSearch');
-    const addBtn = document.getElementById('pickerAdd');
-    const addText = document.getElementById('pickerAddText');
-    ov.classList.add('open'); ov.setAttribute('aria-hidden','false');
-    const render = (q='') => {
-      listBox.innerHTML = '';
-      const qn = q.trim().toLowerCase();
-      (qn? list.filter(x=>x.toLowerCase().includes(qn)) : list).slice(0,300).forEach((name)=>{
-        const btn = document.createElement('button');
-        btn.type='button'; btn.className='list-btn'; btn.textContent = name;
-        btn.addEventListener('click', () => { setValue(target, name); close(); });
-        listBox.appendChild(btn);
-      });
-      addText.textContent = q.trim();
-      addBtn.style.display = q.trim()? 'block':'none';
-    };
-    const close = () => { ov.classList.remove('open'); ov.setAttribute('aria-hidden','true'); search.value=''; };
-    render();
-    search.placeholder = S.picker.placeholder;
-    search.oninput = (e)=>render(e.target.value);
-    document.getElementById('pickerCancel').onclick = close;
-    addBtn.onclick = () => { const v = search.value.trim(); if(!v) return; pushLookup(source, v); setValue(target, v); close(); };
-    setTimeout(()=>search.focus(), 50);
-  }
-  function setValue(target, value){
-    if (target.tagName === 'INPUT') target.value = value;
-    else target.textContent = value;
-    target.dispatchEvent(new Event('change'));
-  }
-}
-
-/* ===== Backend API client (Apps Script style) ===== */
-const FN_LOOKUPS    = 'lookups';
-const FN_OUT_SEARCH = 'out.search';
-const FN_OUT_UPDATE = 'out.update';
-
-function withTimeout(promise, ms = 15000){
-  return new Promise((res, rej) => {
-    const t = setTimeout(() => rej(new Error('timeout')), ms);
-    promise.then(v => { clearTimeout(t); res(v); }, e => { clearTimeout(t); rej(e); });
+export function applyLangTexts(LANG) {
+  const S = STR[LANG];
+  $("#t_title") && ($("#t_title").textContent = S.title);
+  $("#t_sub") && ($("#t_sub").textContent = S.sub);
+  const tabMap = [
+    ["dashboard", S.tabs.dash],
+    ["out", S.tabs.out],
+    ["in", S.tabs.in],
+    ["adjust", S.tabs.adj],
+    ["purchase", S.tabs.pur],
+  ];
+  tabMap.forEach(([key, label]) => {
+    const btn = document.querySelector(`.tabs [data-tab="${key}"]`);
+    if (btn) btn.textContent = label;
   });
 }
 
-async function fetchJson(url, opts){
-  const r = await withTimeout(fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    ...opts
-  }), 15000);
-  if (!r.ok) throw new Error('HTTP '+r.status);
-  const text = await r.text();
-  try { return JSON.parse(text); }
-  catch (e){ console.error('[api] bad json', text); throw e; }
+export function clampList(listEl) {
+  const max = Number(listEl.dataset.limit || "5");
+  const items = listEl.children;
+  for (let i = 0; i < items.length; i++) items[i].style.display = i < max ? "" : "none";
+  listEl.dataset.expanded = "false";
+}
+export function toggleClamp(btn, LANG) {
+  const sel = btn.getAttribute("data-toggle");
+  const list = $(sel);
+  if (!list) return;
+  const expanded = list.dataset.expanded === "true";
+  const items = list.children;
+  for (let i = 0; i < items.length; i++) items[i].style.display = expanded ? (i < Number(list.dataset.limit || "5") ? "" : "none") : "";
+  list.dataset.expanded = expanded ? "false" : "true";
+  btn.textContent = expanded ? (LANG === "th" ? "ดูเพิ่มเติม" : "Show more") : (LANG === "th" ? "ย่อ" : "Show less");
 }
 
-export async function apiCall(fn, payload = {}){
-  if (!API_URL) throw new Error('API_URL not configured');
-  const body = JSON.stringify({ fn, payload });
-  const res = await fetchJson(API_URL, { body });
-  if (res && res.ok) return res.data ?? res;
-  if (res && res.error) throw new Error(res.error);
-  return res;
+export function setBtnLoading(btn, isLoading) {
+  if (!btn) return;
+  btn.classList.toggle("is-loading", !!isLoading);
+  btn.disabled = !!isLoading;
 }
 
-/* ===== Lookups (cached) ===== */
-let LOOKUPS = { projects:[], contractors:[], requesters:[], materials:[], units:[] };
-export function getLookups(){ return LOOKUPS; }
-export function pushLookup(key, value){
-  LOOKUPS[key] = Array.from(new Set([...(LOOKUPS[key]||[]), value]));
-  try{ localStorage.setItem('cache:lookups', JSON.stringify(LOOKUPS)); }catch{}
+/* ================= Stock badge ================= */
+export function stockBadge(stock, min) {
+  const b = document.createElement("span");
+  b.className = "badge";
+  b.textContent = stock == null || isNaN(stock) ? "-" : stock;
+  if (stock <= 0 || (min != null && stock <= Number(min || 0))) b.classList.add("red");
+  else if (min != null && stock <= 2 * Number(min || 0)) b.classList.add("yellow");
+  else b.classList.add("green");
+  return b;
 }
-export async function preloadLookups(){
-  // prefer live; fall back to cache if API fails
-  try{
-    const data = await apiCall(FN_LOOKUPS, {});
-    if (data && typeof data === 'object'){
-      LOOKUPS = { ...LOOKUPS, ...data };
-      localStorage.setItem('cache:lookups', JSON.stringify(LOOKUPS));
-      return LOOKUPS;
+
+/* ================= Picker & Lookups ================= */
+
+let LOOKUPS = {
+  MATERIALS: [],
+  PROJECTS: [],
+  CONTRACTORS: [],
+  REQUESTERS: [],
+};
+
+export function getLookups() { return LOOKUPS; }
+
+export async function preloadLookups() {
+  const [m, p, c, r] = await Promise.allSettled([
+    apiGet("listMaterials", null, { cacheTtlMs: 5 * 60 * 1000, retries: 2 }),
+    apiGet("listProjects",  null, { cacheTtlMs: 5 * 60 * 1000, retries: 2 }),
+    apiGet("listContractors", null, { cacheTtlMs: 5 * 60 * 1000, retries: 2 }),
+    apiGet("listRequesters",  null, { cacheTtlMs: 5 * 60 * 1000, retries: 2 }),
+  ]);
+
+  LOOKUPS.MATERIALS   = Array.isArray(m.value) ? m.value : [];
+  LOOKUPS.PROJECTS    = Array.isArray(p.value) ? p.value : [];
+  LOOKUPS.CONTRACTORS = Array.isArray(c.value) ? c.value : [];
+  LOOKUPS.REQUESTERS  = Array.isArray(r.value) ? r.value : [];
+
+  return LOOKUPS;
+}
+
+const pickerOverlay  = $("#pickerOverlay");
+const pickerList     = $("#pickerList");
+const pickerSearch   = $("#pickerSearch");
+const pickerAdd      = $("#pickerAdd");
+const pickerAddText  = $("#pickerAddText");
+const pickerCancel   = $("#pickerCancel");
+
+let currentTargetInput = null;
+let currentSourceKey = null;
+
+const sources = {
+  materials:  () => LOOKUPS.MATERIALS,
+  projects:   () => LOOKUPS.PROJECTS,
+  contractors:() => LOOKUPS.CONTRACTORS,
+  requesters: () => LOOKUPS.REQUESTERS,
+};
+
+function renderPickerList(query, LANG = "th") {
+  const S = STR[LANG];
+  const all = (sources[currentSourceKey] ? sources[currentSourceKey]() : []) || [];
+  const q = (query || "").toLowerCase().trim();
+  const list = q ? all.filter((v) => String(v).toLowerCase().includes(q)) : all.slice();
+  pickerList.innerHTML = "";
+
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "rowitem";
+    empty.style.justifyContent = "space-between";
+    empty.innerHTML = `<div class="meta">${S.emptyList}</div><button class="btn small" id="pickerRetry">${S.retry}</button>`;
+    pickerList.appendChild(empty);
+    const retryBtn = $("#pickerRetry", pickerList);
+    retryBtn?.addEventListener("click", async () => {
+      await preloadLookups();
+      renderPickerList(pickerSearch.value, LANG);
+    });
+    pickerAdd.classList.remove("hidden");
+    pickerAddText.textContent = query || "";
+    return;
+  } else {
+    pickerAdd.classList.add("hidden");
+  }
+
+  list.forEach((v) => {
+    const row = document.createElement("div");
+    row.className = "pick-row";
+    row.innerHTML = "<strong>" + esc(v) + "</strong>";
+    row.addEventListener("click", () => {
+      if (currentTargetInput) {
+        currentTargetInput.value = v;
+        currentTargetInput.dispatchEvent(new Event("change"));
+      }
+      closePicker();
+    });
+    pickerList.appendChild(row);
+  });
+}
+
+export function openPicker(targetInput, sourceKey, LANG = "th") {
+  currentTargetInput = targetInput;
+  currentSourceKey = sourceKey;
+  if (pickerSearch) pickerSearch.value = "";
+  renderPickerList("", LANG);
+  pickerOverlay.classList.add("open");
+  pickerOverlay.setAttribute("aria-hidden", "false");
+  setTimeout(() => pickerSearch && pickerSearch.focus(), 30);
+}
+export function closePicker() {
+  pickerOverlay.classList.remove("open");
+  pickerOverlay.setAttribute("aria-hidden", "true");
+  currentTargetInput = null;
+  currentSourceKey = null;
+}
+
+pickerSearch && pickerSearch.addEventListener("input", (e) => renderPickerList(e.target.value, currentLang()));
+pickerCancel && pickerCancel.addEventListener("click", closePicker);
+pickerOverlay && pickerOverlay.addEventListener("click", (e) => { if (e.target === pickerOverlay) closePicker(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && pickerOverlay.classList.contains("open")) closePicker(); });
+
+pickerAdd && pickerAdd.addEventListener("click", async () => {
+  const text = pickerSearch.value.trim();
+  if (!text) return;
+  const LANG = currentLang();
+  if (currentSourceKey === "contractors") {
+    const ok = await apiGet("addContractor", { name: text });
+    if (ok) {
+      LOOKUPS.CONTRACTORS = Array.from(new Set([text, ...LOOKUPS.CONTRACTORS]));
+      toast(LANG === "th" ? "เพิ่มผู้รับเหมาแล้ว" : "Added contractor");
     }
-    throw new Error('bad lookups');
-  }catch(e){
-    const raw = localStorage.getItem('cache:lookups');
-    LOOKUPS = raw ? JSON.parse(raw) : LOOKUPS;
-    return LOOKUPS;
+    if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event("change")); }
+    closePicker();
+  } else if (currentSourceKey === "requesters") {
+    const ok = await apiGet("addRequester", { name: text });
+    if (ok) {
+      LOOKUPS.REQUESTERS = Array.from(new Set([text, ...LOOKUPS.REQUESTERS]));
+      toast(LANG === "th" ? "เพิ่มผู้ขอแล้ว" : "Added requester");
+    }
+    if (currentTargetInput) { currentTargetInput.value = text; currentTargetInput.dispatchEvent(new Event("change")); }
+    closePicker();
+  } else {
+    toast(LANG === "th" ? "กรุณาเพิ่มในชีทมาสเตอร์" : "Use master sheet to add new entries");
+    closePicker();
   }
+});
+
+export function bindPickerInputs(root = document, LANG = "th") {
+  $$('input[data-picker]', root).forEach((inp) => {
+    inp.addEventListener("click", () => {
+      const key = inp.getAttribute("data-picker");
+      openPicker(inp, key, LANG);
+    });
+  });
 }
 
-/* ===== Out tab endpoints ===== */
-export async function outSearch(filters = {}, page = 1, per = 50){
-  const data = await apiCall(FN_OUT_SEARCH, { filters, page, per });
-  // Support both {rows,total} and {items,count}
-  return {
-    rows: data.rows || data.items || [],
-    total: data.total ?? data.count ?? (Array.isArray(data) ? data.length : 0),
-  };
-}
-export async function outUpdate(patch){
-  const data = await apiCall(FN_OUT_UPDATE, patch);
-  return data && (data.ok !== false);
+/* current language based on <html lang=""> or default 'th' */
+export function currentLang() {
+  const l = document.documentElement.lang || "th";
+  return l.toLowerCase().startsWith("th") ? "th" : "en";
 }
 
-/* ===== small UI helper ===== */
-export function stockBadge(qty=0){
-  const span = document.createElement('span');
-  span.className = 'badge';
-  span.textContent = String(qty);
-  return span;
+/* ===== smart cache cleanup: remove stale entries on load ===== */
+export function cleanOldCache(maxAgeMs = 15 * 60 * 1000) {
+  try {
+    const now = Date.now();
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('cache:')) continue;
+      try {
+        const raw = localStorage.getItem(k);
+        const obj = raw ? JSON.parse(raw) : null;
+        if (!obj || !obj.ts || (now - obj.ts) > maxAgeMs) toRemove.push(k);
+      } catch {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch {}
 }

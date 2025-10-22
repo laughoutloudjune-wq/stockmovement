@@ -1,254 +1,254 @@
-// tabs/out.js — refined UI, proportional boxes, qty inline with material
-import {
-  $, $$, esc, todayStr,
-  apiGet, apiPost,
-  bindPickerInputs, toast, currentLang, stockBadge
-} from '../js/shared.js';
-import { FabIcons } from '../js/fab.js';
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>ระบบสต็อกวัสดุ</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <style>
+    :root{
+      --fs-xs: clamp(0.78rem, 1.3vw, 0.9rem);
+      --fs-sm: clamp(0.95rem, 1.6vw, 1.05rem);
+      --fs-md: clamp(1.05rem, 2vw, 1.2rem);
+      --fs-lg: clamp(1.2rem, 2.4vw, 1.4rem);
+      --space-1:.5rem; --space-2:.75rem; --space-3:1rem; --space-4:1.25rem;
+      --radius: 14px; --radius-pill: 9999px;
+      --border-weak: rgba(0,0,0,.06);
+      --border: rgba(0,0,0,.10);
+      --bg:#eef1f6; --card: rgba(255,255,255,0.9); --text:#0b0b0d;
+      --accent:#0a84ff; --accent-weak:#e5f0ff;
+      --shadow-s: 0 2px 6px rgba(0,0,0,.06);
+      --shadow-m: 0 6px 16px rgba(0,0,0,.10);
+      --shadow-l: 0 12px 26px rgba(0,0,0,.12);
+      --container-max: 72rem; --pad-x: max(4vw, 1rem);
 
-/* ------------ Styles: fluid grid + consistent control sizes ------------ */
-function injectStyles(){
-  if (document.getElementById('out-tab-styles')) return;
-  const css = `
-  :root{ --space-3:12px; --control-h:42px; }
-  .outWrap{max-width:1100px;margin:0 auto;padding:16px}
-  .tab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-3)}
-  .line-grid{display:grid;grid-template-columns:minmax(320px,2fr) minmax(140px,.9fr) auto;gap:.75rem;align-items:end}
-  @media (max-width:700px){ .line-grid{grid-template-columns:1fr 1fr auto} }
-  @media (max-width:460px){ .line-grid{grid-template-columns:1fr} .line-actions{justify-content:flex-start} }
-  input[type="text"],input[type="number"],input[type="date"]{width:100%;height:var(--control-h);line-height:var(--control-h);box-sizing:border-box;padding:0 .65rem;min-width:0}
-  label{display:block;margin:.15rem 0 .35rem .1rem;font-size:.9rem;opacity:.8}
-  .lnStock{display:flex;align-items:center;gap:.45rem;margin-top:.35rem;border:1px solid var(--border-weak,#e5e7eb);border-radius:10px;padding:.3rem .5rem;min-height:32px}
-  .lnStock.loading{opacity:.8}
-  .lnStock .stock-spinner{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .line-actions{display:flex;align-items:flex-end}
-  `;
-  const st = document.createElement('style'); st.id = 'out-tab-styles'; st.textContent = css; document.head.appendChild(st);
+      --input-bg: #ffffff;
+      --input-border: rgba(0,0,0,0.12);
+      --input-shadow: 0 2px 8px rgba(0,0,0,.08);
+      --input-shadow-focus: 0 6px 18px rgba(10,132,255,.20);
+      --section-grad: linear-gradient(135deg, rgba(10,132,255,.10), rgba(255,255,255,.00));
+    }
+    *,*::before,*::after{ box-sizing:border-box }
+    html{ height:100%; font-size:16px; -webkit-text-size-adjust:100% }
+    body{
+      min-height:100dvh; margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      background:
+        radial-gradient(1200px 800px at 10% -10%, #eaf2ff 0%, transparent 60%),
+        radial-gradient(1000px 700px at 110% 10%, #fff2e6 0%, transparent 55%),
+        linear-gradient(180deg,#f7f9ff 0%, #eef1f6 100%);
+      color:var(--text);
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    }
+    .container{
+      position:relative; z-index:1; width:min(100%, 28rem); margin:0 auto;
+      padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--pad-x) var(--space-2);
+      display:flex; flex-direction:column; gap:var(--space-3)
+    }
+    @media (min-width: 48rem){ .container{ width:min(100%, var(--container-max)) } }
+
+    .glass{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-m);
+      backdrop-filter: saturate(160%) blur(12px);
+      -webkit-backdrop-filter: saturate(160%) blur(12px);
+      background-image: var(--section-grad);
+      background-blend-mode: screen;
+    }
+
+    header{ display:flex; align-items:center; gap:var(--space-2) }
+    .spacer{ flex:1 }
+    .lang{ display:flex; gap:.5rem; align-items:center }
+    .lang button{
+      padding:.5rem 1rem; border-radius:var(--radius-pill); border:1px solid rgba(0,0,0,.08);
+      background:#fff; color:#111; font-weight:800; font-size:var(--fs-sm); cursor:pointer;
+      box-shadow: var(--shadow-s);
+      transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+    }
+    .lang button:hover{ transform: translateY(-1px); background:#fffefc; box-shadow: var(--shadow-m) }
+    .lang button.active{
+      background:linear-gradient(145deg,#0a84ff,#4da3ff);
+      color:#fff; border-color:transparent;
+      box-shadow: 0 6px 14px rgba(10,132,255,.25), inset 0 0 0 1px rgba(255,255,255,.2)
+    }
+
+    .tabs{
+      display:flex; gap:.5rem; padding:.45rem; overflow:auto;
+      border-radius:var(--radius-pill);
+      background:rgba(255,255,255,0.9);
+      border:1px solid var(--border);
+      -webkit-overflow-scrolling:touch;
+      box-shadow: var(--shadow-s);
+    }
+    .tabs button{
+      flex:0 0 auto; white-space:nowrap; padding:.65rem 1rem; border:none;
+      border-radius:var(--radius-pill); background:transparent; cursor:pointer; font-weight:900;
+      color:#1e1e20; font-size:var(--fs-sm);
+      transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+    }
+    .tabs button:hover{ background:#fff; transform:translateY(-1px); box-shadow: var(--shadow-s) }
+    .tabs button.active{ background:#fff; color:#0a84ff; box-shadow: var(--shadow-m) }
+
+    .card{ padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3) }
+    .card h3{ margin:0; font-size:var(--fs-md); font-weight:900; letter-spacing:.2px }
+
+    /* Dashboard grid */
+    .dashboard-grid{ display:grid; gap:1rem; grid-template-columns: 1fr; }
+    @media (min-width: 48rem){ .dashboard-grid{ grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 75rem){ .dashboard-grid{ grid-template-columns: 2fr 1fr 1fr; } .span-2{ grid-column: span 2; } }
+
+    .row{ display:flex; flex-wrap:wrap; gap:var(--space-3) }
+    .row > *{ flex:1 1 14rem }
+    label{ font-size:var(--fs-xs); color:#2e3a48; font-weight:800; letter-spacing:.15px }
+
+    input,select,textarea{
+      width:100%; padding:1rem 1.05rem; font-size:16px; background: var(--input-bg);
+      color:#111; border:1px solid var(--input-border); border-radius: 14px; outline:none;
+      box-shadow: var(--input-shadow);
+      transition: box-shadow .18s ease, border-color .18s ease, transform .06s ease, background .18s ease;
+    }
+    input:hover,select:hover,textarea:hover{ background: #ffffff }
+    input:focus,select:focus,textarea:focus{
+      border-color:#0a84ff; box-shadow: var(--input-shadow-focus), 0 0 0 .25rem var(--accent-weak);
+      transform: translateY(-0.5px);
+    }
+    input[type="date"]{ -webkit-appearance: none; appearance: none; min-width: 12.5rem; max-width: 100%; background-color:#fff; }
+
+    .lines{ display:flex; flex-direction:column; gap:.75rem }
+    .line{ display:flex; flex-direction:column; gap:.65rem; padding:.85rem; border:1px dashed var(--border-weak); border-radius:14px; background:#fff; box-shadow: var(--shadow-s); }
+    .line .grid{ display:flex; flex-wrap:wrap; gap:.75rem }
+    .line .grid > *{ flex:1 1 10rem }
+
+    .list{ display:flex; flex-direction:column; gap:.6rem }
+    .rowitem{
+      display:flex; justify-content:space-between; align-items:center; gap:.75rem;
+      padding:.75rem 1rem; border:1px solid var(--border); border-radius:14px; background:#fff; font-size:var(--fs-sm);
+      box-shadow: var(--shadow-s);
+    }
+    .rowitem .meta{ color:#556070; font-size:var(--fs-xs) }
+
+    .toggle{ display:flex; justify-content:flex-end }
+    .toggle button{
+      border:none; background:transparent; color:#0a84ff; font-weight:900; cursor:pointer; padding:.4rem .6rem;
+      border-radius: var(--radius-pill); transition: background .18s, transform .18s;
+    }
+    .toggle button:hover{ background:rgba(10,132,255,.12); transform: translateY(-1px) }
+
+    .badge{ display:inline-flex; align-items:center; justify-content:center; min-width:2rem; height:2rem; padding:0 .5rem; border-radius:var(--radius-pill); font-size:.95rem; font-weight:900; color:#fff; background:#7b8794; box-shadow: inset 0 -1px 0 rgba(255,255,255,.3); }
+    .badge.red{ background:#ef4444 } .badge.yellow{ background:#f59e0b } .badge.green{ background:#10b981 }
+
+    .btn{
+      appearance:none; cursor:pointer; font-weight:900; font-size:var(--fs-sm);
+      padding:.9rem 1.1rem; border-radius:var(--radius-pill); border:1px solid var(--border);
+      background:#fff; color:#111; box-shadow: 0 6px 14px rgba(0,0,0,.10); -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease, opacity .18s ease;
+      position: relative;
+    }
+    .btn:hover{ background:#fffefc; transform:translateY(-1px); box-shadow: var(--shadow-m) }
+    .btn.primary{ color:#fff; border-color:transparent; background:linear-gradient(145deg,#0a84ff,#4da3ff); box-shadow:0 6px 14px rgba(10,132,255,.28), inset 0 0 0 1px rgba(255,255,255,.2) }
+    .btn.small{ padding:.55rem .9rem; font-size:var(--fs-xs); font-weight:800; background:#fff }
+    .btn:disabled{ opacity:.45; cursor:not-allowed }
+    .btn .btn-spinner{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; }
+    .btn.is-loading .btn-spinner{ display:flex } .btn.is-loading .btn-label{ visibility:hidden }
+    .spinner{ width:18px; height:18px; border:2px solid rgba(0,0,0,.14); border-top-color:#0a84ff; border-radius:50%; animation: spin .9s linear infinite; }
+    .btn.primary .spinner{ border-color: rgba(255,255,255,.35); border-top-color:#fff }
+    @keyframes spin { to { transform: rotate(360deg) } }
+
+    .skeleton-row{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.75rem 1rem; border-radius:14px; border:1px solid var(--border-weak); background:#f5f7fb; box-shadow: var(--shadow-s); animation: pulse 1.2s ease-in-out infinite; min-height: 52px; }
+    .skeleton-bar{ height:12px; width:50%; border-radius:8px; background:#e7ebf5 }
+    .skeleton-badge{ width:36px; height:20px; border-radius:9999px; background:#e7ebf5 }
+    @keyframes pulse { 0% { opacity:.7; } 50% { opacity:1; } 100% { opacity:.7; } }
+    @media (prefers-reduced-motion: reduce){ .spinner, .skeleton-row{ animation: none } }
+
+    /* Speed-Dial FAB (OUT tab) */
+    .fab{
+      position: fixed; right: 1rem; bottom: calc(env(safe-area-inset-bottom) + 1rem);
+      z-index: 60; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem;
+    }
+    .fab .mini{
+      display:flex; align-items:center; gap:.5rem; transform: translateY(8px); opacity:0; pointer-events:none;
+      transition: transform .18s ease, opacity .18s ease;
+    }
+    .fab.expanded .mini{ transform: translateY(0); opacity:1; pointer-events:auto; }
+    .fab .label{
+      background:#fff; border:1px solid var(--border); border-radius: var(--radius-pill); padding:.45rem .7rem; font-size:var(--fs-xs); font-weight:800; box-shadow: var(--shadow-s);
+    }
+    .fab .mini .btn.small{ box-shadow: var(--shadow-m); }
+    .fab-main{
+      width:56px; height:56px; border-radius: 50%; display:grid; place-items:center;
+      background:linear-gradient(145deg,#0a84ff,#4da3ff); color:#fff; border:none; box-shadow: var(--shadow-l);
+      cursor:pointer;
+    }
+    .fab-main .icon{ font-size: 22px; line-height: 1; transform: rotate(0deg); transition: transform .18s ease }
+    .fab.expanded .fab-main .icon{ transform: rotate(45deg) } /* turns + into × look */
+    .toast{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 4.6rem); transform:translateX(-50%); background:#111; color:#fff; padding:.7rem 1rem; border-radius:var(--radius-pill); display:none; z-index:2500; font-size:var(--fs-sm); box-shadow: var(--shadow-m) }
+    .toast.show{ display:block }
+
+    /* Picker overlay */
+#pickerOverlay{
+  position:fixed; inset:0; z-index:4000; /* was 2000 */
+  display:none; align-items:center; justify-content:center;
+  background:rgba(15,18,23,0.35);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
 }
+#pickerOverlay.open{ display:flex }
+    #pickerBox{ background:rgba(255,255,255,.98); border:1px solid var(--border); border-radius:18px; box-shadow: var(--shadow-l); display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; }
+    .picker-header{ display:flex; gap:.5rem; align-items:center; padding:.75rem; border-bottom:1px solid var(--border-weak); background:#fff }
+    .picker-header input{ flex:1; padding:1rem 1.05rem; font-size:16px; border:1px solid var(--input-border); border-radius:14px; outline:none; background:var(--input-bg); box-shadow:var(--input-shadow) }
+    .picker-header input:focus{ border-color:#0a84ff; box-shadow: var(--input-shadow-focus), 0 0 0 .25rem var(--accent-weak) }
+    .picker-list{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.5rem; background:#fff }
+    .pick-row{ padding:.95rem 1rem; font-size:1.02rem; line-height:1.25; border:1px solid var(--border); border-radius:14px; background:#fff; word-break:break-word; box-shadow: var(--shadow-s) }
+    .picker-actions{ border-top:1px solid var(--border-weak); padding:.6rem .75rem; background:#fff; display:flex; gap:.5rem }
 
-/* ------------ Template ------------ */
-function viewTemplate(){
-  return `
-  <div class="outWrap">
-    <section class="card glass" style="overflow:hidden">
-      <h3 style="margin:0 0 .75rem 0">จ่ายออก / OUT</h3>
-      <div class="tab-grid" id="outHeader">
-        <div><label>วันที่</label><input id="outDate" type="date" value="${todayStr()}"></div>
-        <div><label>โครงการ</label><input id="outProject" data-picker="projects" placeholder="ค้นหาโครงการ…"></div>
-        <div><label>ผู้รับเหมา</label><input id="outContractor" data-picker="contractors" placeholder="ค้นหาผู้รับเหมา…"></div>
-        <div><label>ผู้ขอเบิก</label><input id="outRequester" data-picker="requesters" placeholder="ค้นหาผู้ขอเบิก…"></div>
-        <div style="grid-column:1/-1"><label>หมายเหตุ</label><input id="outNote" placeholder="…"></div>
-      </div>
+    @media (min-width: 769px){ #pickerBox{ width:520px; height:70vh } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <!-- Header text removed as requested -->
+    <div class="spacer"></div>
+    <div class="lang">
+      <button id="lang-th" class="active" type="button">ไทย</button>
+      <button id="lang-en" type="button">EN</button>
+      <button id="refreshDataBtn" class="btn small" type="button" style="margin-left:.5rem">
+        <span class="btn-label">↻ Refresh</span>
+        <span class="btn-spinner"><span class="spinner"></span></span>
+      </button>
+    </div>
+  </header>
 
-      <div id="outLines"></div>
-    </section>
+  <div class="tabs glass" id="tabs">
+    <button data-tab="dashboard" class="active" type="button">สรุป</button>
+    <button data-tab="out" type="button">จ่ายออก</button>
+    <button data-tab="in" type="button">รับเข้า</button>
+    <button data-tab="adjust" type="button">ปรับปรุง</button>
+    <button data-tab="purchase" type="button">ขอจัดซื้อ</button>
   </div>
 
-  <!-- History overlay -->
-  <div id="histOverlay" class="overlay-backdrop" style="position:fixed;inset:0;z-index:4500;display:none;background:rgba(15,18,23,.28);backdrop-filter:blur(6px)">
-    <div class="overlay-panel card glass" style="margin:5vh auto;width:min(980px,94%);max-height:90vh;display:flex;flex-direction:column;overflow:visible">
-      <div style="padding:.9rem 1rem;border-bottom:1px solid var(--border-weak);display:flex;gap:.5rem;align-items:center;flex:0 0 auto;background:var(--card)">
-        <strong style="font-size:1.05rem">ค้นหาประวัติการจ่ายออก</strong>
-        <span class="spacer"></span>
-        <button class="btn small" id="btnCloseHist" type="button">ปิด</button>
-      </div>
-      <div id="histBody" style="padding:1rem;display:flex;flex-direction:column;gap:.75rem;overflow:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto">
-        <div class="tab-grid" id="searchHeader">
-          <div><label>จากวันที่</label><input id="sFrom" type="date"></div>
-          <div><label>ถึงวันที่</label><input id="sTo" type="date"></div>
-          <div><label>โครงการ</label><input id="sProj" data-picker="projects"></div>
-          <div><label>ผู้รับเหมา</label><input id="sCont" data-picker="contractors"></div>
-          <div><label>ผู้ขอเบิก</label><input id="sReq" data-picker="requesters"></div>
-          <div><label>วัสดุ</label><input id="sMat" data-picker="materials"></div>
-          <div>
-            <button class="btn" id="btnSearch" type="button">
-              <span class="btn-label">ค้นหา</span><span class="btn-spinner" style="display:none"><span class="spinner"></span></span>
-            </button>
-          </div>
-        </div>
-        <div class="list" id="sResults"></div>
-        <div style="position:sticky;bottom:0;background:var(--card);padding-top:.25rem;border-top:1px solid var(--border-weak)">
-          <button id="btnMore" type="button" style="display:none">ดูเพิ่มเติม</button>
-        </div>
-      </div>
+  <main id="view" aria-live="polite"></main>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<!-- Picker -->
+<div id="pickerOverlay" aria-hidden="true">
+  <div id="pickerBox" role="dialog" aria-modal="true">
+    <div class="picker-header">
+      <input id="pickerSearch" placeholder="ค้นหา…" inputmode="search" />
+      <button class="btn" id="pickerCancel" type="button">ปิด</button>
     </div>
-  </div>`;
-}
-
-/* ------------ Line UI ------------ */
-function lineRow({name="", qty=""}={}) {
-  return `
-  <div class="line">
-    <div class="line-grid">
-      <div>
-        <label>วัสดุ</label>
-        <input class="lnName" data-picker="materials" placeholder="ค้นหาวัสดุ…" value="${esc(name)}">
-        <div class="lnStock"></div>
-      </div>
-      <div>
-        <label>จำนวน</label>
-        <input class="lnQty" type="number" min="0" step="0.01" value="${esc(qty)}">
-      </div>
-      <div class="line-actions"><button class="btn small btnRem" type="button">ลบ</button></div>
+    <div class="picker-list" id="pickerList"></div>
+    <div class="picker-actions">
+      <button class="btn" id="pickerAdd" type="button" title="เพิ่มใหม่">เพิ่ม “<span id="pickerAddText"></span>”</button>
     </div>
-  </div>`;
-}
+  </div>
+</div>
 
-function collectLines(root){
-  const rows=[];
-  $$('#outLines .line',root).forEach(line=>{
-    const name=$('.lnName',line).value.trim();
-    const qty=Number($('.lnQty',line).value);
-    if(name && isFinite(qty) && qty>0) rows.push({name,qty});
-  });
-  return rows;
-}
-
-/* ------------ Stock handlers ------------ */
-function attachStockHandlers(scope){
-  $$('.lnName',scope).forEach(inp=>{
-    const show = async ()=>{
-      const name = inp.value.trim();
-      const box = inp.parentElement.querySelector('.lnStock');
-      if(!name){ box.innerHTML=''; return; }
-      box.classList.add('loading');
-      box.innerHTML = '<span class="stock-spinner"></span><span class="meta">กำลังโหลดคงเหลือ…</span>';
-      try{
-        const r = await apiGet('getCurrentStock', { material:name }, { cacheTtlMs: 4000 });
-        box.classList.remove('loading');
-        if (!r || r.ok===false){ box.innerHTML = '<span class="meta">ไม่พบคงเหลือ</span>'; return; }
-        box.innerHTML = '';
-        box.appendChild(stockBadge(Number(r.stock||0), Number(r.min||0)));
-        const meta = document.createElement('span');
-        meta.className = 'meta';
-        meta.textContent = ` คงเหลือ / Min: ${r.stock ?? '-'} / ${r.min ?? '-'}`;
-        box.appendChild(meta);
-      }catch{
-        box.classList.remove('loading');
-        box.innerHTML = '<span class="meta">โหลดคงเหลือไม่สำเร็จ</span>';
-      }
-    };
-    inp.addEventListener('change', show);
-    inp.addEventListener('blur', show);
-    if (inp.value) show();
-  });
-}
-
-/* ------------ Search / Edit ------------ */
-function renderResults(listEl, rows){
-  const map=new Map();
-  for(const r of rows||[]){
-    const key=r.doc;
-    const line=`${r.item} × ${r.qty}${r.spec?' • '+r.spec:''}`;
-    if(!map.has(key)){ map.set(key,{doc:r.doc,ts:r.ts,project:r.project,contractor:r.contractor,requester:r.requester,lines:[line]}); }
-    else map.get(key).lines.push(line);
-  }
-  const cards=[];
-  for(const v of map.values()){
-    const title=`${esc(v.doc)} • ${esc(v.project||'-')} • ${esc(v.contractor||'-')} • ${esc(v.requester||'-')}`;
-    const preview=v.lines.slice(0,3).map(x=>`<li>${esc(x)}</li>`).join('');
-    const more=v.lines.length>3?`<span class="meta">+${v.lines.length-3} รายการ</span>`:'';
-    cards.push(`<div class="rowitem">
-      <div style="flex:1 1 auto">
-        <div><strong>${title}</strong></div>
-        <div class="meta">${esc(v.ts)}</div>
-        <ul class="meta" style="margin:.35rem 0 0 .85rem;list-style:disc">${preview}</ul>${more}
-      </div>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <button class="btn small" data-open="${esc(v.doc)}" type="button">แก้ไข</button>
-      </div>
-    </div>`);
-  }
-  listEl.innerHTML = cards.join('');
-}
-
-async function doSearch(root, page=0){
-  const q = {
-    type:'OUT',
-    dateFrom: $('#sFrom',root).value || undefined,
-    dateTo:   $('#sTo',root).value || undefined,
-    project:  $('#sProj',root).value || undefined,
-    contractor: $('#sCont',root).value || undefined,
-    requester:  $('#sReq',root).value || undefined,
-    material:   $('#sMat',root).value || undefined,
-    limit: 50, offset: page*50
-  };
-  const btn = $('#btnSearch',root);
-  btn && btn.querySelector('.btn-spinner') && (btn.querySelector('.btn-spinner').style.display='inline-flex');
-  try{
-    const res = await apiGet('out_SearchHistory', q, {retries:1});
-    renderResults($('#sResults',root), (res && res.rows) || []);
-    const more = $('#btnMore',root);
-    const moreVisible = res && res.total > (q.offset + ((res.rows||[]).length));
-    more.style.display = moreVisible ? '' : 'none';
-    more.dataset.page = String(page+1);
-    if (!res || (res.rows||[]).length===0) toast('ไม่พบรายการ');
-  }catch(e){ toast(e.message || 'ค้นหาล้มเหลว'); }
-  finally{ btn && btn.querySelector('.btn-spinner') && (btn.querySelector('.btn-spinner').style.display='none'); }
-}
-
-function openHist(root){
-  const ov = $('#histOverlay',root);
-  ov.style.display = 'block';
-  bindPickerInputs(ov, currentLang());
-  $('#sResults',root).innerHTML='';
-  document.body.style.overflow = 'hidden';
-}
-function closeHist(root){
-  $('#histOverlay',root).style.display = 'none';
-  document.body.style.overflow = '';
-}
-
-/* ------------ OUT save + add line ------------ */
-function addLineUI(root){
-  $('#outLines',root).insertAdjacentHTML('beforeend', lineRow({}));
-  bindPickerInputs(root, currentLang());
-  attachStockHandlers(root);
-  $$('#outLines .btnRem',root).forEach(btn => btn.onclick = ()=> btn.closest('.line')?.remove());
-}
-
-async function submitOut(root){
-  try{
-    const lines = collectLines(root);
-    if (!lines.length){ toast('เพิ่มรายการก่อน'); return; }
-    const body = {
-      type: 'OUT',
-      date: $('#outDate', root).value || undefined,
-      project: $('#outProject', root).value || undefined,
-      contractor: $('#outContractor', root).value || undefined,
-      requester: $('#outRequester', root).value || undefined,
-      note: $('#outNote', root).value || undefined,
-      lines
-    };
-    const res = await apiPost('submitMovementBulk', body);
-    if (!res || res.ok===false) throw new Error(res && res.message || 'Submit failed');
-    toast('บันทึกเอกสารแล้ว: '+ (res.docNo||''));
-    $('#outLines', root).innerHTML = '';
-    addLineUI(root);
-  }catch(e){ toast(e.message || 'บันทึกล้มเหลว'); }
-}
-
-/* ------------ FAB actions for this tab ------------ */
-export function fabActions({root}){
-  return [
-    { label:'ประวัติ',   icon: FabIcons.clock, onClick: ()=> openHist(root) },
-    { label:'เพิ่มบรรทัด', icon: FabIcons.plus,  onClick: ()=> addLineUI(root) },
-    { label:'บันทึก',    icon: FabIcons.save,  variant:'primary', onClick: ()=> submitOut(root) },
-  ];
-}
-
-/* ------------ Entry ------------ */
-export default async function mountOut({root}){
-  injectStyles();
-  root.innerHTML = viewTemplate();
-  bindPickerInputs(root, currentLang());
-  addLineUI(root);
-
-  $('#btnCloseHist',root).addEventListener('click', ()=> closeHist(root));
-  $('#btnSearch',root).addEventListener('click', ()=> doSearch(root, 0));
-  $('#btnMore',root).addEventListener('click', (e)=>{
-    const next = Number(e.currentTarget.dataset.page||1);
-    doSearch(root, next);
-  });
-}
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

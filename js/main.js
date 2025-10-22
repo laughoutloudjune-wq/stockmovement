@@ -1,11 +1,13 @@
-// js/main.js — full bootstrap + router so UI renders
-import { installResponsiveTweaks, bindPickerInputs, preloadLookups, setBtnLoading, currentLang, applyLangTexts } from './shared.js';
-import { mountGlobalFab, setFab, hideFab } from './fab.js';
+// js/main.js
+// Adds cache cleanup, refresh button spinner, proper dashboard mounting, and tab routing.
 
-const root = document.getElementById('view');
+import {
+  $, $$, STR, applyLangTexts, preloadLookups, bindPickerInputs,
+  toast, currentLang, cleanOldCache, setBtnLoading
+} from './shared.js';
 
-// Map tabs to lazy imports (relative to /js/)
-const TAB_MAP = {
+// Lazy import tab modules
+const TAB_MODULES = {
   dashboard: () => import('../tabs/dashboard.js'),
   out:       () => import('../tabs/out.js'),
   in:        () => import('../tabs/in.js'),
@@ -13,71 +15,82 @@ const TAB_MAP = {
   purchase:  () => import('../tabs/purchase.js'),
 };
 
-let currentModule = null;
-export let currentTab = null;
+let LANG = currentLang();
+let currentTab = 'dashboard';
 
-export async function mountTab(tab){
-  currentTab = tab;
-  // update active tab UI
-  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab')===tab));
-  try{
-    const loader = TAB_MAP[tab] || TAB_MAP.dashboard;
-    const mod = await loader();
-    currentModule = mod;
-    // render
-    await (mod.default && mod.default({root}));
-    // after-mount bindings
-    bindPickerInputs(document, currentLang());
-
-    // FAB
-    mountGlobalFab();
-    if (mod.fabActions) {
-      const actions = mod.fabActions({root});
-      if (actions && actions.length) setFab(actions); else hideFab();
-    } else {
-      hideFab();
-    }
-  }catch(e){
-    console.error('Mount failed', e);
-    root.innerHTML = `<section class="card glass"><h3>เกิดข้อผิดพลาด</h3><div class="meta">${e.message||e}</div></section>`;
-    hideFab();
-  }
+async function mountTab(tabKey) {
+  const loader = TAB_MODULES[tabKey];
+  if (!loader) return;
+  const mod = await loader();
+  const root = $('#view');
+  await mod.default({ root, lang: LANG });
+  bindPickerInputs(root, LANG);
 }
 
-// simple hash router
-function getTabFromHash(){
-  const h = (location.hash || '').replace('#','').trim();
-  if (TAB_MAP[h]) return h;
-  return 'dashboard';
-}
-function handleHash(){
-  const t = getTabFromHash();
-  mountTab(t);
-}
+async function init() {
+  // 0) Clean stale cache first (keeps fresh, drops old)
+  cleanOldCache();
 
-// refresh button binding
-function setupRefresh(){
-  document.querySelectorAll('[data-action="refresh"], #btnRefresh').forEach(el=>{
-    if (el.__rf_bound) return;
-    el.__rf_bound = true;
-    el.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      setBtnLoading(el, true);
-      try{ await mountTab(currentTab || getTabFromHash()); } finally { setBtnLoading(el, false); }
+  // Language toggle
+  $('#lang-en')?.addEventListener('click', () => { LANG = 'en'; document.documentElement.lang = 'en'; onLangChange(); });
+  $('#lang-th')?.addEventListener('click', () => { LANG = 'th'; document.documentElement.lang = 'th'; onLangChange(); });
+
+  // Tabs
+  $$('.tabs button').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const key = btn.getAttribute('data-tab');
+      if (!key) return;
+      $$('.tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTab = key;
+      await mountTab(currentTab);
     });
   });
+
+  // 1) Preload lookups BEFORE first mount
+  try {
+    await preloadLookups();
+  } catch {
+    toast(LANG === 'th' ? 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ กำลังใช้ข้อมูลเก่า' : 'Failed to load lookups; using cached data');
+  }
+
+  // 2) Apply language and bind pickers
+  applyLangTexts(LANG);
+  bindPickerInputs(document, LANG);
+
+  // 3) Manual refresh button with spinner
+  const refreshBtn = $('#refreshDataBtn');
+  refreshBtn?.addEventListener('click', async ()=>{
+    try {
+      setBtnLoading(refreshBtn, true);
+      // remove only our cached keys
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('cache:')) keys.push(k);
+      }
+      keys.forEach(k => localStorage.removeItem(k));
+
+      await preloadLookups();
+      toast(LANG==='th' ? 'รีเฟรชข้อมูลแล้ว' : 'Data refreshed');
+
+      // re-mount current tab so UI picks up fresh lists
+      await mountTab(currentTab);
+    } catch {
+      toast(LANG==='th' ? 'รีเฟรชไม่สำเร็จ' : 'Refresh failed');
+    } finally {
+      setBtnLoading(refreshBtn, false);
+    }
+  });
+
+  // 4) Mount default tab
+  await mountTab(currentTab);
 }
 
-// global exposure for other scripts
-window.mountTab = mountTab;
-window.currentTab = currentTab;
-window.appRefresh = async () => mountTab(currentTab || getTabFromHash());
+function onLangChange() {
+  applyLangTexts(LANG);
+  bindPickerInputs(document, LANG);
+  mountTab(currentTab);
+}
 
-document.addEventListener('DOMContentLoaded', async ()=>{
-  installResponsiveTweaks();
-  applyLangTexts(currentLang());
-  await preloadLookups();
-  setupRefresh();
-  window.addEventListener('hashchange', handleHash);
-  handleHash(); // initial mount
-});
+document.addEventListener('DOMContentLoaded', init);

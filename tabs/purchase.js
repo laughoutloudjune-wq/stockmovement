@@ -1,13 +1,13 @@
 // tabs/purchase.js
-import { STR, stockBadge, apiGet, getLookups } from '../js/shared.js';
+import { STR } from '../js/shared.js';
 
-export default async function mount{cap}({ root, lang }) {
-  const S = STR[lang];
-  // Example content; replace with your real UI for this tab
+export default async function mountPurchase({ root, lang }) {
+  const S = (STR && STR[lang]) || { tabs: { dash: 'Dashboard', out: 'Out', in: 'In', adj: 'Adjust', pur: 'Purchase' } };
+  const title = S.tabs.pur;
   const wrap = document.createElement('section');
   wrap.className = 'card glass';
   wrap.innerHTML = `
-    <h3>${S.tabs.pur}</h3>
+    <h3>${title}</h3>
     <div class="row">
       <div>
         <label>${lang==='th' ? 'ตัวอย่าง' : 'Example'}</label>

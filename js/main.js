@@ -1,32 +1,42 @@
-// js/main.js
+// js/main.js (v0.2-fix-out-tab)
 import { $, $$, STR, applyLangTexts, preloadLookups, bindPickerInputs,
          toast, currentLang, cleanOldCache, setBtnLoading } from './shared.js';
 
+const VERSION = 'v0.2-fix-out-tab';
+
+function tabUrl(key) {
+  // Build absolute URL for debug visibility + cache busting to avoid stale caches
+  const base = new URL(import.meta.url);
+  const href = new URL(`../tabs/${key}.js`, base).href;
+  return `${href}?v=${VERSION}`;
+}
+
 const TAB_MODULES = {
-  dashboard: () => import('../tabs/dashboard.js'),
-  out:       () => import('../tabs/out.js'),
-  in:        () => import('../tabs/in.js'),
-  adjust:    () => import('../tabs/adjust.js'),
-  purchase:  () => import('../tabs/purchase.js'),
+  dashboard: () => import(tabUrl('dashboard')),
+  out:       () => import(tabUrl('out')),
+  in:        () => import(tabUrl('in')),
+  adjust:    () => import(tabUrl('adjust')),
+  purchase:  () => import(tabUrl('purchase')),
 };
 
 let LANG = currentLang();
 let currentTab = 'dashboard';
 
 async function mountTab(tabKey) {
-  const loader = TAB_MODULES[tabKey];
   const root = $('#view');
   if (!root) return;
   root.innerHTML = '<div class="card glass"><div class="skeleton-row"><div class="skeleton-bar" style="width:60%"></div><div class="skeleton-badge"></div></div></div>';
   try{
+    const loader = TAB_MODULES[tabKey];
     if (!loader) throw new Error('Tab not found: '+tabKey);
+    console.log('[tabs] importing', tabUrl(tabKey));
     const mod = await loader();
     if (!mod || typeof mod.default !== 'function') throw new Error('Tab module invalid: '+tabKey);
     await mod.default({ root, lang: LANG });
     bindPickerInputs(root, LANG);
   }catch(err){
-    console.error(err);
-    root.innerHTML = '<div class="card glass"><h3>Load error</h3><p>'+String(err)+'</p></div>';
+    console.error('[tabs] failed', tabKey, err);
+    root.innerHTML = '<div class="card glass"><h3>Load error</h3><p>'+String(err)+'</p><code>'+tabUrl(tabKey)+'</code></div>';
     toast(LANG==='th' ? 'โหลดแท็บไม่สำเร็จ' : 'Failed to load tab');
   }
 }

@@ -1,6 +1,6 @@
 // tabs/out.js
 // Material OUT screen with speed-dial FAB (“Add Item” + “Submit Form”).
-// Removed Reset button as requested.
+// Unit field removed per request.
 
 import {
   $, $$, STR, bindPickerInputs, openPicker,
@@ -9,32 +9,40 @@ import {
 
 function OutLine(lang){
   const card=document.createElement('div'); card.className='line';
-  const name=document.createElement('input'); name.placeholder=(lang==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…'); name.readOnly=true; name.setAttribute('data-picker','materials');
-  const qty=document.createElement('input'); qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
-  const unit=document.createElement('input'); unit.placeholder=(lang==='th'?'หน่วย':'Unit');
-  const note=document.createElement('input'); note.placeholder=(lang==='th'?'หมายเหตุ (ถ้ามี)':'Note (optional)');
+  const name=document.createElement('input');
+  name.placeholder=(lang==='th' ? 'พิมพ์เพื่อค้นหา…' : 'Type to search…');
+  name.readOnly=true; name.setAttribute('data-picker','materials');
+
+  const qty=document.createElement('input');
+  qty.type='number'; qty.min='0'; qty.step='any'; qty.placeholder='0'; qty.inputMode='decimal';
+
+  const note=document.createElement('input');
+  note.placeholder=(lang==='th'?'หมายเหตุ (ถ้ามี)':'Note (optional)');
+
   const grid=document.createElement('div'); grid.className='grid';
-  grid.appendChild(name); grid.appendChild(unit); grid.appendChild(qty); grid.appendChild(note);
+  grid.appendChild(name);
+  grid.appendChild(qty);
+  grid.appendChild(note);
+
   const actions=document.createElement('div'); actions.className='actions';
   const rm=document.createElement('button'); rm.type='button'; rm.className='btn small'; rm.textContent='×'; rm.onclick=()=>card.remove();
   actions.appendChild(rm);
+
   card.appendChild(grid); card.appendChild(actions);
   name.addEventListener('click', ()=>openPicker(name,'materials', lang));
   return card;
 }
 
-function collectLines(containerSel){
+function collectLines(rootSel){
   const out=[];
-  $$(containerSel+' .line').forEach(c=>{
+  $$(rootSel+' .line').forEach(c=>{
     const nameEl=c.querySelector('input[data-picker="materials"]');
     const qtyEl=c.querySelector('input[type="number"]');
-    const unitEl=c.querySelector('input[placeholder="Unit"],input[placeholder="หน่วย"]');
     const noteEl=c.querySelector('input[placeholder^="หมายเหตุ"],input[placeholder^="Note"]');
     const name=nameEl?nameEl.value.trim():'';
     const qty=Number(qtyEl?qtyEl.value:0)||0;
-    const unit=unitEl?unitEl.value.trim():'';
     const note=noteEl?noteEl.value.trim():'';
-    if (name) out.push({name, qty, unit, note});
+    if (name) out.push({name, qty, note});
   });
   return out;
 }

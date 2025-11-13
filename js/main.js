@@ -13,6 +13,8 @@ const TAB_MODULES = {
   in:        () => import('../tabs/in.js'),
   adjust:    () => import('../tabs/adjust.js'),
   purchase:  () => import('../tabs/purchase.js'),
+  // NEW:
+  out_history: () => import('../tabs/out_history.js'),
 };
 
 let LANG = currentLang();
@@ -47,6 +49,19 @@ async function init() {
     });
   });
 
+  // Programmatic tab switch (used by OUT tab's History button)
+  window.addEventListener('switch-tab', async (e)=>{
+    const key = e.detail;
+    if (!key || !TAB_MODULES[key]) return;
+    const btn = $(`.tabs button[data-tab="${key}"]`);
+    if (btn) {
+      $$('.tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+    currentTab = key;
+    await mountTab(currentTab);
+  });
+
   // 1) Preload lookups BEFORE first mount
   try {
     await preloadLookups();
@@ -65,19 +80,13 @@ async function init() {
       setBtnLoading(refreshBtn, true);
       // remove only our cached keys
       const keys = [];
-      for (let i = 0; i < localStorage.length; i++) {
+      for (let i=0;i<localStorage.length;i++){
         const k = localStorage.key(i);
-        if (k && k.startsWith('cache:')) keys.push(k);
+        if(k && k.startsWith('cache:')) keys.push(k);
       }
-      keys.forEach(k => localStorage.removeItem(k));
-
-      await preloadLookups();
-      toast(LANG==='th' ? 'รีเฟรชข้อมูลแล้ว' : 'Data refreshed');
-
-      // re-mount current tab so UI picks up fresh lists
-      await mountTab(currentTab);
-    } catch {
-      toast(LANG==='th' ? 'รีเฟรชไม่สำเร็จ' : 'Refresh failed');
+      keys.forEach(k=>localStorage.removeItem(k));
+      await preloadLookups(true); // force fresh
+      toast(LANG==='th'?'รีเฟรชข้อมูลแล้ว':'Data refreshed');
     } finally {
       setBtnLoading(refreshBtn, false);
     }

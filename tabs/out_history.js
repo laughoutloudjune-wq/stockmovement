@@ -1,6 +1,7 @@
-// tabs/out_history.js (Public v1.2 - outlined list)
-// OUT History tab with a themed, outlined card list (Date OUT, Contractor, Requester, Project only).
-// Detail/Edit overlay reuses the OUT form line layout with live stock badges.
+// tabs/out_history.js (Public v1.3 - mobile-friendly outline + expanding search)
+// OUT History list shows Date (no time), Contractor, Requester, Project.
+// Cards are sized to fit on phones. DocNo is hidden from the list but used internally.
+// Detail/Edit overlay reuses OUT form line layout with live stock badges.
 
 import {
   $, $$, STR, bindPickerInputs, openPicker,
@@ -66,14 +67,15 @@ export default async function mount({ root, lang }){
 
   root.innerHTML=`
     <section class="card glass">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;">
+      <div class="hist-toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;">
         <h3 style="margin:0;">📜 ${lang==='th'?'ประวัติการจ่ายออก (OUT)':'OUT History'}</h3>
-        <div style="display:flex;gap:.5rem;align-items:center;">
-          <input id="histSearchText" placeholder="${lang==='th'?'ค้นหา...':'Search...'}" style="min-width:16rem"/>
-          <button class="btn small" id="histReload">⟲ ${lang==='th'?'':'Reload'}</button>
+        <div class="hist-search">
+          <button class="btn small icon" id="histSearchToggle" aria-label="Search" title="${lang==='th'?'ค้นหา':'Search'}">🔍</button>
+          <input id="histSearchText" placeholder="${lang==='th'?'ค้นหา...':'Search...'}" />
+          <button class="btn small" id="histReload" title="${lang==='th'?'โหลดใหม่':'Reload'}">⟲</button>
         </div>
       </div>
-      <div id="histListWrap" style="margin-top:.75rem;"></div>
+      <div id="histListWrap" class="hist-wrap"></div>
     </section>
 
     <!-- Detail/Edit overlay -->
@@ -95,69 +97,56 @@ export default async function mount({ root, lang }){
     </div>
   `;
 
-  /* ---------- Scoped styles for outlined list ---------- */
+  /* ---------- Scoped styles (mobile-first) ---------- */
   const style=document.createElement('style');
   style.textContent=`
+    .hist-wrap { padding: .4rem; }
     .hist-list {
       display:grid;
-      grid-template-columns: 1fr;
-      gap:.65rem;
+      grid-template-columns: 1fr; /* single column on phone */
+      gap:.5rem;
     }
     @media (min-width: 900px){
-      .hist-list { grid-template-columns: 1fr 1fr; }
+      .hist-list { grid-template-columns: 1fr 1fr; } /* two columns on desktop */
     }
     .doc-card {
+      width:100%;
+      box-sizing:border-box;
       border:1px solid var(--border-weak);
       border-radius:14px;
       background: var(--glass,#fff);
       box-shadow: var(--shadow-s, 0 1px 2px rgba(0,0,0,.04));
-      padding:.75rem .9rem;
+      padding: clamp(.6rem, 2.5vw, .9rem);
       display:flex;
-      gap:.8rem;
+      gap:.75rem;
       align-items:flex-start;
       transition: box-shadow .15s ease, border-color .15s ease, transform .05s ease;
       cursor:pointer;
     }
-    .doc-card:hover {
-      border-color: var(--border,#ddd);
-      box-shadow: var(--shadow-m,0 6px 16px rgba(0,0,0,.08));
-    }
+    .doc-card:hover { border-color: var(--border,#ddd); box-shadow: var(--shadow-m,0 6px 16px rgba(0,0,0,.08)); }
     .doc-card:active { transform: translateY(1px); }
 
+    /* Compact left date badge (date only, no time) */
     .doc-date {
-      min-width: 88px;
+      min-width: 82px;
       display:flex; align-items:center; justify-content:center;
       font-variant-numeric: tabular-nums;
-      padding:.35rem .55rem;
+      padding:.3rem .5rem;
       border:1px dashed var(--border-weak);
       border-radius:10px;
       background: #fafafa;
       color:#333;
     }
 
-    .doc-main {
-      flex:1 1 auto;
-      min-width:0;
-      display:flex;
-      flex-direction:column;
-      gap:.35rem;
-    }
+    .doc-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:.35rem; }
+    .doc-topline { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+    .doc-title { font-weight:600; color:#111; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .doc-meta { font-size:.9rem; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-    .doc-topline {
-      display:flex; align-items:center; justify-content:space-between; gap:.5rem;
-      font-weight:600;
-    }
-    .doc-topline .docno {
-      color:#111;
-      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    }
-
-    .chip-row {
-      display:flex; flex-wrap:wrap; gap:.4rem;
-    }
+    .chip-row { display:flex; flex-wrap:wrap; gap:.35rem; }
     .chip {
       border:1px solid var(--border-weak);
-      padding:.2rem .5rem;
+      padding:.18rem .5rem;
       border-radius:999px;
       background:#fff;
       font-size:.85rem;
@@ -167,9 +156,39 @@ export default async function mount({ root, lang }){
     }
     .chip b { font-weight:600; margin-right:.35rem; color:#222; }
 
-    .doc-meta {
-      font-size:.85rem; color:#666;
-    }
+/* COLLAPSED (icon only) */
+.hist-search {
+  display:flex;
+  align-items:center;
+  position:relative;
+  gap:.3rem;
+}
+
+.hist-search input {
+  width:0;
+  max-width:0;
+  opacity:0;
+  transition: width .18s ease, max-width .18s ease, opacity .18s ease;
+}
+
+/* EXPANDED — fits inside phone screens */
+.hist-search.open input {
+  opacity:1;
+
+  /* On phones: never exceed toolbar space */
+  width: clamp(90px, 40vw, 160px);
+  max-width: clamp(90px, 40vw, 160px);
+
+  /* Desktop: allow larger search field */
+}
+
+@media (min-width:900px){
+  .hist-search.open input {
+    width: 240px;
+    max-width: 240px;
+  }
+}
+    .hist-search .icon { min-width:34px; }
   `;
   root.appendChild(style);
 
@@ -181,11 +200,20 @@ export default async function mount({ root, lang }){
   const title=$('#histTitle',root);
   const closeBtn=$('#histClose',root);
   const saveBtn=$('#histSave',root);
+  const searchToggle=$('#histSearchToggle',root);
+  const searchInput=$('#histSearchText',root);
+  const reloadBtn=$('#histReload',root);
+  const toolbarSearch=$('.hist-search',root);
+
+  // search expand/collapse
+  searchToggle.onclick=()=>{
+    const open=toolbarSearch.classList.toggle('open');
+    if(open){ searchInput.focus(); } else { searchInput.value=''; loadHistory(); }
+  };
+  searchInput.onkeydown=(e)=>{ if(e.key==='Enter'){ loadHistory(); } };
+  reloadBtn.onclick=()=>loadHistory();
 
   closeBtn.onclick=()=>{ overlay.style.display='none'; };
-
-  $('#histReload',root).onclick=()=>loadHistory();
-  $('#histSearchText',root).onkeydown=(e)=>{ if(e.key==='Enter') loadHistory(); };
 
   /* ---------- Load + render outlined cards ---------- */
   async function loadHistory(){
@@ -193,11 +221,11 @@ export default async function mount({ root, lang }){
     try{
       const res=await apiPost('out_SearchHistory',{limit:0});
       const rows=Array.isArray(res.rows)?res.rows:[];
-      const q=($('#histSearchText',root)?.value||'').toLowerCase().trim();
+      const q=(searchInput.value||'').toLowerCase().trim();
 
       const filtered = q
         ? rows.filter(r=>{
-            const blob=[r.doc,r.ts,r.project,r.contractor,r.requester].join(' ').toLowerCase();
+            const blob=[r.ts,r.project,r.contractor,r.requester].join(' ').toLowerCase();
             return blob.includes(q);
           })
         : rows;
@@ -217,17 +245,19 @@ export default async function mount({ root, lang }){
         card.className='doc-card';
         card.setAttribute('data-doc', r.doc);
 
-        // Left: date badge
+        // date only (strip time if present)
+        const ts=r.ts||'';
+        const dateOnly = ts.includes(' ') ? ts.split(' ')[0] : ts;
+
         const left=document.createElement('div');
         left.className='doc-date';
-        left.textContent = r.ts || '';
+        left.textContent = dateOnly;
 
-        // Right: info
         const right=document.createElement('div');
         right.className='doc-main';
         right.innerHTML = `
           <div class="doc-topline">
-            <div class="docno">${esc(r.doc||'')}</div>
+            <div class="doc-title">${esc(lang==='th'?'รายการจ่ายออก':'Material OUT')}</div>
             <div class="doc-meta">${esc(r.project||'-')}</div>
           </div>
           <div class="chip-row">
@@ -263,7 +293,6 @@ export default async function mount({ root, lang }){
       if(!res||!res.ok||!res.doc) throw new Error(res?.message||'Not found');
       const d=res.doc;
 
-      // Build same lines UI as OUT tab
       const linesWrap=document.createElement('div'); linesWrap.className='lines';
       (d.lines||[]).forEach(li=>{
         const card=OutLine(lang);
@@ -298,7 +327,7 @@ export default async function mount({ root, lang }){
         const c=OutLine(lang); wrap.appendChild(c); bindPickerInputs(box,lang);
         const i=c.querySelector('input[data-picker="materials"]');
         i.addEventListener('click', ()=>openPicker(i,'materials',lang));
-        i.click(); // open picker immediately
+        i.click(); // open immediately
       };
 
       saveBtn.onclick = async ()=>{
@@ -328,7 +357,7 @@ export default async function mount({ root, lang }){
       };
 
     }catch(err){
-      console.warn('openDoc error:', err);
+      console.warn('openDoc error:',err);
       body.innerHTML=`<div class="meta" style="color:#b91c1c">${lang==='th'?'โหลดไม่สำเร็จ':'Failed to load document'}</div>`;
       saveBtn.onclick=null;
     }

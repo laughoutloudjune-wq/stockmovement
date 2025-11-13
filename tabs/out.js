@@ -69,10 +69,10 @@ function OutLine(lang){
   // Open picker
   name.addEventListener('click', ()=>openPicker(name,'materials', lang));
 
-  // After selection, fetch current stock and update badge
+  // Stock badge
   name.addEventListener('change', async ()=>{
-    const v = name.value.trim();
-    if (!v) { 
+    const v=name.value.trim();
+    if(!v){
       const bNew = document.createElement('span');
       bNew.className='badge'; 
       bNew.textContent='-';
@@ -80,8 +80,8 @@ function OutLine(lang){
       badge = bNew;
       return;
     }
-    // show tiny spinner while fetching
-    const spin = document.createElement('span');
+
+    const spin=document.createElement('span');
     spin.className = 'badge';
     spin.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span>';
     meta.replaceChild(spin, badge);
@@ -152,46 +152,38 @@ export default async function mount({ root, lang }){
           <input id="Note" placeholder="${lang==='th'?'ถ้ามี':'Optional'}" />
         </div>
       </div>
+
       <div class="lines" id="outLines"></div>
+
+      <div style="text-align:right;margin-top:.5rem;">
+        <button class="btn small" id="openOutHistoryBtn">📜 ${lang==='th'?'ประวัติการจ่ายออก':'OUT History'}</button>
+      </div>
     </section>
 
-    <!-- Speed-Dial FAB -->
     <div class="fab" id="fab">
       <div class="mini" id="fabSubmitWrap" aria-hidden="true">
         <div class="label">${S.btnSubmit}</div>
         <button class="btn small primary" id="fabSubmitBtn" type="button">
-          <span class="btn-label">💾</span>
-          <span class="btn-spinner"><span class="spinner"></span></span>
+          <span class="btn-label">💾</span><span class="btn-spinner"><span class="spinner"></span></span>
         </button>
       </div>
       <div class="mini" id="fabAddWrap" aria-hidden="true">
         <div class="label">${S.btnAdd}</div>
         <button class="btn small" id="fabAddBtn" type="button">
-          <span class="btn-label">＋</span>
-          <span class="btn-spinner"><span class="spinner"></span></span>
+          <span class="btn-label">＋</span><span class="btn-spinner"><span class="spinner"></span></span>
         </button>
       </div>
-      <button class="fab-main" id="fabMain" aria-expanded="false" aria-controls="fab">
-        <span class="icon">＋</span>
-      </button>
+      <button class="fab-main" id="fabMain" aria-expanded="false" aria-controls="fab"><span class="icon">＋</span></button>
     </div>
   `;
 
-  const lines = $('#outLines', root);
-
-  function addLine(){ 
-    lines.appendChild(OutLine(lang)); 
-    bindPickerInputs(root, lang); 
-  }
-
+  // local helpers
+  const lines=$('#outLines',root);
+  function addLine(){ lines.appendChild(OutLine(lang)); bindPickerInputs(root,lang); }
   function clearForm(){
-    lines.innerHTML=''; 
-    addLine();
-    $('#Note', root).value='';
-    $('#OutDate', root).value=todayStr();
-    $('#ProjectInput', root).value='';
-    $('#ContractorInput', root).value='';
-    $('#RequesterInput', root).value='';
+    lines.innerHTML=''; addLine();
+    $('#Note',root).value=''; $('#OutDate',root).value=todayStr();
+    $('#ProjectInput',root).value=''; $('#ContractorInput',root).value=''; $('#RequesterInput',root).value='';
   }
 
   // FAB behavior
@@ -225,14 +217,14 @@ export default async function mount({ root, lang }){
     try{
       const res = await apiPost('submitMovementBulk', p);
       if(res && res.ok){
-        toast((lang==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ')+(res.docNo||''));
+        toast((lang==='th'?'บันทึกแล้ว • เอกสาร ':'Saved • Doc ') + (res.docNo||''));
         clearForm();
-      } else {
+      }else{
         toast((res && res.message) || 'Error');
       }
-    } catch{
+    }catch{
       toast(lang==='th'?'เกิดข้อผิดพลาดในการบันทึก':'Failed to submit');
-    } finally {
+    }finally{
       setBtnLoading(fabSubmit, false);
       fab.classList.remove('expanded');
       fabMain.setAttribute('aria-expanded','false');
@@ -247,4 +239,9 @@ export default async function mount({ root, lang }){
   // Init
   $('#OutDate', root).value=todayStr();
   addLine();
+
+  // 🔗 Open OUT History tab (no layout change)
+  $('#openOutHistoryBtn', root)?.addEventListener('click', ()=>{
+    window.dispatchEvent(new CustomEvent('switch-tab',{ detail:'out_history' }));
+  });
 }

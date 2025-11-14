@@ -110,35 +110,19 @@ export default async function mount({ root, lang }){
       .hist-list { grid-template-columns: 1fr 1fr; } /* two columns on desktop */
     }
     .doc-card {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-
-  /* ensure it stays inside parent card on mobile */
-  margin: 0 auto;
-
-  border: 1px solid var(--border-weak);
-  border-radius: 12px;
-
-  background: var(--glass, #fff);
-  box-shadow: var(--shadow-s, 0 1px 2px rgba(0,0,0,.04));
-
-  padding: .65rem .75rem;
-
-  display: flex;
-  gap: .65rem;
-  align-items: flex-start;
-
-  transition: box-shadow .15s ease, border-color .15s ease, transform .05s ease;
-  cursor: pointer;
-}
-
-@media (max-width: 480px){
-  .doc-card {
-    padding: .6rem .6rem;
-    border-radius: 10px;
-  }
-}
+      width:100%;
+      box-sizing:border-box;
+      border:1px solid var(--border-weak);
+      border-radius:14px;
+      background: var(--glass,#fff);
+      box-shadow: var(--shadow-s, 0 1px 2px rgba(0,0,0,.04));
+      padding: clamp(.6rem, 2.5vw, .9rem);
+      display:flex;
+      gap:.75rem;
+      align-items:flex-start;
+      transition: box-shadow .15s ease, border-color .15s ease, transform .05s ease;
+      cursor:pointer;
+    }
     .doc-card:hover { border-color: var(--border,#ddd); box-shadow: var(--shadow-m,0 6px 16px rgba(0,0,0,.08)); }
     .doc-card:active { transform: translateY(1px); }
 
@@ -172,38 +156,19 @@ export default async function mount({ root, lang }){
     }
     .chip b { font-weight:600; margin-right:.35rem; color:#222; }
 
-/* COLLAPSED (icon only) */
-.hist-search {
-  display:flex;
-  align-items:center;
-  position:relative;
-  gap:.3rem;
-}
-
-.hist-search input {
-  width:0;
-  max-width:0;
-  opacity:0;
-  transition: width .18s ease, max-width .18s ease, opacity .18s ease;
-}
-
-/* EXPANDED — fits inside phone screens */
-.hist-search.open input {
-  opacity:1;
-
-  /* On phones: never exceed toolbar space */
-  width: clamp(90px, 40vw, 160px);
-  max-width: clamp(90px, 40vw, 160px);
-
-  /* Desktop: allow larger search field */
-}
-
-@media (min-width:900px){
-  .hist-search.open input {
-    width: 240px;
-    max-width: 240px;
-  }
-}
+    /* Expanding search */
+    .hist-search { display:flex; align-items:center; gap:.4rem; }
+    .hist-search input {
+      width:0;
+      opacity:0;
+      max-width: 0;
+      transition: width .18s ease, opacity .18s ease, max-width .18s ease;
+    }
+    .hist-search.open input {
+      width: min(54vw, 280px);
+      max-width: min(54vw, 280px);
+      opacity:1;
+    }
     .hist-search .icon { min-width:34px; }
   `;
   root.appendChild(style);
@@ -272,6 +237,10 @@ export default async function mount({ root, lang }){
         const right=document.createElement('div');
         right.className='doc-main';
         right.innerHTML = `
+          <div class="doc-topline">
+            <div class="doc-title">${esc(lang==='th'?'รายการจ่ายออก':'Material OUT')}</div>
+            <div class="doc-meta">${esc(r.project||'-')}</div>
+          </div>
           <div class="chip-row">
             <div class="chip"><b>${lang==='th'?'ผู้รับเหมา':'Contractor'}:</b> ${esc(r.contractor||'-')}</div>
             <div class="chip"><b>${lang==='th'?'ผู้ขอเบิก':'Requester'}:</b> ${esc(r.requester||'-')}</div>

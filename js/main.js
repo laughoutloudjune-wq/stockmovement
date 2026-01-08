@@ -1,20 +1,17 @@
 // js/main.js
-// Adds cache cleanup, refresh button spinner, proper dashboard mounting, and tab routing.
-
 import {
   $, $$, STR, applyLangTexts, preloadLookups, bindPickerInputs,
   toast, currentLang, cleanOldCache, setBtnLoading
 } from './shared.js';
 
-// Lazy import tab modules
 const TAB_MODULES = {
   dashboard: () => import('../tabs/dashboard.js'),
   out:       () => import('../tabs/out.js'),
   in:        () => import('../tabs/in.js'),
   adjust:    () => import('../tabs/adjust.js'),
   purchase:  () => import('../tabs/purchase.js'),
-  // NEW:
   out_history: () => import('../tabs/out_history.js'),
+  report:    () => import('../tabs/report.js'), // <--- NEW
 };
 
 let LANG = currentLang();
@@ -23,82 +20,59 @@ let currentTab = 'dashboard';
 async function mountTab(tabKey) {
   const loader = TAB_MODULES[tabKey];
   if (!loader) return;
-  const mod = await loader();
+  
+  // Highlight Tab Button
+  $$('.tabs button').forEach(b => b.classList.remove('active'));
+  const btn = $(`.tabs button[data-tab="${tabKey}"]`);
+  if(btn) btn.classList.add('active');
+
   const root = $('#view');
-  await mod.default({ root, lang: LANG });
-  bindPickerInputs(root, LANG);
+  // Simple loading state for view
+  root.innerHTML = '<div style="padding:2rem;text-align:center;opacity:0.6">Loading...</div>';
+
+  try {
+      const mod = await loader();
+      await mod.default({ root, lang: LANG });
+      bindPickerInputs(root, LANG);
+  } catch(e) {
+      console.error(e);
+      root.innerHTML = '<div style="padding:1rem;color:red">Error loading tab</div>';
+  }
 }
 
 async function init() {
-  // 0) Clean stale cache first (keeps fresh, drops old)
-  cleanOldCache();
+  cleanOldCache(); // 1 hour cleaner
 
-  // Language toggle
   $('#lang-en')?.addEventListener('click', () => { LANG = 'en'; document.documentElement.lang = 'en'; onLangChange(); });
   $('#lang-th')?.addEventListener('click', () => { LANG = 'th'; document.documentElement.lang = 'th'; onLangChange(); });
 
-  // Tabs
   $$('.tabs button').forEach((btn) => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-tab');
-      if (!key) return;
-      $$('.tabs button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentTab = key;
-      await mountTab(currentTab);
+      if(key) { currentTab = key; mountTab(key); }
     });
   });
 
-  // Programmatic tab switch (used by OUT tab's History button)
-  window.addEventListener('switch-tab', async (e)=>{
-    const key = e.detail;
-    if (!key || !TAB_MODULES[key]) return;
-    const btn = $(`.tabs button[data-tab="${key}"]`);
-    if (btn) {
-      $$('.tabs button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
-    currentTab = key;
-    await mountTab(currentTab);
-  });
+  window.addEventListener('switch-tab', (e) => mountTab(e.detail));
 
-  // 1) Preload lookups BEFORE first mount
-  try {
-    await preloadLookups();
-  } catch {
-    toast(LANG === 'th' ? 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ กำลังใช้ข้อมูลเก่า' : 'Failed to load lookups; using cached data');
-  }
+  // Preload lookups in background (non-blocking if possible, but here we await slightly)
+  preloadLookups().catch(() => console.log('Background preload failed'));
 
-  // 2) Apply language and bind pickers
   applyLangTexts(LANG);
-  bindPickerInputs(document, LANG);
-
-  // 3) Manual refresh button with spinner
+  
+  // Refresh Button
   const refreshBtn = $('#refreshDataBtn');
   refreshBtn?.addEventListener('click', async ()=>{
-    try {
-      setBtnLoading(refreshBtn, true);
-      // remove only our cached keys
-      const keys = [];
-      for (let i=0;i<localStorage.length;i++){
-        const k = localStorage.key(i);
-        if(k && k.startsWith('cache:')) keys.push(k);
-      }
-      keys.forEach(k=>localStorage.removeItem(k));
-      await preloadLookups(true); // force fresh
-      toast(LANG==='th'?'รีเฟรชข้อมูลแล้ว':'Data refreshed');
-    } finally {
-      setBtnLoading(refreshBtn, false);
-    }
+    setBtnLoading(refreshBtn, true);
+    localStorage.clear(); // Hard clear
+    location.reload();    // Full reload to be safe
   });
 
-  // 4) Mount default tab
   await mountTab(currentTab);
 }
 
 function onLangChange() {
   applyLangTexts(LANG);
-  bindPickerInputs(document, LANG);
   mountTab(currentTab);
 }
 

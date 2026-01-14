@@ -9,7 +9,8 @@ import Adjust from './components/Adjust.js';
 import Purchase from './components/Purchase.js';
 import Report from './components/Report.js';
 import OutHistory from './components/OutHistory.js';
-import Migrate from './components/Migrate.js'; // <--- NEW
+import Migrate from './components/Migrate.js';
+import Settings from './components/Settings.js'; // <--- NEW
 
 const App = {
   setup() {
@@ -24,8 +25,9 @@ const App = {
       { key: 'adjust',    label: 'adj',  component: Adjust },
       { key: 'purchase',  label: 'pur',  component: Purchase },
       { key: 'report',    label: 'report', component: Report },
+      { key: 'settings',  label: 'settings', component: Settings }, // <--- NEW
+      // Hidden Tabs
       { key: 'out_history', label: 'out', component: OutHistory },
-      // Hidden Tab for Migration
       { key: 'migrate', label: 'Migrate', component: Migrate } 
     ];
 
@@ -37,7 +39,7 @@ const App = {
     };
 
     onMounted(() => {
-      preloadLookups();
+      preloadLookups(); // Now fetches from Firebase
       window.addEventListener('switch-tab', (e) => {
         if(e.detail) currentTab.value = e.detail;
       });
@@ -52,7 +54,7 @@ const App = {
         <h1 class="text-2xl font-bold text-slate-800 tracking-tight">{{ S.title }}</h1>
         
         <div class="flex gap-2">
-          <button @click="currentTab='migrate'" class="p-2 text-slate-300 hover:text-slate-500 transition-colors" title="Migrate DB">⚙️</button>
+          <button @click="currentTab='settings'" class="p-2 text-slate-300 hover:text-slate-500 transition-colors" title="Settings">⚙️</button>
           
           <div class="flex bg-white rounded-full p-1 shadow-sm border border-slate-200">
             <button @click="switchLang('th')" :class="lang==='th'?'bg-blue-500 text-white shadow':'text-slate-500 hover:bg-slate-50'" class="px-4 py-1 rounded-full text-sm font-bold transition-all">TH</button>
@@ -74,10 +76,10 @@ const App = {
       </nav>
 
       <div v-if="currentTab === 'out_history'" class="sticky top-2 z-40 flex">
-        <button @click="currentTab='out'" class="bg-white text-slate-600 px-4 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-sm flex items-center gap-2">⬅ Back to OUT</button>
+        <button @click="currentTab='out'" class="bg-white text-slate-600 px-4 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-sm flex items-center gap-2">⬅ Back</button>
       </div>
       <div v-if="currentTab === 'migrate'" class="sticky top-2 z-40 flex">
-        <button @click="currentTab='dashboard'" class="bg-white text-slate-600 px-4 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-sm flex items-center gap-2">⬅ Back to Dashboard</button>
+        <button @click="currentTab='settings'" class="bg-white text-slate-600 px-4 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-sm flex items-center gap-2">⬅ Back</button>
       </div>
 
       <main class="flex-1">

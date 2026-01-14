@@ -1,12 +1,13 @@
 import { ref, computed } from 'vue';
-import { apiPost, apiGet, STR, toast, todayStr } from '../shared.js';
+import { db } from '../firebase.js';
+import { collection, doc, runTransaction, getDoc } from 'firebase/firestore'; 
+import { STR, toast, todayStr } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
-  props: ['lang', 'user'], // We accept the 'user' prop
+  props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
-    // Removed 'requester' from form state (it comes from props.user now)
     const form = ref({ date: todayStr(), project: '', contractor: '', note: '' });
     const lines = ref([{ name: '', qty: '', note: '', stock: null, stockLoading: false }]);
     const loading = ref(false);
@@ -15,50 +16,86 @@ export default {
     const addLine = () => lines.value.push({ name: '', qty: '', note: '', stock: null, stockLoading: false });
     const removeLine = (index) => lines.value.splice(index, 1);
 
+    // Check Stock (Read from Firestore)
     const onMaterialSelect = async (line) => {
       if (!line.name) return;
       line.stockLoading = true;
       try {
-        const res = await apiGet('getCurrentStock', { material: line.name });
-        if (res && res.ok) {
-          const s = Number(res.stock);
-          const m = Number(res.min || 0);
+        const safeId = line.name.replace(/\//g, '_');
+        const snap = await getDoc(doc(db, 'materials', safeId));
+        if (snap.exists()) {
+          const data = snap.data();
+          const s = Number(data.stock || 0);
+          const m = Number(data.min || 0);
           let color = 'bg-green-100 text-green-700';
           if (s <= 0 || s <= m) color = 'bg-red-100 text-red-700';
           else if (s <= 2 * m) color = 'bg-yellow-100 text-yellow-700';
           line.stock = { val: s, color };
+        } else {
+          line.stock = { val: 0, color: 'bg-gray-100 text-gray-500' };
         }
       } catch (e) { console.error(e); } 
       finally { line.stockLoading = false; }
     };
 
     const submit = async () => {
-      const validLines = lines.value.filter(l => l.name && l.qty).map(l => ({ name: l.name, qty: Number(l.qty), note: l.note }));
-      if (validLines.length === 0) {
-        toast(props.lang === 'th' ? 'กรุณาเพิ่มรายการ' : 'Add at least one line');
-        return;
-      }
+      const validLines = lines.value.filter(l => l.name && l.qty).map(l => ({ 
+        name: l.name, qty: Number(l.qty), note: l.note || '' 
+      }));
+
+      if (validLines.length === 0) return toast(props.lang === 'th' ? 'กรุณาเพิ่มรายการ' : 'Add at least one line');
+      
       loading.value = true;
       try {
-        // 🔒 AUTO-FILL REQUESTER
-        const payload = { 
-            type: 'OUT', 
-            ...form.value, 
-            lines: validLines,
+        // --- FIRESTORE TRANSACTION ---
+        // 1. Create Order
+        // 2. Deduct Stock for each item
+        await runTransaction(db, async (transaction) => {
+          
+          // Check all stocks first
+          for (const line of validLines) {
+             const safeId = line.name.replace(/\//g, '_');
+             const matRef = doc(db, 'materials', safeId);
+             const matDoc = await transaction.get(matRef);
+             
+             if (!matDoc.exists()) throw new Error(`Material not found: ${line.name}`);
+             
+             // Calculate new stock
+             const currentStock = Number(matDoc.data().stock || 0);
+             const newStock = currentStock - line.qty;
+             
+             // Update Stock
+             transaction.update(matRef, { stock: newStock });
+          }
+
+          // Create Order Document
+          const newOrderRef = doc(collection(db, 'orders'));
+          const docNo = 'OUT-' + Date.now().toString().slice(-6); // Simple ID gen
+          
+          transaction.set(newOrderRef, {
+            type: 'OUT',
+            docNo: docNo,
+            date: form.value.date,
+            project: form.value.project,
+            contractor: form.value.contractor,
+            note: form.value.note,
             requester: props.user.displayName || props.user.email,
             requesterEmail: props.user.email,
-            requesterPhoto: props.user.photoURL
-        };
+            requesterPhoto: props.user.photoURL,
+            items: validLines,
+            timestamp: new Date().toISOString()
+          });
+        });
 
-        const res = await apiPost('submitMovementBulk', payload);
-        if (res && res.ok) {
-          toast((props.lang === 'th' ? 'บันทึกแล้ว • เอกสาร ' : 'Saved • Doc ') + (res.docNo || ''));
-          // Reset
-          lines.value = [{ name: '', qty: '', note: '', stock: null }];
-          form.value.note = ''; form.value.project = ''; form.value.contractor = ''; 
-        } else toast(res?.message || 'Error');
-      } catch (e) { toast('Failed to submit'); } 
-      finally { loading.value = false; }
+        toast((props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved'));
+        // Reset
+        lines.value = [{ name: '', qty: '', note: '', stock: null }];
+        form.value.note = ''; form.value.project = ''; form.value.contractor = ''; 
+
+      } catch (e) {
+        console.error(e);
+        toast('Failed: ' + e.message);
+      } finally { loading.value = false; }
     };
 
     return { S, form, lines, loading, addLine, removeLine, onMaterialSelect, submit };
@@ -68,13 +105,12 @@ export default {
       <section class="glass rounded-2xl p-5 shadow-sm space-y-4">
         <div class="flex justify-between items-center">
           <h3 class="font-bold text-lg text-slate-800">{{ S.outTitle }}</h3>
-          <button @click="$emit('switch-tab', 'out_history')" class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
+          <button @click="$emit('switch-tab', 'report')" class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
             📜 History
           </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
           <div class="min-w-0">
              <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.requester }}</label>
              <div class="flex items-center gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2.5">
@@ -85,22 +121,18 @@ export default {
                 </div>
              </div>
           </div>
-
           <div class="min-w-0">
             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.outDate }}</label>
             <input type="date" v-model="form.date" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
           </div>
-          
           <div class="min-w-0">
             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.proj }}</label>
             <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" />
           </div>
-          
           <div class="min-w-0">
             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.contractor }}</label>
             <ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pickAdd" />
           </div>
-          
           <div class="md:col-span-2 min-w-0">
             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.note }}</label>
             <input v-model="form.note" :placeholder="lang==='th'?'หมายเหตุ (ถ้ามี)':'Note (Optional)'" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
@@ -111,7 +143,6 @@ export default {
       <div class="space-y-4">
         <div v-for="(line, idx) in lines" :key="idx" class="glass rounded-2xl p-4 shadow-sm relative animate-fade-in-up">
           <button @click="removeLine(idx)" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">×</button>
-
           <div class="space-y-3 pt-2">
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-8 min-w-0">
@@ -121,9 +152,8 @@ export default {
                 <input type="number" v-model="line.qty" placeholder="0" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
-
             <div class="flex items-center justify-between gap-3">
-               <input v-model="line.note" :placeholder="lang==='th'?'หมายเหตุ':'Remark'" class="flex-1 bg-transparent border-b border-slate-200 text-sm py-1 outline-none text-slate-600" />
+               <input v-model="line.note" :placeholder="lang==='th'?'หมายเหตุรายตัว...':'Line note...'" class="flex-1 bg-transparent border-b border-slate-200 text-sm py-1 outline-none text-slate-600" />
                <div class="flex items-center gap-2 shrink-0 h-8">
                   <span class="text-xs text-slate-400 font-bold uppercase">{{ lang==='th'?'คงเหลือ':'Stock' }}</span>
                   <div v-if="line.stockLoading" class="animate-spin w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full"></div>

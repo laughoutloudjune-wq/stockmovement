@@ -23,17 +23,14 @@ export default {
       results.value = [];
       try {
         const ref = collection(db, 'orders');
-        // Simple Query (Client-side filtering for search/type to avoid index hell)
         const q = query(ref, where('date', '>=', filters.value.start), where('date', '<=', filters.value.end), orderBy('date', 'desc'));
         
         const snap = await getDocs(q);
         let data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Filter Type
         if (filters.value.type !== 'ALL') {
             data = data.filter(r => r.type === filters.value.type);
         }
-        // Filter Search (Check items array or project/requester)
         if (filters.value.search) {
             const term = filters.value.search.toLowerCase();
             data = data.filter(r => 
@@ -62,7 +59,6 @@ export default {
 
     const openEdit = (order) => {
         editingId.value = order.id;
-        // Deep copy to avoid modifying list directly
         editForm.value = JSON.parse(JSON.stringify(order));
         if (!editForm.value.items) editForm.value.items = [];
         isEditOpen.value = true;
@@ -100,12 +96,24 @@ export default {
       <section class="glass rounded-2xl p-5 shadow-sm space-y-4">
         <h3 class="font-bold text-lg text-slate-800">📊 Report (Orders)</h3>
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="label">From</label><input type="date" v-model="filters.start" class="input" /></div>
-          <div><label class="label">To</label><input type="date" v-model="filters.end" class="input" /></div>
-          <div class="col-span-2"><input v-model="filters.search" placeholder="Search..." class="input" /></div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">From</label>
+            <input type="date" v-model="filters.start" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">To</label>
+            <input type="date" v-model="filters.end" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div class="col-span-2">
+            <input v-model="filters.search" placeholder="Search..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
           <div class="col-span-2 flex gap-2">
-              <select v-model="filters.type" class="input flex-1"><option value="ALL">All</option><option value="OUT">OUT</option><option value="IN">IN</option></select>
-              <button @click="generate" class="bg-blue-500 text-white font-bold px-6 rounded-xl shadow-md">Search</button>
+              <select v-model="filters.type" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none flex-1">
+                <option value="ALL">All Types</option>
+                <option value="OUT">OUT</option>
+                <option value="IN">IN</option>
+              </select>
+              <button @click="generate" class="bg-blue-500 text-white font-bold px-6 rounded-xl shadow-md active:scale-95 transition-transform">Search</button>
           </div>
         </div>
       </section>
@@ -113,11 +121,11 @@ export default {
       <div class="space-y-3">
         <div v-if="results.length === 0 && !loading" class="text-center py-10 text-slate-400">No records found</div>
 
-        <div v-for="r in results" :key="r.id" class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 relative group">
+        <div v-for="r in results" :key="r.id" class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 relative group transition-all hover:shadow-md">
            
            <div class="flex justify-between items-start mb-2">
               <div>
-                 <span class="badge" :class="r.type==='IN'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'">{{ r.type }}</span>
+                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider" :class="r.type==='IN'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'">{{ r.type }}</span>
                  <span class="text-xs text-slate-500 font-bold ml-2">{{ r.date }}</span>
                  <div class="text-[10px] text-slate-400">{{ r.docNo }}</div>
               </div>
@@ -145,41 +153,47 @@ export default {
           <div class="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" @click="isEditOpen = false"></div>
           
           <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 animate-fade-in-up max-h-[90vh] overflow-y-auto">
-            <h3 class="font-bold text-lg mb-4">Edit Order</h3>
+            <h3 class="font-bold text-lg mb-4 text-slate-800">Edit Order</h3>
             
-            <div class="space-y-3">
+            <div class="space-y-4">
               <div class="grid grid-cols-2 gap-3">
-                <div><label class="label">Date</label><input type="date" v-model="editForm.date" class="input" /></div>
-                <div><label class="label">Project</label><ItemPicker v-model="editForm.project" source="PROJECTS" /></div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Date</label>
+                    <input type="date" v-model="editForm.date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Project</label>
+                    <ItemPicker v-model="editForm.project" source="PROJECTS" />
+                </div>
               </div>
-              <div><label class="label">Requester</label><ItemPicker v-model="editForm.requester" source="REQUESTERS" /></div>
-              <div><label class="label">Contractor</label><ItemPicker v-model="editForm.contractor" source="CONTRACTORS" /></div>
+              <div>
+                  <label class="block text-xs font-bold text-slate-500 mb-1">Requester</label>
+                  <ItemPicker v-model="editForm.requester" source="REQUESTERS" />
+              </div>
+              <div>
+                  <label class="block text-xs font-bold text-slate-500 mb-1">Contractor</label>
+                  <ItemPicker v-model="editForm.contractor" source="CONTRACTORS" />
+              </div>
               
-              <div class="space-y-2 pt-2">
+              <div class="space-y-2 pt-2 border-t border-slate-100">
+                 <label class="block text-xs font-bold text-slate-500">Items</label>
                  <div v-for="(line, idx) in editForm.items" :key="idx" class="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
                     <div class="flex-1"><ItemPicker v-model="line.name" source="MATERIALS" /></div>
-                    <input type="number" v-model="line.qty" class="w-16 input text-center font-bold" />
+                    <input type="number" v-model="line.qty" class="w-16 bg-white border border-slate-200 rounded-lg px-2 py-1 text-center font-bold text-sm outline-none" />
                     <button @click="removeLine(idx)" class="text-red-500 font-bold px-2">×</button>
                  </div>
-                 <button @click="addLine" class="w-full py-2 border border-dashed border-slate-300 rounded-lg text-slate-400 text-sm font-bold">+ Add Item</button>
+                 <button @click="addLine" class="w-full py-3 border border-dashed border-slate-300 rounded-xl text-slate-400 text-sm font-bold hover:bg-slate-50 transition-colors">+ Add Item</button>
               </div>
             </div>
 
             <div class="flex gap-2 mt-6">
-              <button @click="isEditOpen = false" class="flex-1 bg-slate-100 font-bold py-3 rounded-xl">Cancel</button>
-              <button @click="saveEdit" class="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg">Save Changes</button>
+              <button @click="isEditOpen = false" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-200">Cancel</button>
+              <button @click="saveEdit" class="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-600">Save Changes</button>
             </div>
           </div>
         </div>
       </teleport>
 
     </div>
-  `,
-  // Helper CSS classes for clean template
-  styles: `
-    .label { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 0.25rem; }
-    .input { width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; outline: none; }
-    .input:focus { ring: 2px solid #3b82f6; }
-    .badge { padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }
   `
 };

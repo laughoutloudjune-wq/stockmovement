@@ -3,10 +3,11 @@ import { apiPost, apiGet, STR, toast, todayStr } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
-  props: ['lang'],
+  props: ['lang', 'user'], // We accept the 'user' prop
   components: { ItemPicker },
   setup(props) {
-    const form = ref({ date: todayStr(), project: '', contractor: '', requester: '', note: '' });
+    // Removed 'requester' from form state (it comes from props.user now)
+    const form = ref({ date: todayStr(), project: '', contractor: '', note: '' });
     const lines = ref([{ name: '', qty: '', note: '', stock: null, stockLoading: false }]);
     const loading = ref(false);
     const S = computed(() => STR[props.lang]);
@@ -39,12 +40,22 @@ export default {
       }
       loading.value = true;
       try {
-        const payload = { type: 'OUT', ...form.value, lines: validLines };
+        // 🔒 AUTO-FILL REQUESTER
+        const payload = { 
+            type: 'OUT', 
+            ...form.value, 
+            lines: validLines,
+            requester: props.user.displayName || props.user.email,
+            requesterEmail: props.user.email,
+            requesterPhoto: props.user.photoURL
+        };
+
         const res = await apiPost('submitMovementBulk', payload);
         if (res && res.ok) {
           toast((props.lang === 'th' ? 'บันทึกแล้ว • เอกสาร ' : 'Saved • Doc ') + (res.docNo || ''));
+          // Reset
           lines.value = [{ name: '', qty: '', note: '', stock: null }];
-          form.value.note = ''; form.value.project = ''; form.value.contractor = ''; form.value.requester = '';
+          form.value.note = ''; form.value.project = ''; form.value.contractor = ''; 
         } else toast(res?.message || 'Error');
       } catch (e) { toast('Failed to submit'); } 
       finally { loading.value = false; }
@@ -63,11 +74,37 @@ export default {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label class="block text-xs font-bold text-slate-500 mb-1">{{ S.outDate }}</label><input type="date" v-model="form.date" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm" /></div>
-          <div><label class="block text-xs font-bold text-slate-500 mb-1">{{ S.proj }}</label><ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" /></div>
-          <div><label class="block text-xs font-bold text-slate-500 mb-1">{{ S.contractor }}</label><ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pickAdd" /></div>
-          <div><label class="block text-xs font-bold text-slate-500 mb-1">{{ S.requester }}</label><ItemPicker v-model="form.requester" source="REQUESTERS" :placeholder="S.pickAdd" /></div>
-          <div class="md:col-span-2"><label class="block text-xs font-bold text-slate-500 mb-1">{{ S.note }}</label><input v-model="form.note" :placeholder="lang==='th'?'หมายเหตุ (ถ้ามี)':'Note (Optional)'" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm" /></div>
+          
+          <div class="min-w-0">
+             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.requester }}</label>
+             <div class="flex items-center gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2.5">
+                <img :src="user.photoURL" class="w-6 h-6 rounded-full border border-white shadow-sm" />
+                <div class="flex flex-col">
+                  <span class="text-sm font-bold text-slate-700 leading-tight">{{ user.displayName }}</span>
+                  <span class="text-[10px] text-slate-400 leading-tight">{{ user.email }}</span>
+                </div>
+             </div>
+          </div>
+
+          <div class="min-w-0">
+            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.outDate }}</label>
+            <input type="date" v-model="form.date" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
+          </div>
+          
+          <div class="min-w-0">
+            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.proj }}</label>
+            <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" />
+          </div>
+          
+          <div class="min-w-0">
+            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.contractor }}</label>
+            <ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pickAdd" />
+          </div>
+          
+          <div class="md:col-span-2 min-w-0">
+            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.note }}</label>
+            <input v-model="form.note" :placeholder="lang==='th'?'หมายเหตุ (ถ้ามี)':'Note (Optional)'" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
+          </div>
         </div>
       </section>
 
@@ -77,11 +114,11 @@ export default {
 
           <div class="space-y-3 pt-2">
             <div class="grid grid-cols-12 gap-3">
-              <div class="col-span-8">
+              <div class="col-span-8 min-w-0">
                 <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang==='th'?'ระบุวัสดุ...':'Select material...'" @change="onMaterialSelect(line)" />
               </div>
-              <div class="col-span-4">
-                <input type="number" v-model="line.qty" placeholder="0" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none shadow-sm" />
+              <div class="col-span-4 min-w-0">
+                <input type="number" v-model="line.qty" placeholder="0" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
 
@@ -98,7 +135,7 @@ export default {
         </div>
       </div>
 
-      <div class="flex justify-center"><button @click="addLine" class="flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 font-bold hover:bg-slate-50 transition-all"><span class="text-xl leading-none text-blue-500">+</span> {{ S.btnAdd }}</button></div>
+      <div class="flex justify-center"><button @click="addLine" class="flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95"><span class="text-xl leading-none text-blue-500">+</span> {{ S.btnAdd }}</button></div>
 
       <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
         <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">

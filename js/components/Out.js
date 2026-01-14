@@ -123,7 +123,7 @@ export default {
             </div>
 
             <div class="flex items-center justify-between gap-3">
-               <input v-model="line.note" :placeholder="lang==='th'?'หมายเหตุรายตัว...':'Line note...'" class="flex-1 bg-transparent border-b border-slate-200 text-sm py-1 outline-none text-slate-600" />
+               <input v-model="line.note" :placeholder="lang==='th'?'หมายเหตุ':'Remark'" class="flex-1 bg-transparent border-b border-slate-200 text-sm py-1 outline-none text-slate-600" />
                <div class="flex items-center gap-2 shrink-0 h-8">
                   <span class="text-xs text-slate-400 font-bold uppercase">{{ lang==='th'?'คงเหลือ':'Stock' }}</span>
                   <div v-if="line.stockLoading" class="animate-spin w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full"></div>

@@ -1,17 +1,16 @@
 import { ref } from 'vue';
-import { apiGet, apiPost, toast } from '../shared.js'; // Old Backend
-import { db } from '../firebase.js';           // New Backend
+import { apiGet, apiPost, toast } from '../shared.js';
+import { db } from '../firebase.js';
 import { writeBatch, doc, collection } from 'firebase/firestore';
 
 export default {
   setup() {
     const logs = ref([]);
     const loading = ref(false);
-    const progress = ref(0);
 
     const log = (msg) => logs.value.push(msg);
 
-    // --- 1. Migrate Materials (Master Data) ---
+    // --- 1. Migrate Materials ---
     const runMigration = async () => {
       loading.value = true;
       logs.value = [];
@@ -40,44 +39,59 @@ export default {
       finally { loading.value = false; }
     };
 
-    // --- 2. Migrate History (Movements) ---
+    // --- 2. Migrate History (GROUPED) ---
     const runHistoryMigration = async () => {
       loading.value = true;
       logs.value = [];
       try {
         log("🚀 Fetching Google Sheet History...");
-        
-        // Fetch ALL history (wide date range)
         const payload = { start: '2020-01-01', end: '2030-12-31', type: '', material: '', project: '' };
         const res = await apiPost('getMovementReport', payload);
         
-        if (!res || !res.data || res.data.length === 0) {
-          throw new Error("No history found in Google Sheets.");
-        }
+        if (!res || !res.data || res.data.length === 0) throw new Error("No history found.");
 
         const rows = res.data;
-        log(`📥 Found ${rows.length} records. Uploading to Firestore...`);
+        log(`📥 Found ${rows.length} records. Grouping by Order...`);
 
-        // Firestore batches allow max 500 ops. We must chunk it.
-        const chunkSize = 450;
-        for (let i = 0; i < rows.length; i += chunkSize) {
-          const chunk = rows.slice(i, i + chunkSize);
+        // Grouping Logic
+        const groups = {};
+        rows.forEach(row => {
+          // Create a key to group by (Use docNo if available, else combine fields)
+          const key = row.docNo || `${row.date}_${row.type}_${row.project}_${row.by}`;
+          
+          if (!groups[key]) {
+            groups[key] = {
+              docNo: row.docNo || 'MIG-' + Math.random().toString(36).substr(2, 9),
+              date: row.date,
+              type: row.type || 'UNKNOWN',
+              project: row.project || '',
+              requester: row.by || '',
+              contractor: row.contractor || '', // If available
+              items: [],
+              migratedAt: new Date().toISOString()
+            };
+          }
+          // Add item to the group
+          groups[key].items.push({
+            name: row.item,
+            qty: Number(row.qty),
+            note: row.note || ''
+          });
+        });
+
+        const orders = Object.values(groups);
+        log(`📦 Condensed into ${orders.length} Orders.`);
+
+        // Upload in Batches
+        const chunkSize = 400;
+        for (let i = 0; i < orders.length; i += chunkSize) {
+          const chunk = orders.slice(i, i + chunkSize);
           const batch = writeBatch(db);
           
-          chunk.forEach(row => {
-            // Create a unique ID for this movement line
-            const newRef = doc(collection(db, 'movements')); 
-            
-            // Clean up the data
-            batch.set(newRef, {
-              date: row.date || '',
-              type: row.type || 'UNKNOWN', // IN, OUT, ADJUST
-              item: row.item || 'Unknown',
-              qty: Number(row.qty || 0),
-              project: row.project || '',
-              by: row.by || '', // Requester
-              migratedAt: new Date().toISOString()
-            });
+          chunk.forEach(order => {
+            // Use docNo as ID if unique, or auto-ID
+            const ref = doc(collection(db, 'orders')); 
+            batch.set(ref, order);
           });
 
           await batch.commit();
@@ -85,7 +99,7 @@ export default {
         }
 
         log("🎉 History Migration Complete!");
-        toast("History Imported");
+        toast("History Imported (Grouped)");
 
       } catch (e) {
         console.error(e);
@@ -107,13 +121,11 @@ export default {
             <button @click="runMigration" :disabled="loading" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all">
                 1. Import Materials
             </button>
-            
             <button @click="runHistoryMigration" :disabled="loading" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-orange-500/30 transition-all">
-                2. Import History (IN/OUT)
+                2. Import History (Grouped)
             </button>
         </div>
       </section>
-
       <div class="bg-slate-900 rounded-2xl p-4 font-mono text-sm text-green-400 h-64 overflow-y-auto shadow-inner border border-slate-700">
         <div v-if="logs.length === 0" class="text-slate-600 italic">Ready to start...</div>
         <div v-for="(l, i) in logs" :key="i" class="mb-1">> {{ l }}</div>

@@ -58,7 +58,7 @@ const App = {
       { key: 'out',       label: 'out',  component: StockOut },
       { key: 'in',        label: 'in',   component: StockIn },
       { key: 'adjust',    label: 'adj',  component: Adjust },
-      { key: 'purchase',  label: 'pur',  component: Purchase }, // We will pass 'user' prop to this
+      { key: 'purchase',  label: 'pur',  component: Purchase },
       { key: 'report',    label: 'report', component: Report },
       { key: 'settings',  label: 'settings', component: Settings },
       { key: 'out_history', label: 'out', component: OutHistory },
@@ -102,6 +102,9 @@ const App = {
           </div>
           
           <div class="flex gap-2 items-center">
+            
+            <button @click="currentTab='settings'" class="p-2 text-slate-300 hover:text-slate-500 transition-colors" title="Settings">⚙️</button>
+
             <button @click="logout" class="flex items-center gap-2 bg-white pl-2 pr-4 py-1.5 rounded-full shadow-sm border border-slate-200 hover:bg-red-50 hover:border-red-100 transition-all group">
               <img :src="user.photoURL" class="w-6 h-6 rounded-full border border-slate-100" />
               <span class="text-xs font-bold text-slate-600 group-hover:text-red-500">Logout</span>
@@ -125,6 +128,13 @@ const App = {
             {{ S.tabs[t.label] || t.label }}
           </button>
         </nav>
+
+        <div v-if="currentTab === 'out_history'" class="sticky top-2 z-40 flex">
+          <button @click="currentTab='out'" class="bg-white text-slate-600 px-4 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-sm flex items-center gap-2">⬅ Back</button>
+        </div>
+        <div v-if="currentTab === 'migrate'" class="sticky top-2 z-40 flex">
+          <button @click="currentTab='settings'" class="bg-white text-slate-600 px-4 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-sm flex items-center gap-2">⬅ Back</button>
+        </div>
 
         <main class="flex-1">
           <transition name="fade" mode="out-in">

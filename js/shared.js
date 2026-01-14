@@ -6,7 +6,7 @@ export const API_URL = window.API_URL || "https://script.google.com/macros/s/AKf
 export const todayStr = () => new Date().toISOString().split("T")[0];
 
 // 2. Global State (Made Reactive for Vue)
-// This fixes the "does not provide export" error AND makes dropdowns update instantly
+// This MUST be exported for ItemPicker.js to work
 export const LOOKUPS = reactive({ 
   MATERIALS: [], 
   PROJECTS: [], 

@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { apiGet, toast } from '../shared.js'; // Old Backend
 import { db } from '../firebase.js';           // New Backend
-import { writeBatch, doc, collection, getDocs } from 'firebase/firestore';
+import { writeBatch, doc } from 'firebase/firestore';
 
 export default {
   setup() {
@@ -29,16 +29,24 @@ export default {
         log(`✅ Found ${materials.length} SKUs.`);
 
         // 2. Prepare Firebase Batch (Max 500 ops per batch)
+        // Note: If you have >500 items, we should ideally chunk this. 
+        // For <500, a single batch is fine.
         const batch = writeBatch(db);
         let count = 0;
 
         materials.forEach(name => {
           if (!name) return;
-          // Create document with ID = Name (prevents duplicates)
-          const ref = doc(db, 'materials', name); 
+          
+          // 🔴 FIX: Sanitize the ID. Replace '/' with '_' 
+          // Firestore IDs cannot contain '/'.
+          const safeId = name.replace(/\//g, '_'); 
+
+          // Create document with Safe ID
+          const ref = doc(db, 'materials', safeId); 
+          
           batch.set(ref, {
-            name: name,
-            stock: 0,      // Default stock (Safest to start fresh or do Stock Take)
+            name: name,    // The real name stays "1/2"
+            stock: 0,      // Default stock
             min: 5,        // Default min limit
             updatedAt: new Date().toISOString()
           });

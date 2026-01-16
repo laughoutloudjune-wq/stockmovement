@@ -16,7 +16,6 @@ export default {
     const addLine = () => lines.value.push({ name: '', qty: '', note: '', stock: null, stockLoading: false });
     const removeLine = (index) => lines.value.splice(index, 1);
 
-    // Check Stock (Read from Firestore)
     const onMaterialSelect = async (line) => {
       if (!line.name) return;
       line.stockLoading = true;
@@ -47,12 +46,9 @@ export default {
       
       loading.value = true;
       try {
-        // --- FIRESTORE TRANSACTION ---
-        // 1. Create Order
-        // 2. Deduct Stock for each item
         await runTransaction(db, async (transaction) => {
-          
-          // Check all stocks first
+          // STEP 1: READ
+          const updates = [];
           for (const line of validLines) {
              const safeId = line.name.replace(/\//g, '_');
              const matRef = doc(db, 'materials', safeId);
@@ -60,17 +56,16 @@ export default {
              
              if (!matDoc.exists()) throw new Error(`Material not found: ${line.name}`);
              
-             // Calculate new stock
              const currentStock = Number(matDoc.data().stock || 0);
              const newStock = currentStock - line.qty;
-             
-             // Update Stock
-             transaction.update(matRef, { stock: newStock });
+             updates.push({ ref: matRef, newStock });
           }
 
-          // Create Order Document
+          // STEP 2: WRITE
+          updates.forEach(u => transaction.update(u.ref, { stock: u.newStock }));
+
           const newOrderRef = doc(collection(db, 'orders'));
-          const docNo = 'OUT-' + Date.now().toString().slice(-6); // Simple ID gen
+          const docNo = 'OUT-' + Date.now().toString().slice(-6); 
           
           transaction.set(newOrderRef, {
             type: 'OUT',
@@ -88,7 +83,6 @@ export default {
         });
 
         toast((props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved'));
-        // Reset
         lines.value = [{ name: '', qty: '', note: '', stock: null }];
         form.value.note = ''; form.value.project = ''; form.value.contractor = ''; 
 
@@ -164,9 +158,7 @@ export default {
           </div>
         </div>
       </div>
-
       <div class="flex justify-center"><button @click="addLine" class="flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95"><span class="text-xl leading-none text-blue-500">+</span> {{ S.btnAdd }}</button></div>
-
       <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
         <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
           <span v-if="loading" class="animate-spin text-2xl">C</span><span v-else>💾 {{ S.btnSubmit }}</span>

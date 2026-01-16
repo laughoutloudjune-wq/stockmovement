@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { apiGet, apiPost, toast } from '../shared.js';
 import { db } from '../firebase.js';
-import { writeBatch, doc, collection } from 'firebase/firestore';
+import { writeBatch, doc, collection, getDocs, setDoc } from 'firebase/firestore';
 
 export default {
   setup() {
@@ -10,7 +10,7 @@ export default {
 
     const log = (msg) => logs.value.push(msg);
 
-    // --- 1. Migrate Master Data (Materials + Projects + Contractors) ---
+    // --- 1. Migrate Master Data (Materials) ---
     const runMasterMigration = async () => {
       loading.value = true;
       logs.value = [];
@@ -25,7 +25,8 @@ export default {
             materials.forEach(name => {
                 if (!name) return;
                 const safeId = name.replace(/\//g, '_'); 
-                batch.set(doc(db, 'materials', safeId), { name, stock: 0, min: 5 });
+                // Use set with MERGE so we don't zero-out existing stock if run again
+                batch.set(doc(db, 'materials', safeId), { name, min: 5 }, { merge: true });
                 count++;
             });
             log(`- Prepared ${materials.length} Materials`);
@@ -37,10 +38,9 @@ export default {
         if (Array.isArray(projects)) {
             projects.forEach(name => {
                 if (!name) return;
-                batch.set(doc(db, 'projects', name), { name });
+                batch.set(doc(db, 'projects', name), { name }, { merge: true });
                 count++;
             });
-            log(`- Prepared ${projects.length} Projects`);
         }
 
         // C. Contractors
@@ -49,22 +49,20 @@ export default {
         if (Array.isArray(contractors)) {
             contractors.forEach(name => {
                 if (!name) return;
-                batch.set(doc(db, 'contractors', name), { name });
+                batch.set(doc(db, 'contractors', name), { name }, { merge: true });
                 count++;
             });
-            log(`- Prepared ${contractors.length} Contractors`);
         }
         
-        // D. Requesters (Optional but good)
+        // D. Requesters
         log("👤 Fetching Requesters...");
         const requesters = await apiGet('listRequesters');
         if (Array.isArray(requesters)) {
             requesters.forEach(name => {
                 if (!name) return;
-                batch.set(doc(db, 'requesters', name), { name });
+                batch.set(doc(db, 'requesters', name), { name }, { merge: true });
                 count++;
             });
-             log(`- Prepared ${requesters.length} Requesters`);
         }
 
         log(`🚀 Committing ${count} items to Firestore...`);
@@ -128,7 +126,7 @@ export default {
           log(`✅ Uploaded batch ${i} - ${i + chunk.length}`);
         }
 
-        log("🎉 History Migration Complete!");
+        log("🎉 History Imported! (Now run Recalculate)");
         toast("History Imported");
 
       } catch (e) {
@@ -139,7 +137,72 @@ export default {
       }
     };
 
-    return { logs, loading, runMasterMigration, runHistoryMigration };
+    // --- 3. RECALCULATE STOCK ---
+    const recalculateStock = async () => {
+      loading.value = true;
+      logs.value = [];
+      try {
+        log("🔄 Reading all orders from Firestore...");
+        
+        const snap = await getDocs(collection(db, 'orders'));
+        const tallies = {};
+
+        log(`📊 Processing ${snap.size} orders...`);
+
+        snap.docs.forEach(d => {
+            const data = d.data();
+            const type = data.type; // IN, OUT, ADJUST
+            
+            if (data.items && Array.isArray(data.items)) {
+                data.items.forEach(item => {
+                    const name = item.name;
+                    if (!name) return;
+                    
+                    const qty = Number(item.qty || 0);
+                    if (!tallies[name]) tallies[name] = 0;
+
+                    // Calculation Logic
+                    if (type === 'IN' || type === 'ADJUST') {
+                        tallies[name] += qty;
+                    } else if (type === 'OUT') {
+                        tallies[name] -= qty;
+                    }
+                });
+            }
+        });
+
+        const materialNames = Object.keys(tallies);
+        log(`💾 Updating stock for ${materialNames.length} items...`);
+
+        // Batch Update (Chunked)
+        const chunkSize = 400;
+        for (let i = 0; i < materialNames.length; i += chunkSize) {
+            const batch = writeBatch(db);
+            const chunk = materialNames.slice(i, i + chunkSize);
+            
+            chunk.forEach(name => {
+                const safeId = name.replace(/\//g, '_');
+                const ref = doc(db, 'materials', safeId);
+                // Update stock, create doc if missing (merge)
+                batch.set(ref, { name: name, stock: tallies[name] }, { merge: true });
+            });
+
+            await batch.commit();
+            log(`✅ Updated batch ${i} - ${i + chunk.length}`);
+        }
+
+        log("🎉 Stock Levels Updated Successfully!");
+        toast("Stock Recalculated");
+
+      } catch (e) {
+         console.error(e);
+         log("❌ Error: " + e.message);
+      } finally {
+         loading.value = false;
+      }
+    };
+
+    return { logs, loading, runMasterMigration, runHistoryMigration, recalculateStock };
   },
   template: `
     <div class="space-y-6 pb-20">
@@ -149,10 +212,13 @@ export default {
         
         <div class="flex flex-col gap-3 max-w-sm mx-auto">
             <button @click="runMasterMigration" :disabled="loading" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all text-sm">
-                1. Import Master Data (Materials/Projects/Contractors)
+                1. Import Master Data (Materials/Projects)
             </button>
-            <button @click="runHistoryMigration" :disabled="loading" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-orange-500/30 transition-all text-sm">
-                2. Import History (Grouped Orders)
+            <button @click="runHistoryMigration" :disabled="loading" class="bg-orange-200 hover:bg-orange-300 text-orange-800 font-bold py-3 px-6 rounded-xl transition-all text-sm">
+                2. Import History (Orders)
+            </button>
+            <button @click="recalculateStock" :disabled="loading" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-blue-500/30 transition-all text-sm">
+                3. Recalculate Stock Levels
             </button>
         </div>
       </section>

@@ -1,7 +1,8 @@
 import { ref } from 'vue';
 import { apiGet, apiPost, toast } from '../shared.js';
 import { db } from '../firebase.js';
-import { writeBatch, doc, collection, getDocs } from 'firebase/firestore';
+// 🔴 ADDED 'addDoc' HERE
+import { writeBatch, doc, collection, getDocs, addDoc } from 'firebase/firestore';
 
 export default {
   setup() {
@@ -99,26 +100,23 @@ export default {
       } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
     };
 
-    // 4. IMPORT PURCHASE HISTORY (Deep Fetch)
+    // 4. IMPORT PURCHASE HISTORY
     const runPurchaseMigration = async () => {
       loading.value = true;
       logs.value = [];
       try {
         log("🛒 Fetching Purchase List...");
-        const list = await apiGet('pur_History'); // Get list of docNos
+        const list = await apiGet('pur_History'); 
         
         if (!Array.isArray(list)) throw new Error("No purchase history found");
         log(`📥 Found ${list.length} Requests. fetching details...`);
 
-        // We process in small chunks to avoid overwhelming the system
         for (let i = 0; i < list.length; i++) {
            const h = list[i];
-           // Fetch line items for this specific DocNo
            log(`> Fetching details for ${h.docNo} (${i+1}/${list.length})...`);
            
            let items = [];
            try {
-             // We try to fetch details from old API
              const lines = await apiGet('pur_DocLines', { payload: { docNo: h.docNo } });
              if (Array.isArray(lines)) {
                  items = lines.map(l => ({ name: l.item, qty: Number(l.qty) }));
@@ -127,11 +125,11 @@ export default {
              log(`⚠️ Could not fetch items for ${h.docNo}, saving header only.`);
            }
 
-           // Save to Firestore immediately
+           // Use addDoc (now properly imported)
            await addDoc(collection(db, 'orders'), {
                  type: 'PURCHASE',
                  docNo: h.docNo,
-                 date: h.date || (h.ts ? h.ts.split(' ')[0] : todayStr()),
+                 date: h.date || (h.ts ? h.ts.split(' ')[0] : new Date().toISOString().split('T')[0]),
                  timestamp: h.ts || new Date().toISOString(),
                  project: h.project || '',
                  contractor: '', 

@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { db } from '../firebase.js';
-import { collection, addDoc, query, where, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore'; 
+import { collection, addDoc, query, where, getDocs, doc, updateDoc } from 'firebase/firestore'; 
 import { STR, toast, todayStr } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
@@ -34,7 +34,7 @@ export default {
         await addDoc(collection(db, 'orders'), {
           type: 'PURCHASE',
           docNo: docNo,
-          status: 'Requested', // Default status
+          status: 'Requested',
           project: form.value.project,
           contractor: form.value.contractor,
           needBy: form.value.needBy,
@@ -45,7 +45,7 @@ export default {
           requesterPhoto: props.user.photoURL,
           items: validLines,
           timestamp: new Date().toISOString(),
-          date: todayStr() // Helper for sorting
+          date: todayStr() 
         });
 
         toast((props.lang==='th'?'ส่งคำขอแล้ว ':'Request sent ') + docNo);
@@ -61,26 +61,35 @@ export default {
       } finally { loading.value = false; }
     };
 
-    // --- 2. LOAD HISTORY FROM FIRESTORE ---
+    // --- 2. LOAD HISTORY (Fixed Sorting) ---
     const loadHistory = async () => {
       historyLoading.value = true;
       try {
+        // FIX: Removed 'orderBy' from Firestore query to avoid Index errors
         const q = query(
           collection(db, 'orders'),
-          where('type', '==', 'PURCHASE'),
-          orderBy('timestamp', 'desc')
+          where('type', '==', 'PURCHASE')
         );
         
         const snap = await getDocs(q);
-        history.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Sort in JavaScript instead
+        const rawList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        rawList.sort((a, b) => {
+            const tA = a.timestamp || a.date || '';
+            const tB = b.timestamp || b.date || '';
+            return tB.localeCompare(tA); // Descending (Newest first)
+        });
+
+        history.value = rawList;
 
       } catch (e) {
-        console.error(e);
-        if(e.code === 'failed-precondition') console.warn("Index needed for sort");
+        console.error("Load Error:", e);
+        toast('Error loading history');
       } finally { historyLoading.value = false; }
     };
 
-    // --- 3. EXPAND & UPDATE ---
+    // --- 3. ACTIONS ---
     const toggleExpand = (doc) => {
       if (expandedDoc.value === doc.id) {
         expandedDoc.value = null;
@@ -92,7 +101,7 @@ export default {
     const updateStatus = async (item, newStatus) => {
       try {
         await updateDoc(doc(db, 'orders', item.id), { status: newStatus });
-        item.status = newStatus; // Update UI
+        item.status = newStatus;
         toast('Status Updated');
       } catch (e) { toast('Failed'); }
     };
@@ -172,6 +181,8 @@ export default {
         
         <div v-if="historyLoading" class="space-y-3 animate-pulse"><div v-for="i in 3" class="h-20 bg-slate-200 rounded-xl"></div></div>
         
+        <div v-else-if="history.length === 0" class="text-center text-slate-400 py-6">No purchase requests yet</div>
+
         <div v-else class="space-y-4">
           <div v-for="h in history" :key="h.id" class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
              <div @click="toggleExpand(h)" class="p-4 cursor-pointer hover:bg-slate-50 transition-colors">

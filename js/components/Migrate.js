@@ -17,23 +17,18 @@ export default {
       try {
         const batch = writeBatch(db);
         let count = 0;
-        
         log("📦 Materials...");
         const materials = await apiGet('listMaterials');
         if (Array.isArray(materials)) materials.forEach(n => { if(n) batch.set(doc(db,'materials',n.replace(/\//g,'_')), {name:n,min:5},{merge:true}); });
-
         log("🏗️ Projects...");
         const projects = await apiGet('listProjects');
         if (Array.isArray(projects)) projects.forEach(n => { if(n) batch.set(doc(db,'projects',n), {name:n},{merge:true}); });
-
         log("👷 Contractors...");
         const contractors = await apiGet('listContractors');
         if (Array.isArray(contractors)) contractors.forEach(n => { if(n) batch.set(doc(db,'contractors',n), {name:n},{merge:true}); });
-        
         log("👤 Requesters...");
         const requesters = await apiGet('listRequesters');
         if (Array.isArray(requesters)) requesters.forEach(n => { if(n) batch.set(doc(db,'requesters',n), {name:n},{merge:true}); });
-
         await batch.commit();
         log("✅ Master Data Done!");
       } catch (e) { log("❌ Error: " + e.message); } finally { loading.value = false; }
@@ -47,7 +42,6 @@ export default {
         log("🚀 Google Sheets History...");
         const res = await apiPost('getMovementReport', { start:'2020-01-01', end:'2030-12-31' });
         const rows = res.data || [];
-        
         const groups = {};
         rows.forEach(row => {
           const key = row.docNo || `${row.date}_${row.type}_${row.project}_${row.by}`;
@@ -63,10 +57,8 @@ export default {
           };
           groups[key].items.push({ name: row.item, qty: Number(row.qty), note: row.note||'' });
         });
-
         const orders = Object.values(groups);
         log(`📦 Saving ${orders.length} Orders...`);
-        
         const chunkSize = 400;
         for (let i = 0; i < orders.length; i += chunkSize) {
           const batch = writeBatch(db);
@@ -93,7 +85,6 @@ export default {
                 else if(data.type === 'OUT') tallies[i.name] -= Number(i.qty);
             });
         });
-        
         const keys = Object.keys(tallies);
         log(`💾 Updating ${keys.length} items...`);
         const chunkSize = 400;
@@ -108,41 +99,51 @@ export default {
       } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
     };
 
-    // 4. IMPORT PURCHASE HISTORY (NEW)
+    // 4. IMPORT PURCHASE HISTORY (Deep Fetch)
     const runPurchaseMigration = async () => {
       loading.value = true;
       logs.value = [];
       try {
-        log("🛒 Fetching Purchase History...");
-        const list = await apiGet('pur_History'); // Fetches headers
+        log("🛒 Fetching Purchase List...");
+        const list = await apiGet('pur_History'); // Get list of docNos
         
         if (!Array.isArray(list)) throw new Error("No purchase history found");
-        log(`📥 Found ${list.length} Requests. Importing...`);
-        
-        // Note: Old API pur_History didn't give items list in the summary.
-        // We will import the headers so they appear in the list.
-        // If you need full details, it requires fetching line-by-line which is slow,
-        // so we start with this to populate the list.
+        log(`📥 Found ${list.length} Requests. fetching details...`);
 
-        const batch = writeBatch(db);
-        list.forEach(h => {
-             const ref = doc(collection(db, 'orders'));
-             batch.set(ref, {
+        // We process in small chunks to avoid overwhelming the system
+        for (let i = 0; i < list.length; i++) {
+           const h = list[i];
+           // Fetch line items for this specific DocNo
+           log(`> Fetching details for ${h.docNo} (${i+1}/${list.length})...`);
+           
+           let items = [];
+           try {
+             // We try to fetch details from old API
+             const lines = await apiGet('pur_DocLines', { payload: { docNo: h.docNo } });
+             if (Array.isArray(lines)) {
+                 items = lines.map(l => ({ name: l.item, qty: Number(l.qty) }));
+             }
+           } catch(err) {
+             log(`⚠️ Could not fetch items for ${h.docNo}, saving header only.`);
+           }
+
+           // Save to Firestore immediately
+           await addDoc(collection(db, 'orders'), {
                  type: 'PURCHASE',
                  docNo: h.docNo,
-                 date: h.date || h.ts.split(' ')[0], // Try to parse date
+                 date: h.date || (h.ts ? h.ts.split(' ')[0] : todayStr()),
                  timestamp: h.ts || new Date().toISOString(),
-                 project: h.project,
-                 contractor: '', // Old summary might not have this
+                 project: h.project || '',
+                 contractor: '', 
                  requester: '',
-                 status: h.status,
-                 needBy: h.needBy,
-                 items: [] // Items might be empty if not in summary
-             });
-        });
+                 status: h.status || 'Requested',
+                 needBy: h.needBy || '',
+                 items: items
+           });
+        }
         
-        await batch.commit();
-        log("✅ Purchase History Imported!");
+        log("✅ Purchase History Imported with Details!");
+        toast("Done");
         
       } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
     };
@@ -163,7 +164,7 @@ export default {
       </section>
       <div class="bg-slate-900 rounded-2xl p-4 font-mono text-sm text-green-400 h-64 overflow-y-auto shadow-inner border border-slate-700">
         <div v-if="logs.length === 0" class="text-slate-600 italic">Ready...</div>
-        <div v-for="(l, i) in logs" :key="i" class="mb-1">> {{ l }}</div>
+        <div v-for="(l, i) in logs" :key="i" class="mb-1 text-xs whitespace-nowrap">{{ l }}</div>
       </div>
     </div>
   `,

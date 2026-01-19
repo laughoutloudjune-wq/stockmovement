@@ -1,78 +1,100 @@
 import { ref, computed, onMounted } from 'vue';
-import { apiPost, apiGet, STR, toast, todayStr } from '../shared.js';
+import { db } from '../firebase.js';
+import { collection, addDoc, query, where, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore'; 
+import { STR, toast, todayStr } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
-  props: ['lang', 'user'], // We accept 'user' prop now
+  props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
     const form = ref({ project: '', contractor: '', needBy: todayStr(), priority: 'Normal', note: '' });
     const lines = ref([{ name: '', qty: '' }]);
+    const loading = ref(false);
     
-    // History State
+    // History
     const history = ref([]);
     const historyLoading = ref(true);
     const expandedDoc = ref(null);
-    const expandedLines = ref([]);
-    const detailsLoading = ref(false);
-    const loading = ref(false);
 
     const S = computed(() => STR[props.lang]);
 
     const addLine = () => lines.value.push({ name: '', qty: '' });
     const removeLine = (i) => lines.value.splice(i, 1);
 
+    // --- 1. SUBMIT TO FIRESTORE ---
     const submit = async () => {
       const validLines = lines.value.filter(l => l.name && l.qty).map(l => ({ name: l.name, qty: Number(l.qty) }));
       if (!validLines.length) return toast(props.lang==='th'?'กรุณาเพิ่มรายการ':'Add line');
 
       loading.value = true;
       try {
-        const payload = { 
-          type: 'PURCHASE', 
-          ...form.value, 
-          lines: validLines,
-          // 🔒 AUTO-FILL REQUESTER FROM GOOGLE LOGIN
+        const docNo = 'PUR-' + Date.now().toString().slice(-6);
+        
+        await addDoc(collection(db, 'orders'), {
+          type: 'PURCHASE',
+          docNo: docNo,
+          status: 'Requested', // Default status
+          project: form.value.project,
+          contractor: form.value.contractor,
+          needBy: form.value.needBy,
+          priority: form.value.priority,
+          note: form.value.note,
           requester: props.user.displayName || props.user.email,
           requesterEmail: props.user.email,
-          requesterPhoto: props.user.photoURL
-        };
+          requesterPhoto: props.user.photoURL,
+          items: validLines,
+          timestamp: new Date().toISOString(),
+          date: todayStr() // Helper for sorting
+        });
 
-        const res = await apiPost('submitPurchaseRequest', payload);
-        if (res?.ok) {
-          toast((props.lang==='th'?'ส่งคำขอแล้ว ':'Request sent ') + (res.docNo||''));
-          lines.value = [{ name: '', qty: '' }]; 
-          form.value.note = '';
-          loadHistory(); 
-        } else toast(res?.message || 'Error');
-      } catch { toast('Failed to submit'); } 
-      finally { loading.value = false; }
+        toast((props.lang==='th'?'ส่งคำขอแล้ว ':'Request sent ') + docNo);
+        
+        // Reset
+        lines.value = [{ name: '', qty: '' }]; 
+        form.value.note = '';
+        loadHistory(); // Refresh list
+
+      } catch (e) {
+        console.error(e);
+        toast('Failed to submit');
+      } finally { loading.value = false; }
     };
 
-    // --- History Logic (Same as before) ---
+    // --- 2. LOAD HISTORY FROM FIRESTORE ---
     const loadHistory = async () => {
       historyLoading.value = true;
       try {
-        const res = await apiGet('pur_History', null, { cacheTtlMs: 20000 });
-        history.value = Array.isArray(res) ? res : [];
-      } catch { history.value = []; } 
-      finally { historyLoading.value = false; }
+        const q = query(
+          collection(db, 'orders'),
+          where('type', '==', 'PURCHASE'),
+          orderBy('timestamp', 'desc')
+        );
+        
+        const snap = await getDocs(q);
+        history.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      } catch (e) {
+        console.error(e);
+        if(e.code === 'failed-precondition') console.warn("Index needed for sort");
+      } finally { historyLoading.value = false; }
     };
 
-    const toggleExpand = async (doc) => {
-      if (expandedDoc.value === doc.docNo) { expandedDoc.value = null; return; }
-      expandedDoc.value = doc.docNo;
-      expandedLines.value = [];
-      detailsLoading.value = true;
+    // --- 3. EXPAND & UPDATE ---
+    const toggleExpand = (doc) => {
+      if (expandedDoc.value === doc.id) {
+        expandedDoc.value = null;
+      } else {
+        expandedDoc.value = doc.id;
+      }
+    };
+
+    const updateStatus = async (item, newStatus) => {
       try {
-        const res = await apiGet('pur_DocLines', { payload: { docNo: doc.docNo } });
-        expandedLines.value = Array.isArray(res) ? res : [];
-      } catch { toast('Failed to load details'); } 
-      finally { detailsLoading.value = false; }
-    };
-
-    const updateStatus = async (doc, newStatus) => {
-      // ... (Same status logic as before) ...
+        await updateDoc(doc(db, 'orders', item.id), { status: newStatus });
+        item.status = newStatus; // Update UI
+        toast('Status Updated');
+      } catch (e) { toast('Failed'); }
     };
 
     const statusColor = (s) => {
@@ -87,7 +109,7 @@ export default {
 
     return { 
       S, form, lines, loading, 
-      history, historyLoading, expandedDoc, expandedLines, detailsLoading,
+      history, historyLoading, expandedDoc,
       addLine, removeLine, submit, toggleExpand, updateStatus, statusColor 
     };
   },
@@ -115,15 +137,8 @@ export default {
             <input type="date" v-model="form.needBy" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
           </div>
           
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purProj }}</label>
-            <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" />
-          </div>
-
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purContractor }}</label>
-            <ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pick" />
-          </div>
+          <div class="min-w-0"><label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purProj }}</label><ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" /></div>
+          <div class="min-w-0"><label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purContractor }}</label><ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pick" /></div>
           
           <div class="min-w-0">
              <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purPriority }}</label>
@@ -135,7 +150,6 @@ export default {
              <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purNote }}</label>
              <input v-model="form.note" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
           </div>
-
         </div>
       </section>
 
@@ -155,23 +169,37 @@ export default {
 
       <section class="mt-8 border-t border-slate-200/50 pt-6">
         <h3 class="font-bold text-lg text-slate-800 mb-4 px-2">{{ S.purOlder || 'History' }}</h3>
+        
         <div v-if="historyLoading" class="space-y-3 animate-pulse"><div v-for="i in 3" class="h-20 bg-slate-200 rounded-xl"></div></div>
+        
         <div v-else class="space-y-4">
-          <div v-for="h in history" :key="h.docNo" class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div v-for="h in history" :key="h.id" class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
              <div @click="toggleExpand(h)" class="p-4 cursor-pointer hover:bg-slate-50 transition-colors">
                <div class="flex justify-between items-start mb-2 gap-2">
                  <div class="min-w-0 flex-1">
                    <div class="font-bold text-slate-800 text-sm truncate">{{ h.docNo }} • {{ h.project || '-' }}</div>
-                   <div class="text-xs text-slate-500 mt-1 truncate">{{ h.ts }} • Need: {{ h.needBy }}</div>
+                   <div class="text-xs text-slate-500 mt-1 truncate">{{ h.date }} • Need: {{ h.needBy }}</div>
                  </div>
                  <span class="px-2 py-1 rounded-lg text-[10px] uppercase font-extrabold tracking-wide whitespace-nowrap" :class="statusColor(h.status)">{{ h.status }}</span>
                </div>
              </div>
-             <div v-if="expandedDoc === h.docNo" class="bg-slate-50 border-t border-slate-100 p-4">
+             
+             <div v-if="expandedDoc === h.id" class="bg-slate-50 border-t border-slate-100 p-4 animate-fade-in-up">
+                <div class="flex items-center gap-2 mb-4 bg-white p-2 rounded-lg border border-slate-200">
+                  <span class="text-xs font-bold text-slate-400 uppercase">Status:</span>
+                  <select :value="h.status" @change="updateStatus(h, $event.target.value)" class="bg-transparent font-bold text-sm outline-none text-slate-700 flex-1">
+                    <option value="Requested">Requested</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Ordered">Ordered</option>
+                    <option value="Received">Received</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </div>
+
                 <table class="w-full text-sm">
                   <tbody class="divide-y divide-slate-100">
-                    <tr v-for="li in expandedLines" :key="li.item">
-                      <td class="py-2 pl-2 text-slate-700 break-words pr-2">{{ li.item }}</td>
+                    <tr v-for="li in h.items" :key="li.name">
+                      <td class="py-2 pl-2 text-slate-700 break-words pr-2">{{ li.name }}</td>
                       <td class="py-2 text-right pr-2 font-mono font-bold">{{ li.qty }}</td>
                     </tr>
                   </tbody>

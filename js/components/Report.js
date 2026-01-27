@@ -8,7 +8,8 @@ export default {
   props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
-    const filters = ref({ start: todayStr().slice(0, 8) + '01', end: todayStr(), type: 'ALL', search: '' });
+    // ADDED: material filter
+    const filters = ref({ start: todayStr().slice(0, 8) + '01', end: todayStr(), type: 'ALL', search: '', material: '' });
     const results = ref([]);
     const loading = ref(false);
 
@@ -31,6 +32,12 @@ export default {
         if (filters.value.type !== 'ALL') {
             data = data.filter(r => r.type === filters.value.type);
         }
+        
+        // ADDED: Material/SKU Filter
+        if (filters.value.material) {
+            data = data.filter(r => (r.items || []).some(i => i.name === filters.value.material));
+        }
+
         if (filters.value.search) {
             const term = filters.value.search.toLowerCase();
             data = data.filter(r => 
@@ -45,6 +52,42 @@ export default {
         console.error(e);
         if(e.code === 'failed-precondition') alert("Missing Index. Check Console.");
       } finally { loading.value = false; }
+    };
+
+    // ADDED: Excel Export
+    const exportExcel = () => {
+        if (results.value.length === 0) return toast('No data to export');
+        
+        // BOM for Thai encoding
+        let csv = "\uFEFFDate,DocNo,Type,Project,Requester,Contractor,Item,Qty,Note\n";
+        
+        results.value.forEach(r => {
+            if (r.items && r.items.length) {
+                r.items.forEach(item => {
+                    // Escape commas
+                    const safeName = (item.name || '').replace(/,/g, ' ');
+                    const safeNote = (r.note || '').replace(/,/g, ' ');
+                    const line = [
+                        r.date, r.docNo, r.type, r.project||'', r.requester||'', r.contractor||'', 
+                        safeName, item.qty, safeNote
+                    ].join(",");
+                    csv += line + "\n";
+                });
+            } else {
+                // Header only record?
+                csv += [r.date, r.docNo, r.type, r.project||'', r.requester||'', r.contractor||'', '', '', ''].join(",") + "\n";
+            }
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `report_${filters.value.start}_${filters.value.end}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     // --- Actions ---
@@ -86,7 +129,7 @@ export default {
     onMounted(generate);
 
     return { 
-        filters, results, loading, generate, remove, 
+        filters, results, loading, generate, remove, exportExcel,
         openEdit, isEditOpen, editForm, saveEdit, addLine, removeLine
     };
   },
@@ -104,19 +147,33 @@ export default {
             <label class="block text-xs font-bold text-slate-500 mb-1">To</label>
             <input type="date" v-model="filters.end" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
+          
           <div class="col-span-2">
-            <input v-model="filters.search" placeholder="Search..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+            <label class="block text-xs font-bold text-slate-500 mb-1">Filter Item/SKU</label>
+            <ItemPicker v-model="filters.material" source="MATERIALS" placeholder="All Items (Optional)" />
+          </div>
+
+          <div class="col-span-2">
+            <input v-model="filters.search" placeholder="Search doc, project..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div class="col-span-2 flex gap-2">
               <select v-model="filters.type" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none flex-1">
                 <option value="ALL">All Types</option>
                 <option value="OUT">OUT</option>
                 <option value="IN">IN</option>
+                <option value="ADJUST">ADJUST</option>
+                <option value="PURCHASE">PURCHASE</option>
               </select>
               <button @click="generate" class="bg-blue-500 text-white font-bold px-6 rounded-xl shadow-md active:scale-95 transition-transform">Search</button>
           </div>
         </div>
       </section>
+
+      <div v-if="results.length > 0" class="flex justify-end">
+          <button @click="exportExcel" class="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition-colors">
+            📄 Export Excel
+          </button>
+      </div>
 
       <div class="space-y-3">
         <div v-if="results.length === 0 && !loading" class="text-center py-10 text-slate-400">No records found</div>
@@ -125,7 +182,14 @@ export default {
            
            <div class="flex justify-between items-start mb-2">
               <div>
-                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider" :class="r.type==='IN'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'">{{ r.type }}</span>
+                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider" 
+                    :class="{
+                        'bg-green-100 text-green-700': r.type==='IN',
+                        'bg-red-100 text-red-700': r.type==='OUT',
+                        'bg-yellow-100 text-yellow-700': r.type==='ADJUST'
+                    }">
+                    {{ r.type }}
+                 </span>
                  <span class="text-xs text-slate-500 font-bold ml-2">{{ r.date }}</span>
                  <div class="text-[10px] text-slate-400">{{ r.docNo }}</div>
               </div>
@@ -197,3 +261,4 @@ export default {
     </div>
   `
 };
+}

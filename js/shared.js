@@ -19,7 +19,6 @@ export const LOOKUPS = reactive({
 const safeJson = (t) => { try { return JSON.parse(t); } catch { return { ok: false, error: "Bad JSON" }; } };
 
 export async function apiGet(fn, payload = null, { cacheTtlMs = 0 } = {}) {
-  // Legacy cache logic removed for clarity, simple fetch:
   const qs = new URLSearchParams({ fn });
   if (payload) qs.set("payload", JSON.stringify(payload));
   const res = await fetch(`${API_URL}?${qs.toString()}`);
@@ -54,8 +53,12 @@ export async function preloadLookups(force = false) {
       getDocs(collection(db, 'requesters'))
     ]);
 
-    // Map docs to simple arrays of names
-    const matList = m.docs.map(d => d.data().name).sort();
+    // FIX: Map Materials to Object {name, stock}, others keep as String
+    const matList = m.docs.map(d => ({ 
+        name: d.data().name, 
+        stock: d.data().stock || 0 
+    })).sort((a,b) => a.name.localeCompare(b.name));
+
     const projList = p.docs.map(d => d.data().name).sort();
     const contList = c.docs.map(d => d.data().name).sort();
     const reqList  = r.docs.map(d => d.data().name).sort();

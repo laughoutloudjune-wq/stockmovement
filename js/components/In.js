@@ -1,9 +1,11 @@
 import { ref, computed } from 'vue';
-import { apiPost, STR, toast, todayStr } from '../shared.js';
+import { db } from '../firebase.js';
+import { collection, doc, runTransaction } from 'firebase/firestore';
+import { STR, toast, todayStr } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
-  props: ['lang'],
+  props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
     const date = ref(todayStr());
@@ -32,18 +34,45 @@ export default {
 
       loading.value = true;
       try {
-        const payload = { type: 'IN', date: date.value, lines: validLines };
-        const res = await apiPost('submitMovementBulk', payload);
-        
-        if (res && res.ok) {
-          toast((props.lang === 'th' ? 'บันทึกแล้ว • เอกสาร ' : 'Saved • Doc ') + (res.docNo || ''));
-          lines.value = [{ name: '', qty: '' }];
-          date.value = todayStr();
-        } else {
-          toast(res?.message || 'Error');
-        }
+        await runTransaction(db, async (transaction) => {
+           // 1. Prepare updates for Materials
+           for (const line of validLines) {
+              const safeId = line.name.replace(/\//g, '_');
+              const matRef = doc(db, 'materials', safeId);
+              const matDoc = await transaction.get(matRef);
+              
+              let newStock = line.qty;
+              if (matDoc.exists()) {
+                 const current = Number(matDoc.data().stock || 0);
+                 newStock = current + line.qty;
+                 transaction.update(matRef, { stock: newStock });
+              } else {
+                 // Create new if not exists
+                 transaction.set(matRef, { name: line.name, stock: newStock, min: 5 });
+              }
+           }
+
+           // 2. Create Order History
+           const docNo = 'IN-' + Date.now().toString().slice(-6);
+           const newOrderRef = doc(collection(db, 'orders'));
+           transaction.set(newOrderRef, {
+              type: 'IN',
+              docNo: docNo,
+              date: date.value,
+              project: '', // Optional for IN
+              requester: props.user?.displayName || props.user?.email || 'Admin',
+              items: validLines,
+              timestamp: new Date().toISOString()
+           });
+        });
+
+        toast((props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved'));
+        lines.value = [{ name: '', qty: '' }];
+        date.value = todayStr();
+
       } catch (e) {
-        toast('Failed to submit');
+        console.error(e);
+        toast('Failed to submit: ' + e.message);
       } finally {
         loading.value = false;
       }
@@ -101,3 +130,4 @@ export default {
     </div>
   `
 };
+}

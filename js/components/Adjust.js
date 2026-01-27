@@ -1,9 +1,11 @@
 import { ref, computed } from 'vue';
-import { apiPost, apiGet, STR, toast } from '../shared.js';
+import { db } from '../firebase.js';
+import { collection, doc, runTransaction, getDoc } from 'firebase/firestore';
+import { STR, toast } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
-  props: ['lang'],
+  props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
     const lines = ref([{ name: '', qty: '', stock: null, stockLoading: false }]);
@@ -13,36 +15,73 @@ export default {
     const addLine = () => lines.value.push({ name: '', qty: '', stock: null });
     const removeLine = (i) => lines.value.splice(i, 1);
 
-    // Reusing the "Check Stock" logic
+    // FIX: Get Stock from Firestore directly
     const onMaterialSelect = async (line) => {
       if (!line.name) return;
       line.stockLoading = true;
       try {
-        const res = await apiGet('getCurrentStock', { material: line.name });
-        if (res?.ok) {
-          const s = Number(res.stock);
-          const m = Number(res.min || 0);
+        const safeId = line.name.replace(/\//g, '_');
+        const snap = await getDoc(doc(db, 'materials', safeId));
+        
+        if (snap.exists()) {
+          const data = snap.data();
+          const s = Number(data.stock || 0);
+          const m = Number(data.min || 0);
           let color = 'bg-green-100 text-green-700';
           if (s <= 0 || s <= m) color = 'bg-red-100 text-red-700';
           else if (s <= 2 * m) color = 'bg-yellow-100 text-yellow-700';
           line.stock = { val: s, color };
+        } else {
+          line.stock = { val: 0, color: 'bg-gray-100 text-slate-400' };
         }
       } catch (e) { console.error(e); } 
       finally { line.stockLoading = false; }
     };
 
+    // FIX: Submit via Firestore Transaction
     const submit = async () => {
       const validLines = lines.value.filter(l => l.name && l.qty != null && l.qty !== '').map(l => ({ name: l.name, qty: Number(l.qty) }));
       if (validLines.length === 0) return toast(props.lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line');
 
       loading.value = true;
       try {
-        const res = await apiPost('submitMovementBulk', { type: 'ADJUST', lines: validLines });
-        if (res?.ok) {
-          toast(props.lang==='th'?'บันทึกแล้ว':'Saved');
-          lines.value = [{ name: '', qty: '', stock: null }];
-        } else toast(res?.message || 'Error');
-      } catch { toast('Failed to submit'); } 
+        await runTransaction(db, async (transaction) => {
+            // 1. Update Materials
+            for (const line of validLines) {
+                const safeId = line.name.replace(/\//g, '_');
+                const matRef = doc(db, 'materials', safeId);
+                const matDoc = await transaction.get(matRef);
+                
+                let newStock = line.qty; // For Adjust, we might want "Add/Remove" (delta). Assuming input is delta (+/-).
+                // If existing, add delta to current
+                if (matDoc.exists()) {
+                    newStock = Number(matDoc.data().stock || 0) + line.qty;
+                    transaction.update(matRef, { stock: newStock });
+                } else {
+                    // Initialize if not exists
+                    transaction.set(matRef, { name: line.name, stock: newStock, min: 5 });
+                }
+            }
+
+            // 2. Log History
+            const docNo = 'ADJ-' + Date.now().toString().slice(-6);
+            const newOrderRef = doc(collection(db, 'orders'));
+            transaction.set(newOrderRef, {
+                type: 'ADJUST',
+                docNo: docNo,
+                date: new Date().toISOString().split('T')[0],
+                requester: props.user?.displayName || 'Admin',
+                items: validLines,
+                timestamp: new Date().toISOString()
+            });
+        });
+
+        toast(props.lang==='th'?'บันทึกแล้ว':'Saved');
+        lines.value = [{ name: '', qty: '', stock: null }];
+      } catch (e) { 
+        console.error(e);
+        toast('Failed to submit: ' + e.message); 
+      } 
       finally { loading.value = false; }
     };
 
@@ -86,3 +125,4 @@ export default {
     </div>
   `
 };
+}

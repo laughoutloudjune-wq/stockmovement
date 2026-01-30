@@ -35,31 +35,42 @@ export default {
       loading.value = true;
       try {
         await runTransaction(db, async (transaction) => {
-           // 1. Prepare updates for Materials
+           // --- STEP 1: READ PHASE ---
+           // All reads must happen before any writes
+           const updates = [];
            for (const line of validLines) {
               const safeId = line.name.replace(/\//g, '_');
               const matRef = doc(db, 'materials', safeId);
               const matDoc = await transaction.get(matRef);
               
               let newStock = line.qty;
+              let exists = false;
+
               if (matDoc.exists()) {
                  const current = Number(matDoc.data().stock || 0);
                  newStock = current + line.qty;
-                 transaction.update(matRef, { stock: newStock });
+                 exists = true;
+              }
+              updates.push({ ref: matRef, stock: newStock, exists, name: line.name });
+           }
+
+           // --- STEP 2: WRITE PHASE ---
+           for (const u of updates) {
+              if (u.exists) {
+                 transaction.update(u.ref, { stock: u.stock });
               } else {
-                 // Create new if not exists
-                 transaction.set(matRef, { name: line.name, stock: newStock, min: 5 });
+                 transaction.set(u.ref, { name: u.name, stock: u.stock, min: 5 });
               }
            }
 
-           // 2. Create Order History
+           // Log History (Write)
            const docNo = 'IN-' + Date.now().toString().slice(-6);
            const newOrderRef = doc(collection(db, 'orders'));
            transaction.set(newOrderRef, {
               type: 'IN',
               docNo: docNo,
               date: date.value,
-              project: '', // Optional for IN
+              project: '', 
               requester: props.user?.displayName || props.user?.email || 'Admin',
               items: validLines,
               timestamp: new Date().toISOString()
@@ -82,7 +93,6 @@ export default {
   },
   template: `
     <div class="space-y-6 pb-20">
-      
       <section class="glass rounded-2xl p-5 shadow-sm space-y-4">
         <h3 class="font-bold text-lg text-slate-800">{{ S.inTitle }}</h3>
         <div>
@@ -94,22 +104,12 @@ export default {
       <div class="space-y-3">
         <div v-for="(line, idx) in lines" :key="idx" class="glass rounded-2xl p-4 shadow-sm relative animate-fade-in-up">
           <button @click="removeLine(idx)" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">×</button>
-
           <div class="grid grid-cols-12 gap-3 mt-2">
             <div class="col-span-8">
-              <ItemPicker 
-                v-model="line.name" 
-                source="MATERIALS" 
-                :placeholder="lang === 'th' ? 'ค้นหาวัสดุ...' : 'Search material...'" 
-              />
+              <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang === 'th' ? 'ค้นหาวัสดุ...' : 'Search material...'" />
             </div>
             <div class="col-span-4">
-              <input 
-                type="number" 
-                v-model="line.qty" 
-                placeholder="0" 
-                class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-              />
+              <input type="number" v-model="line.qty" placeholder="0" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" />
             </div>
           </div>
         </div>

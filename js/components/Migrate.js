@@ -100,6 +100,18 @@ export default {
       } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
     };
 
+    // Example helper to download JSON from Firestore
+const exportCollection = async (collectionName) => {
+  const snap = await getDocs(collection(db, collectionName));
+  const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${collectionName}_export.json`;
+  link.click();
+};
+
     // 4. IMPORT PURCHASE HISTORY
     const runPurchaseMigration = async () => {
       loading.value = true;

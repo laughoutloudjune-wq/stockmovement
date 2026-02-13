@@ -1,7 +1,6 @@
 import { ref } from 'vue';
 import { apiGet, apiPost, toast } from '../shared.js';
 import { db } from '../firebase.js';
-// 🔴 ADDED 'addDoc' HERE
 import { writeBatch, doc, collection, getDocs, addDoc } from 'firebase/firestore';
 
 export default {
@@ -11,13 +10,48 @@ export default {
 
     const log = (msg) => logs.value.push(msg);
 
+    // --- NEW: EXPORT FUNCTION ---
+    const exportAllData = async () => {
+      loading.value = true;
+      log("📡 Starting full export from Firebase...");
+      try {
+        const collections = ['materials', 'projects', 'contractors', 'requesters', 'orders'];
+        const allData = {};
+
+        for (const colName of collections) {
+          log(`Reading ${colName}...`);
+          const snap = await getDocs(collection(db, colName));
+          allData[colName] = snap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        }
+
+        // Create the JSON file for download
+        const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `construction_data_backup_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        log("✅ Export Complete! Check your downloads folder.");
+        toast("Export Successful");
+      } catch (e) {
+        log("❌ Export Failed: " + e.message);
+        console.error(e);
+      } finally {
+        loading.value = false;
+      }
+    };
+
     // 1. MASTER DATA
     const runMasterMigration = async () => {
       loading.value = true;
       logs.value = [];
       try {
         const batch = writeBatch(db);
-        let count = 0;
         log("📦 Materials...");
         const materials = await apiGet('listMaterials');
         if (Array.isArray(materials)) materials.forEach(n => { if(n) batch.set(doc(db,'materials',n.replace(/\//g,'_')), {name:n,min:5},{merge:true}); });
@@ -100,24 +134,6 @@ export default {
       } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
     };
 
-// Add this to your setup() in Migrate.js
-const exportToJSON = async () => {
-  const collections = ['materials', 'projects', 'contractors', 'requesters', 'orders'];
-  const dataExport = {};
-
-  for (const col of collections) {
-    const snap = await getDocs(collection(db, col));
-    dataExport[col] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  }
-
-  const blob = new Blob([JSON.stringify(dataExport, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'firebase_backup.json';
-  a.click();
-};
-
     // 4. IMPORT PURCHASE HISTORY
     const runPurchaseMigration = async () => {
       loading.value = true;
@@ -143,7 +159,6 @@ const exportToJSON = async () => {
              log(`⚠️ Could not fetch items for ${h.docNo}, saving header only.`);
            }
 
-           // Use addDoc (now properly imported)
            await addDoc(collection(db, 'orders'), {
                  type: 'PURCHASE',
                  docNo: h.docNo,
@@ -164,7 +179,7 @@ const exportToJSON = async () => {
       } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
     };
 
-    return { logs, loading, runMasterMigration, runHistoryMigration, recalculateStock, runPurchaseMigration };
+    return { logs, loading, runMasterMigration, runHistoryMigration, recalculateStock, runPurchaseMigration, exportAllData };
   },
   template: `
     <div class="space-y-6 pb-20">
@@ -172,14 +187,19 @@ const exportToJSON = async () => {
         <h3 class="font-bold text-2xl text-slate-800">🔥 Database Migration</h3>
         
         <div class="grid grid-cols-1 gap-3 max-w-sm mx-auto">
-            <button @click="runMasterMigration" :disabled="loading" class="btn">1. Import Master Data</button>
+            <button @click="exportAllData" :disabled="loading" class="w-full bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-500/20 hover:bg-green-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+               <span v-if="loading" class="animate-spin text-xl">C</span>
+               <span v-else>⬇️ Export All Data (JSON)</span>
+            </button>
+
+            <div class="h-4"></div> <button @click="runMasterMigration" :disabled="loading" class="btn">1. Import Master Data</button>
             <button @click="runHistoryMigration" :disabled="loading" class="btn">2. Import Movement History</button>
             <button @click="recalculateStock" :disabled="loading" class="btn">3. Recalculate Stock</button>
             <button @click="runPurchaseMigration" :disabled="loading" class="btn bg-purple-100 text-purple-700 hover:bg-purple-200">4. Import Purchase History</button>
         </div>
       </section>
       <div class="bg-slate-900 rounded-2xl p-4 font-mono text-sm text-green-400 h-64 overflow-y-auto shadow-inner border border-slate-700">
-        <div v-if="logs.length === 0" class="text-slate-600 italic">Ready...</div>
+        <div v-if="logs.length === 0" class="text-slate-600 italic">Ready for migration or export...</div>
         <div v-for="(l, i) in logs" :key="i" class="mb-1 text-xs whitespace-nowrap">{{ l }}</div>
       </div>
     </div>

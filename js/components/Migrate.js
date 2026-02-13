@@ -100,16 +100,22 @@ export default {
       } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
     };
 
-    // Example helper to download JSON from Firestore
-const exportCollection = async (collectionName) => {
-  const snap = await getDocs(collection(db, collectionName));
-  const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+// Add this to your setup() in Migrate.js
+const exportToJSON = async () => {
+  const collections = ['materials', 'projects', 'contractors', 'requesters', 'orders'];
+  const dataExport = {};
+
+  for (const col of collections) {
+    const snap = await getDocs(collection(db, col));
+    dataExport[col] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+
+  const blob = new Blob([JSON.stringify(dataExport, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${collectionName}_export.json`;
-  link.click();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'firebase_backup.json';
+  a.click();
 };
 
     // 4. IMPORT PURCHASE HISTORY

@@ -2,43 +2,37 @@ import { ref, reactive, onMounted, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { toast, preloadLookups } from '../shared.js';
-import Migrate from './Migrate.js'; // <--- Import the Migration Tool
+import Migrate from './Migrate.js';
 
 export default {
-  components: { Migrate }, // <--- Register it
+  components: { Migrate },
   setup() {
-    const activeSection = ref('materials'); 
+    const activeSection = ref('materials');
     const loading = ref(false);
     const list = ref([]);
     const searchQuery = ref('');
 
-    // Modal State
     const isModalOpen = ref(false);
     const editMode = ref(false);
-    const form = reactive({ id: '', name: '', min: 0 });
+    const form = reactive({ id: '', name: '', min: 0, subProjectsText: '' });
 
-    // Configuration for each section
     const CONFIG = {
       materials:   { col: 'materials',   label: 'Materials',   hasMin: true },
       projects:    { col: 'projects',    label: 'Projects',    hasMin: false },
       contractors: { col: 'contractors', label: 'Contractors', hasMin: false },
       requesters:  { col: 'requesters',  label: 'Requesters',  hasMin: false },
-      // Special "Database" tab for migration
-      migration:   { col: null,          label: 'Database',    isSpecial: true } 
+      migration:   { col: null,          label: 'Database',    isSpecial: true }
     };
 
     const currentConfig = computed(() => CONFIG[activeSection.value]);
 
-    // Fetch Data
     const loadData = async () => {
-      // Don't load list for Migration tab
-      if (currentConfig.value.isSpecial) return; 
+      if (currentConfig.value.isSpecial) return;
 
       loading.value = true;
       list.value = [];
       try {
-        const colRef = collection(db, currentConfig.value.col);
-        const snap = await getDocs(colRef);
+        const snap = await getDocs(collection(db, currentConfig.value.col));
         list.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       } catch (e) {
         console.error(e);
@@ -48,17 +42,18 @@ export default {
       }
     };
 
-    // Filter
     const filteredList = computed(() => {
       if (!searchQuery.value) return list.value;
       const q = searchQuery.value.toLowerCase();
-      return list.value.filter(i => i.name.toLowerCase().includes(q));
+      return list.value.filter(i => String(i.name || '').toLowerCase().includes(q));
     });
 
-    // Actions
     const openAdd = () => {
       editMode.value = false;
-      form.id = ''; form.name = ''; form.min = 5;
+      form.id = '';
+      form.name = '';
+      form.min = 5;
+      form.subProjectsText = '';
       isModalOpen.value = true;
     };
 
@@ -66,9 +61,16 @@ export default {
       editMode.value = true;
       form.id = item.id;
       form.name = item.name;
-      form.min = item.min || 0;
+      form.min = Number(item.min || 0);
+      form.subProjectsText = Array.isArray(item.subProjects) ? item.subProjects.join('\n') : '';
       isModalOpen.value = true;
     };
+
+    const parseSubProjects = () =>
+      form.subProjectsText
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
 
     const save = async () => {
       if (!form.name) return toast('Name is required');
@@ -79,6 +81,7 @@ export default {
           const ref = doc(db, colName, form.id);
           const data = { name: form.name };
           if (currentConfig.value.hasMin) data.min = Number(form.min);
+          if (activeSection.value === 'projects') data.subProjects = parseSubProjects();
           await updateDoc(ref, data);
           toast('Updated');
         } else {
@@ -89,12 +92,14 @@ export default {
             data.min = Number(form.min);
             data.stock = 0;
           }
+          if (activeSection.value === 'projects') data.subProjects = parseSubProjects();
           await setDoc(ref, data);
           toast('Added');
         }
+
         isModalOpen.value = false;
         await loadData();
-        await preloadLookups(true); 
+        await preloadLookups(true);
       } catch (e) {
         console.error(e);
         toast('Failed to save');
@@ -112,6 +117,7 @@ export default {
         await loadData();
         await preloadLookups(true);
       } catch (e) {
+        console.error(e);
         toast('Failed to delete');
       } finally {
         loading.value = false;
@@ -126,21 +132,21 @@ export default {
 
     onMounted(loadData);
 
-    return { 
-      activeSection, list, filteredList, loading, searchQuery, 
+    return {
+      activeSection, list, filteredList, loading, searchQuery,
       isModalOpen, editMode, form, currentConfig, CONFIG,
-      switchTab, openAdd, openEdit, save, remove 
+      switchTab, openAdd, openEdit, save, remove
     };
   },
   template: `
     <div class="space-y-6 pb-24">
-      
       <div class="flex justify-between items-center px-1">
-        <h3 class="font-bold text-lg text-slate-800">⚙️ Settings</h3>
+        <h3 class="font-bold text-lg text-slate-800">Settings</h3>
       </div>
 
       <div class="glass p-1 rounded-xl flex overflow-x-auto no-scrollbar gap-1">
-        <button v-for="(cfg, key) in CONFIG" 
+        <button
+          v-for="(cfg, key) in CONFIG"
           :key="key"
           @click="switchTab(key)"
           :class="activeSection === key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'"
@@ -155,24 +161,24 @@ export default {
       </div>
 
       <div v-else class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[50vh] flex flex-col animate-fade-in-up">
-        
         <div class="p-3 border-b border-slate-100 flex gap-2">
           <input v-model="searchQuery" placeholder="Search..." class="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-          <button @click="openAdd" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm">
-            + New
-          </button>
+          <button @click="openAdd" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm">+ New</button>
         </div>
 
         <div class="flex-1 overflow-y-auto max-h-[60vh]">
           <div v-if="loading" class="p-8 text-center text-slate-400">Loading...</div>
           <div v-else-if="filteredList.length === 0" class="p-8 text-center text-slate-400">No items found</div>
-          
+
           <div v-else class="divide-y divide-slate-50">
             <div v-for="item in filteredList" :key="item.id" class="p-3 flex justify-between items-center hover:bg-slate-50 transition-colors group">
               <div>
                 <div class="font-bold text-slate-700 text-sm">{{ item.name }}</div>
                 <div v-if="activeSection === 'materials'" class="text-xs text-slate-400">
-                  Min: <span class="font-mono text-slate-600">{{ item.min }}</span> • Stock: <span class="font-mono text-slate-600">{{ item.stock }}</span>
+                  Min: <span class="font-mono text-slate-600">{{ item.min }}</span> | Stock: <span class="font-mono text-slate-600">{{ item.stock }}</span>
+                </div>
+                <div v-if="activeSection === 'projects'" class="text-xs text-slate-400">
+                  Sub Projects: <span class="font-mono text-slate-600">{{ (item.subProjects || []).length }}</span>
                 </div>
               </div>
               <div class="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -195,11 +201,18 @@ export default {
                 <input v-model="form.name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" :disabled="editMode && activeSection === 'materials'" />
                 <p v-if="editMode && activeSection === 'materials'" class="text-[10px] text-orange-500 mt-1">Material names cannot be changed.</p>
               </div>
+
               <div v-if="activeSection === 'materials'">
                 <label class="block text-xs font-bold text-slate-500 mb-1">Min Stock Alert</label>
                 <input type="number" v-model="form.min" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+
+              <div v-if="activeSection === 'projects'">
+                <label class="block text-xs font-bold text-slate-500 mb-1">Sub Projects (1 per line)</label>
+                <textarea v-model="form.subProjectsText" rows="6" placeholder="แปลง 92-97&#10;แปลง 98-102" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+              </div>
             </div>
+
             <div class="flex gap-2 mt-6">
               <button @click="isModalOpen = false" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl hover:bg-slate-200">Cancel</button>
               <button @click="save" :disabled="loading" class="flex-1 bg-blue-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-600">{{ loading ? 'Saving...' : 'Save' }}</button>
@@ -207,7 +220,7 @@ export default {
           </div>
         </div>
       </teleport>
-
     </div>
   `
 };
+

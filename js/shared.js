@@ -2,45 +2,16 @@ import { reactive } from 'vue';
 import { db } from './firebase.js';
 import { collection, getDocs } from 'firebase/firestore';
 
-// 1. API Configuration (Keep for legacy transaction logs if needed)
-export const API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbwEJDNfo63e0LjEZa-bhXmX3aY2PUs96bUBGz186T-pVlphV4NGNYxGT2tcx1DWgbDI/exec";
-
 export const todayStr = () => new Date().toISOString().split("T")[0];
 
 // 2. Global State (Reactive)
 export const LOOKUPS = reactive({ 
   MATERIALS: [], 
   PROJECTS: [], 
+  PROJECT_META: {},
   CONTRACTORS: [], 
   REQUESTERS: [] 
 });
-
-// 3. API Helpers (Legacy)
-const safeJson = (t) => { try { return JSON.parse(t); } catch { return { ok: false, error: "Bad JSON" }; } };
-
-export async function apiGet(fn, payload = null, { cacheTtlMs = 0 } = {}) {
-  const qs = new URLSearchParams({ fn });
-  if (payload) qs.set("payload", JSON.stringify(payload));
-  const res = await fetch(`${API_URL}?${qs.toString()}`);
-  const text = await res.text();
-  const data = norm(safeJson(text));
-  return data;
-}
-
-export async function apiPost(fn, body) {
-  const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ fn, payload: body || {} }),
-  });
-  const text = await res.text();
-  return norm(safeJson(text));
-}
-
-function norm(data) {
-  if (data && Object.prototype.hasOwnProperty.call(data, "result")) return data.result;
-  return data;
-}
 
 // 4. Data Loading Logic (NOW USING FIREBASE)
 export async function preloadLookups(force = false) {
@@ -53,19 +24,33 @@ export async function preloadLookups(force = false) {
       getDocs(collection(db, 'requesters'))
     ]);
 
-    // FIX: Map Materials to Object {name, stock}, others keep as String
+    // Map Materials to Object {name, stock, min}
     const matList = m.docs.map(d => ({ 
         name: d.data().name, 
-        stock: d.data().stock || 0 
+        stock: Number(d.data().stock || 0),
+        min: Number(d.data().min || 0)
     })).sort((a,b) => a.name.localeCompare(b.name));
 
-    const projList = p.docs.map(d => d.data().name).sort();
+    const projMeta = {};
+    const projList = p.docs
+      .map(d => d.data())
+      .filter(x => x && x.name)
+      .map(x => {
+        const subs = Array.isArray(x.subProjects)
+          ? x.subProjects.map(s => String(s).trim()).filter(Boolean)
+          : [];
+        projMeta[x.name] = subs;
+        return x.name;
+      })
+      .sort();
     const contList = c.docs.map(d => d.data().name).sort();
     const reqList  = r.docs.map(d => d.data().name).sort();
 
     // Update Reactive State
     LOOKUPS.MATERIALS.splice(0, LOOKUPS.MATERIALS.length, ...matList);
     LOOKUPS.PROJECTS.splice(0, LOOKUPS.PROJECTS.length, ...projList);
+    Object.keys(LOOKUPS.PROJECT_META).forEach(k => delete LOOKUPS.PROJECT_META[k]);
+    Object.entries(projMeta).forEach(([k, v]) => LOOKUPS.PROJECT_META[k] = v);
     LOOKUPS.CONTRACTORS.splice(0, LOOKUPS.CONTRACTORS.length, ...contList);
     LOOKUPS.REQUESTERS.splice(0, LOOKUPS.REQUESTERS.length, ...reqList);
 

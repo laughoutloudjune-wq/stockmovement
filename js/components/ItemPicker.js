@@ -2,7 +2,7 @@ import { ref, computed, nextTick } from 'vue';
 import { LOOKUPS } from '../shared.js';
 
 export default {
-  props: ['modelValue', 'source', 'placeholder'],
+  props: ['modelValue', 'source', 'placeholder', 'items'],
   emits: ['update:modelValue', 'change'],
   setup(props, { emit }) {
     const isOpen = ref(false);
@@ -13,7 +13,7 @@ export default {
     
     // IMPROVED SEARCH LOGIC (Token-based)
     const filtered = computed(() => {
-      const all = LOOKUPS[listKey.value] || [];
+      const all = Array.isArray(props.items) ? props.items : (LOOKUPS[listKey.value] || []);
       const q = search.value.toLowerCase().trim();
       
       // If no search, return top 50

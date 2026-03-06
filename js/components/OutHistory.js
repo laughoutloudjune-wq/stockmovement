@@ -1,5 +1,7 @@
 import { ref, onMounted } from 'vue';
-import { apiPost, toast } from '../shared.js';
+import { db } from '../firebase.js';
+import { toast } from '../shared.js';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 export default {
   props: ['lang'],
@@ -11,10 +13,22 @@ export default {
     const load = async () => {
       loading.value = true;
       try {
-        const res = await apiPost('out_SearchHistory', { limit: 50 }); // Fetch last 50
-        // Group by Date
+        const snap = await getDocs(query(collection(db, 'orders'), where('type', '==', 'OUT')));
+        const rows = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || ''))
+          .slice(0, 100)
+          .map(r => ({
+            doc: r.docNo || r.id,
+            ts: r.timestamp || `${r.date || ''} 00:00:00`,
+            project: [r.project, r.subProject].filter(Boolean).join(' > '),
+            contractor: r.contractor || '-',
+            requester: r.requester || '-',
+            itemCount: Array.isArray(r.items) ? r.items.length : 0
+          }));
+
         const groups = {};
-        (res.rows || []).forEach(r => {
+        rows.forEach(r => {
           const d = (r.ts||'').split(' ')[0];
           if(!groups[d]) groups[d] = [];
           groups[d].push(r);

@@ -1,20 +1,22 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, doc, runTransaction, getDoc } from 'firebase/firestore'; 
-import { STR, toast, todayStr } from '../shared.js';
+import { STR, LOOKUPS, toast, todayStr } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
   props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
-    const form = ref({ date: todayStr(), project: '', contractor: '', note: '' });
+    const form = ref({ date: todayStr(), project: '', subProject: '', contractor: '', note: '' });
     const lines = ref([{ name: '', qty: '', note: '', stock: null, stockLoading: false }]);
     const loading = ref(false);
     const S = computed(() => STR[props.lang]);
 
     const addLine = () => lines.value.push({ name: '', qty: '', note: '', stock: null, stockLoading: false });
     const removeLine = (index) => lines.value.splice(index, 1);
+    const subProjects = computed(() => LOOKUPS.PROJECT_META[form.value.project] || []);
+    const onProjectChange = () => { form.value.subProject = ''; };
 
     const onMaterialSelect = async (line) => {
       if (!line.name) return;
@@ -72,6 +74,7 @@ export default {
             docNo: docNo,
             date: form.value.date,
             project: form.value.project,
+            subProject: form.value.subProject || '',
             contractor: form.value.contractor,
             note: form.value.note,
             requester: props.user.displayName || props.user.email,
@@ -84,7 +87,7 @@ export default {
 
         toast((props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved'));
         lines.value = [{ name: '', qty: '', note: '', stock: null }];
-        form.value.note = ''; form.value.project = ''; form.value.contractor = ''; 
+        form.value.note = ''; form.value.project = ''; form.value.subProject = ''; form.value.contractor = ''; 
 
       } catch (e) {
         console.error(e);
@@ -92,7 +95,7 @@ export default {
       } finally { loading.value = false; }
     };
 
-    return { S, form, lines, loading, addLine, removeLine, onMaterialSelect, submit };
+    return { S, form, lines, loading, subProjects, onProjectChange, addLine, removeLine, onMaterialSelect, submit };
   },
   template: `
     <div class="space-y-6 pb-24">
@@ -121,7 +124,15 @@ export default {
           </div>
           <div class="min-w-0">
             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.proj }}</label>
-            <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" />
+            <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" @change="onProjectChange" />
+          </div>
+          <div class="min-w-0">
+            <label class="block text-xs font-bold text-slate-500 mb-1">Sub Project</label>
+            <ItemPicker
+              v-model="form.subProject"
+              :items="subProjects"
+              :placeholder="subProjects.length ? 'Select sub project...' : 'No sub project'"
+            />
           </div>
           <div class="min-w-0">
             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.contractor }}</label>

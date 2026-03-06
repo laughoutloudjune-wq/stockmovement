@@ -1,5 +1,7 @@
 import { ref, onMounted, computed } from 'vue';
-import { apiGet, STR } from '../shared.js';
+import { db } from '../firebase.js';
+import { STR } from '../shared.js';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 export default {
   props: ['lang'],
@@ -11,13 +13,34 @@ export default {
 
     onMounted(async () => {
       try {
-        // Parallel fetch for speed
-        const [lowRes, topRes] = await Promise.all([
-          apiGet('dash_LowStock', {}, { cacheTtlMs: 60_000 }),
-          apiGet('dash_TopItems', {}, { cacheTtlMs: 60_000 })
+        const [matSnap, outSnap] = await Promise.all([
+          getDocs(collection(db, 'materials')),
+          getDocs(query(collection(db, 'orders'), where('type', '==', 'OUT')))
         ]);
-        lowStock.value = Array.isArray(lowRes) ? lowRes : [];
-        topItems.value = Array.isArray(topRes) ? topRes : [];
+
+        const mats = matSnap.docs.map(d => d.data()).filter(x => x && x.name);
+        lowStock.value = mats
+          .filter(x => Number(x.stock || 0) <= Number(x.min || 0))
+          .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
+          .slice(0, 10)
+          .map(x => ({
+            name: x.name,
+            stock: Number(x.stock || 0),
+            min: Number(x.min || 0)
+          }));
+
+        const usage = {};
+        outSnap.docs.forEach(d => {
+          const data = d.data();
+          (data.items || []).forEach(i => {
+            const key = i.name;
+            usage[key] = (usage[key] || 0) + Number(i.qty || 0);
+          });
+        });
+        topItems.value = Object.entries(usage)
+          .map(([name, qty]) => ({ name, qty }))
+          .sort((a, b) => b.qty - a.qty)
+          .slice(0, 10);
       } catch (e) {
         console.error(e);
       } finally {

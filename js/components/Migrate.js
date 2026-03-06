@@ -1,8 +1,7 @@
 import { ref } from 'vue';
-import { apiGet, apiPost, toast } from '../shared.js';
 import { db } from '../firebase.js';
-// 🔴 ADDED 'addDoc' HERE
-import { writeBatch, doc, collection, getDocs, addDoc } from 'firebase/firestore';
+import { writeBatch, doc, collection, getDocs } from 'firebase/firestore';
+import { toast } from '../shared.js';
 
 export default {
   setup() {
@@ -11,155 +10,133 @@ export default {
 
     const log = (msg) => logs.value.push(msg);
 
-    // 1. MASTER DATA
-    const runMasterMigration = async () => {
-      loading.value = true;
-      logs.value = [];
-      try {
-        const batch = writeBatch(db);
-        let count = 0;
-        log("📦 Materials...");
-        const materials = await apiGet('listMaterials');
-        if (Array.isArray(materials)) materials.forEach(n => { if(n) batch.set(doc(db,'materials',n.replace(/\//g,'_')), {name:n,min:5},{merge:true}); });
-        log("🏗️ Projects...");
-        const projects = await apiGet('listProjects');
-        if (Array.isArray(projects)) projects.forEach(n => { if(n) batch.set(doc(db,'projects',n), {name:n},{merge:true}); });
-        log("👷 Contractors...");
-        const contractors = await apiGet('listContractors');
-        if (Array.isArray(contractors)) contractors.forEach(n => { if(n) batch.set(doc(db,'contractors',n), {name:n},{merge:true}); });
-        log("👤 Requesters...");
-        const requesters = await apiGet('listRequesters');
-        if (Array.isArray(requesters)) requesters.forEach(n => { if(n) batch.set(doc(db,'requesters',n), {name:n},{merge:true}); });
-        await batch.commit();
-        log("✅ Master Data Done!");
-      } catch (e) { log("❌ Error: " + e.message); } finally { loading.value = false; }
-    };
-
-    // 2. MOVEMENT HISTORY
-    const runHistoryMigration = async () => {
-      loading.value = true;
-      logs.value = [];
-      try {
-        log("🚀 Google Sheets History...");
-        const res = await apiPost('getMovementReport', { start:'2020-01-01', end:'2030-12-31' });
-        const rows = res.data || [];
-        const groups = {};
-        rows.forEach(row => {
-          const key = row.docNo || `${row.date}_${row.type}_${row.project}_${row.by}`;
-          if (!groups[key]) groups[key] = {
-              docNo: row.docNo || 'MIG-'+Math.random().toString(36).substr(2,9),
-              date: row.date,
-              type: row.type || 'UNKNOWN',
-              project: row.project || '',
-              requester: row.by || '',
-              contractor: row.contractor || '',
-              items: [],
-              timestamp: new Date().toISOString()
-          };
-          groups[key].items.push({ name: row.item, qty: Number(row.qty), note: row.note||'' });
-        });
-        const orders = Object.values(groups);
-        log(`📦 Saving ${orders.length} Orders...`);
-        const chunkSize = 400;
-        for (let i = 0; i < orders.length; i += chunkSize) {
-          const batch = writeBatch(db);
-          orders.slice(i, i+chunkSize).forEach(o => batch.set(doc(collection(db,'orders')), o));
-          await batch.commit();
-        }
-        log("✅ History Done!");
-      } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
-    };
-
-    // 3. RECALCULATE STOCK
     const recalculateStock = async () => {
       loading.value = true;
       logs.value = [];
       try {
-        log("🔄 Recalculating...");
+        log('Recalculating material stock from order history...');
         const snap = await getDocs(collection(db, 'orders'));
         const tallies = {};
+
         snap.docs.forEach(d => {
-            const data = d.data();
-            if (data.items) data.items.forEach(i => {
-                if(!tallies[i.name]) tallies[i.name] = 0;
-                if(data.type === 'IN' || data.type === 'ADJUST') tallies[i.name] += Number(i.qty);
-                else if(data.type === 'OUT') tallies[i.name] -= Number(i.qty);
-            });
+          const data = d.data();
+          (data.items || []).forEach(i => {
+            const key = i.name;
+            if (!key) return;
+            if (!tallies[key]) tallies[key] = 0;
+            if (data.type === 'IN' || data.type === 'ADJUST') tallies[key] += Number(i.qty || 0);
+            else if (data.type === 'OUT') tallies[key] -= Number(i.qty || 0);
+          });
         });
+
         const keys = Object.keys(tallies);
-        log(`💾 Updating ${keys.length} items...`);
+        log(`Updating ${keys.length} material rows...`);
+
         const chunkSize = 400;
         for (let i = 0; i < keys.length; i += chunkSize) {
-            const batch = writeBatch(db);
-            keys.slice(i, i+chunkSize).forEach(k => {
-                batch.set(doc(db,'materials',k.replace(/\//g,'_')), {name:k, stock:tallies[k]}, {merge:true});
-            });
-            await batch.commit();
+          const batch = writeBatch(db);
+          keys.slice(i, i + chunkSize).forEach(k => {
+            batch.set(doc(db, 'materials', k.replace(/\//g, '_')), { name: k, stock: tallies[k] }, { merge: true });
+          });
+          await batch.commit();
         }
-        log("✅ Stock Updated!");
-      } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
+
+        log('Stock updated.');
+        toast('Done');
+      } catch (e) {
+        console.error(e);
+        log('Error: ' + e.message);
+      } finally {
+        loading.value = false;
+      }
     };
 
-    // 4. IMPORT PURCHASE HISTORY
-    const runPurchaseMigration = async () => {
+    const backfillOrderDates = async () => {
       loading.value = true;
       logs.value = [];
       try {
-        log("🛒 Fetching Purchase List...");
-        const list = await apiGet('pur_History'); 
-        
-        if (!Array.isArray(list)) throw new Error("No purchase history found");
-        log(`📥 Found ${list.length} Requests. fetching details...`);
+        log('Backfilling missing order date fields from timestamp...');
+        const snap = await getDocs(collection(db, 'orders'));
+        const updates = [];
 
-        for (let i = 0; i < list.length; i++) {
-           const h = list[i];
-           log(`> Fetching details for ${h.docNo} (${i+1}/${list.length})...`);
-           
-           let items = [];
-           try {
-             const lines = await apiGet('pur_DocLines', { payload: { docNo: h.docNo } });
-             if (Array.isArray(lines)) {
-                 items = lines.map(l => ({ name: l.item, qty: Number(l.qty) }));
-             }
-           } catch(err) {
-             log(`⚠️ Could not fetch items for ${h.docNo}, saving header only.`);
-           }
+        snap.docs.forEach(d => {
+          const data = d.data();
+          if (!data.date) {
+            const date = data.timestamp ? String(data.timestamp).slice(0, 10) : new Date().toISOString().split('T')[0];
+            updates.push({ id: d.id, date });
+          }
+        });
 
-           // Use addDoc (now properly imported)
-           await addDoc(collection(db, 'orders'), {
-                 type: 'PURCHASE',
-                 docNo: h.docNo,
-                 date: h.date || (h.ts ? h.ts.split(' ')[0] : new Date().toISOString().split('T')[0]),
-                 timestamp: h.ts || new Date().toISOString(),
-                 project: h.project || '',
-                 contractor: '', 
-                 requester: '',
-                 status: h.status || 'Requested',
-                 needBy: h.needBy || '',
-                 items: items
-           });
+        const chunkSize = 400;
+        for (let i = 0; i < updates.length; i += chunkSize) {
+          const batch = writeBatch(db);
+          updates.slice(i, i + chunkSize).forEach(u => {
+            batch.update(doc(db, 'orders', u.id), { date: u.date });
+          });
+          await batch.commit();
         }
-        
-        log("✅ Purchase History Imported with Details!");
-        toast("Done");
-        
-      } catch (e) { log("❌ " + e.message); } finally { loading.value = false; }
+
+        log(`Backfilled ${updates.length} orders.`);
+        toast('Done');
+      } catch (e) {
+        console.error(e);
+        log('Error: ' + e.message);
+      } finally {
+        loading.value = false;
+      }
     };
 
-    return { logs, loading, runMasterMigration, runHistoryMigration, recalculateStock, runPurchaseMigration };
+    const normalizePurchaseItems = async () => {
+      loading.value = true;
+      logs.value = [];
+      try {
+        log('Normalizing purchase item fields (status/supplier/note)...');
+        const snap = await getDocs(collection(db, 'orders'));
+        const purchases = snap.docs.filter(d => d.data().type === 'PURCHASE');
+
+        let updated = 0;
+        const chunkSize = 300;
+        for (let i = 0; i < purchases.length; i += chunkSize) {
+          const batch = writeBatch(db);
+          purchases.slice(i, i + chunkSize).forEach(d => {
+            const data = d.data();
+            const items = (data.items || []).map(item => ({
+              name: item.name || '',
+              qty: Number(item.qty || 0),
+              supplier: item.supplier || '',
+              status: item.status || 'Requested',
+              note: item.note || ''
+            }));
+            batch.update(doc(db, 'orders', d.id), { items });
+            updated += 1;
+          });
+          await batch.commit();
+        }
+
+        log(`Normalized ${updated} purchase orders.`);
+        toast('Done');
+      } catch (e) {
+        console.error(e);
+        log('Error: ' + e.message);
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    return { logs, loading, recalculateStock, backfillOrderDates, normalizePurchaseItems };
   },
   template: `
     <div class="space-y-6 pb-20">
       <section class="glass rounded-2xl p-6 shadow-sm text-center space-y-4">
-        <h3 class="font-bold text-2xl text-slate-800">🔥 Database Migration</h3>
-        
+        <h3 class="font-bold text-2xl text-slate-800">Database Tools</h3>
+
         <div class="grid grid-cols-1 gap-3 max-w-sm mx-auto">
-            <button @click="runMasterMigration" :disabled="loading" class="btn">1. Import Master Data</button>
-            <button @click="runHistoryMigration" :disabled="loading" class="btn">2. Import Movement History</button>
-            <button @click="recalculateStock" :disabled="loading" class="btn">3. Recalculate Stock</button>
-            <button @click="runPurchaseMigration" :disabled="loading" class="btn bg-purple-100 text-purple-700 hover:bg-purple-200">4. Import Purchase History</button>
+          <button @click="recalculateStock" :disabled="loading" class="btn">1. Recalculate Stock</button>
+          <button @click="backfillOrderDates" :disabled="loading" class="btn">2. Backfill Missing Dates</button>
+          <button @click="normalizePurchaseItems" :disabled="loading" class="btn">3. Normalize Purchase Items</button>
         </div>
       </section>
+
       <div class="bg-slate-900 rounded-2xl p-4 font-mono text-sm text-green-400 h-64 overflow-y-auto shadow-inner border border-slate-700">
         <div v-if="logs.length === 0" class="text-slate-600 italic">Ready...</div>
         <div v-for="(l, i) in logs" :key="i" class="mb-1 text-xs whitespace-nowrap">{{ l }}</div>

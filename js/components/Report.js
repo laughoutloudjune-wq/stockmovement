@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { toast, todayStr } from '../shared.js';
@@ -40,6 +40,7 @@ export default {
             docNo: r.docNo || '-',
             type: r.type || '-',
             project: projectLabel(r),
+            contractor: r.contractor || '-',
             requester: r.requester || '-',
             qty: i.qty ?? '-',
             itemNote: itemNote(i),
@@ -200,8 +201,6 @@ export default {
       expanded.value = expanded.value === r.id ? null : r.id;
     };
 
-    onMounted(generate);
-
     return {
       filters, results, loading, generate, remove, exportExcel,
       openEdit, isEditOpen, editForm, saveEdit, addLine, removeLine,
@@ -229,7 +228,7 @@ export default {
           </div>
 
           <div class="col-span-2">
-            <input v-model="filters.search" placeholder="Search doc, project, requester, note..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="filters.search" placeholder="Search doc, project, contractor, requester, note..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div class="col-span-2 flex gap-2">
@@ -269,18 +268,19 @@ export default {
             <div class="text-xs text-slate-500">{{ filters.material }}</div>
           </div>
           <div class="overflow-x-auto">
-            <div class="min-w-[860px]">
-              <div class="grid grid-cols-[100px_110px_80px_minmax(180px,1fr)_120px_80px_170px_170px] gap-3 px-4 py-2 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 border-b border-slate-200 bg-slate-50">
+            <div class="min-w-[980px]">
+              <div class="grid grid-cols-[100px_110px_80px_minmax(160px,1fr)_minmax(120px,1fr)_120px_80px_150px_150px] gap-3 px-4 py-2 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 border-b border-slate-200 bg-slate-50">
                 <span>Date</span>
                 <span>Doc No</span>
                 <span>Type</span>
                 <span>Project</span>
+                <span>Contractor</span>
                 <span>Requester</span>
                 <span class="text-right">Qty</span>
                 <span>Item Note</span>
                 <span>Order Note</span>
               </div>
-              <div v-for="row in ledgerRows" :key="row.id" class="grid grid-cols-[100px_110px_80px_minmax(180px,1fr)_120px_80px_170px_170px] gap-3 px-4 py-2.5 text-xs border-b border-slate-100 last:border-b-0 odd:bg-white even:bg-slate-50/50 items-center">
+              <div v-for="row in ledgerRows" :key="row.id" class="grid grid-cols-[100px_110px_80px_minmax(160px,1fr)_minmax(120px,1fr)_120px_80px_150px_150px] gap-3 px-4 py-2.5 text-xs border-b border-slate-100 last:border-b-0 odd:bg-white even:bg-slate-50/50 items-center">
                 <span class="text-slate-600">{{ row.date || '-' }}</span>
                 <span class="font-semibold text-slate-700">{{ row.docNo }}</span>
                 <span>
@@ -294,6 +294,7 @@ export default {
                   >{{ row.type }}</span>
                 </span>
                 <span class="text-slate-700">{{ row.project }}</span>
+                <span class="truncate text-slate-600" :title="row.contractor">{{ row.contractor }}</span>
                 <span class="truncate text-slate-600">{{ row.requester }}</span>
                 <span class="text-right font-mono font-bold text-slate-800">{{ row.qty }}</span>
                 <span class="truncate text-slate-600">{{ row.itemNote }}</span>
@@ -336,12 +337,28 @@ export default {
               <div class="text-[11px] text-slate-500 truncate">{{ r.requesterEmail || '-' }}</div>
             </div>
             <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Contractor</div>
+              <div class="text-sm font-semibold text-slate-700 truncate" :title="r.contractor || ''">{{ r.contractor || '—' }}</div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
               <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Order Note</div>
               <div class="text-sm text-slate-700 truncate">{{ orderNote(r) }}</div>
             </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Status</div>
-              <div class="text-sm text-slate-700">{{ r.status || '-' }}</div>
+            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 md:col-span-2">
+              <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
+                <div>
+                  <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Status</div>
+                  <div class="text-sm text-slate-700">{{ r.status || '—' }}</div>
+                </div>
+                <div v-if="r.type === 'PURCHASE' && (r.needBy || r.priority)">
+                  <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Need by / Priority</div>
+                  <div class="text-sm text-slate-700">
+                    <span v-if="r.needBy">{{ r.needBy }}</span>
+                    <span v-if="r.needBy && r.priority" class="text-slate-400 mx-1">·</span>
+                    <span v-if="r.priority">{{ r.priority }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -368,6 +385,9 @@ export default {
           </div>
 
           <div v-if="expanded === r.id" class="mt-3 pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
+            <div v-if="r.contractor"><b>Contractor:</b> {{ r.contractor }}</div>
+            <div v-if="r.type === 'PURCHASE' && r.needBy"><b>Need by:</b> {{ r.needBy }}</div>
+            <div v-if="r.type === 'PURCHASE' && r.priority"><b>Priority:</b> {{ r.priority }}</div>
             <div><b>Order note:</b> {{ orderNote(r) }}</div>
             <div><b>Timestamp:</b> {{ r.timestamp || '-' }}</div>
             <div v-for="(item, idx) in r.items" :key="'note-' + idx" class="bg-slate-50 rounded-lg p-2">

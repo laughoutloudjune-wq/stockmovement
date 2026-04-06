@@ -13,6 +13,12 @@ export default {
 
     onMounted(async () => {
       try {
+        const cutoff = (() => {
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          return d.toISOString().split('T')[0];
+        })();
+
         const [matSnap, outSnap] = await Promise.all([
           getDocs(collection(db, 'materials')),
           getDocs(query(collection(db, 'orders'), where('type', '==', 'OUT')))
@@ -30,13 +36,15 @@ export default {
           }));
 
         const usage = {};
-        outSnap.docs.forEach(d => {
-          const data = d.data();
-          (data.items || []).forEach(i => {
-            const key = i.name;
-            usage[key] = (usage[key] || 0) + Number(i.qty || 0);
+        outSnap.docs
+          .filter(d => (d.data().date || '') >= cutoff)
+          .forEach(d => {
+            const data = d.data();
+            (data.items || []).forEach(i => {
+              const key = i.name;
+              usage[key] = (usage[key] || 0) + Number(i.qty || 0);
+            });
           });
-        });
         topItems.value = Object.entries(usage)
           .map(([name, qty]) => ({ name, qty }))
           .sort((a, b) => b.qty - a.qty)
@@ -82,6 +90,7 @@ export default {
       <section class="glass rounded-2xl p-5 shadow-sm">
         <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
           <span class="text-yellow-500">🏆</span> {{ S.dashTopItems }}
+          <span class="text-xs font-normal text-slate-400 ml-1">(30 days)</span>
         </h3>
 
         <div v-if="loading" class="space-y-3 animate-pulse">

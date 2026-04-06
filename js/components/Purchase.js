@@ -2,6 +2,12 @@ import { ref, computed, onMounted } from 'vue';
 import { db } from '../firebase.js';
 import { collection, addDoc, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { STR, LOOKUPS, toast, todayStr } from '../shared.js';
+
+const daysFromNow = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+};
 import ItemPicker from './ItemPicker.js';
 
 const ITEM_STATUS = ['Requested', 'Quoted', 'Ordered', 'Received', 'Cancelled'];
@@ -14,7 +20,7 @@ export default {
       project: '',
       subProject: '',
       contractor: '',
-      needBy: todayStr(),
+      needBy: daysFromNow(7),
       priority: 'Normal',
       note: ''
     });
@@ -24,6 +30,7 @@ export default {
     const history = ref([]);
     const historyLoading = ref(true);
     const expandedDoc = ref(null);
+    const historyStatusFilter = ref('ALL');
 
     const isEditOpen = ref(false);
     const editForm = ref({});
@@ -189,10 +196,16 @@ export default {
       return 'bg-slate-100 text-slate-600';
     };
 
+    const filteredHistory = computed(() => {
+      if (historyStatusFilter.value === 'ALL') return history.value;
+      return history.value.filter(h => (h.status || '').toLowerCase() === historyStatusFilter.value.toLowerCase());
+    });
+
     onMounted(loadHistory);
 
     return {
-      S, form, lines, loading, history, historyLoading, expandedDoc,
+      S, form, lines, loading, history, filteredHistory, historyLoading, expandedDoc,
+      historyStatusFilter,
       subProjects, onProjectChange, addLine, removeLine, submit, toggleExpand,
       updateStatus, updateItemStatus, statusColor, removeOrder, openEdit,
       isEditOpen, editForm, saveEdit, addEditLine, removeEditLine, ITEM_STATUS, LOOKUPS
@@ -270,12 +283,22 @@ export default {
       <div class="flex justify-center"><button @click="addLine" class="px-6 py-3 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95">+ {{ S.btnAdd }}</button></div>
 
       <section class="mt-8 border-t border-slate-200/50 pt-6">
-        <h3 class="font-bold text-lg text-slate-800 mb-4 px-2">{{ S.purOlder || 'History' }}</h3>
+        <div class="flex items-center justify-between mb-4 px-2 gap-3 flex-wrap">
+          <h3 class="font-bold text-lg text-slate-800">{{ S.purOlder || 'History' }}</h3>
+          <select v-model="historyStatusFilter" class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 outline-none shadow-sm">
+            <option value="ALL">All Status</option>
+            <option value="Requested">Requested</option>
+            <option value="Approved">Approved</option>
+            <option value="Ordered">Ordered</option>
+            <option value="Received">Received</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
         <div v-if="historyLoading" class="space-y-3 animate-pulse"><div v-for="i in 3" class="h-20 bg-slate-200 rounded-xl"></div></div>
-        <div v-else-if="history.length === 0" class="text-center text-slate-400 py-6">No requests found</div>
+        <div v-else-if="filteredHistory.length === 0" class="text-center text-slate-400 py-6">No requests found</div>
 
         <div v-else class="space-y-4">
-          <div v-for="h in history" :key="h.id" class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden group">
+          <div v-for="h in filteredHistory" :key="h.id" class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden group">
             <div class="p-4 flex justify-between items-start gap-2 hover:bg-slate-50 transition-colors">
               <div class="min-w-0 flex-1 cursor-pointer" @click="toggleExpand(h)">
                 <div class="font-bold text-slate-800 text-sm truncate">{{ h.docNo }} | {{ [h.project, h.subProject].filter(Boolean).join(' > ') || '-' }}</div>
@@ -331,7 +354,7 @@ export default {
 
       <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
         <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-          <span v-if="loading" class="animate-spin text-2xl">C</span><span v-else>Save {{ S.btnSubmit }}</span>
+          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div><span v-else>{{ S.btnSubmit }}</span>
         </button>
       </div>
 

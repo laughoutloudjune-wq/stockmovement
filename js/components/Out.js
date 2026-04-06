@@ -17,6 +17,7 @@ export default {
     const removeLine = (index) => lines.value.splice(index, 1);
     const subProjects = computed(() => LOOKUPS.PROJECT_META[form.value.project] || []);
     const onProjectChange = () => { form.value.subProject = ''; };
+    const goToReport = () => window.dispatchEvent(new CustomEvent('switch-tab', { detail: 'report' }));
 
     const onMaterialSelect = async (line) => {
       if (!line.name) return;
@@ -60,6 +61,9 @@ export default {
              
              const currentStock = Number(matDoc.data().stock || 0);
              const newStock = currentStock - line.qty;
+             if (newStock < 0) throw new Error(
+               `Insufficient stock for "${line.name}": available ${currentStock}, requested ${line.qty}`
+             );
              updates.push({ ref: matRef, newStock });
           }
 
@@ -95,14 +99,14 @@ export default {
       } finally { loading.value = false; }
     };
 
-    return { S, form, lines, loading, subProjects, onProjectChange, addLine, removeLine, onMaterialSelect, submit };
+    return { S, form, lines, loading, subProjects, onProjectChange, addLine, removeLine, onMaterialSelect, submit, goToReport };
   },
   template: `
     <div class="space-y-6 pb-24">
       <section class="glass rounded-2xl p-5 shadow-sm space-y-4">
         <div class="flex justify-between items-center">
           <h3 class="font-bold text-lg text-slate-800">{{ S.outTitle }}</h3>
-          <button @click="$emit('switch-tab', 'report')" class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
+          <button @click="goToReport" class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
             📜 History
           </button>
         </div>
@@ -151,7 +155,7 @@ export default {
           <div class="space-y-3 pt-2">
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-8 min-w-0">
-                <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang==='th'?'ระบุวัสดุ...':'Select material...'" @change="onMaterialSelect(line)" />
+                <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang==='th'?'ระบุวัสดุ...':'Select material...'" :allow-add="true" @change="onMaterialSelect(line)" />
               </div>
               <div class="col-span-4 min-w-0">
                 <input type="number" v-model="line.qty" placeholder="0" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
@@ -172,7 +176,7 @@ export default {
       <div class="flex justify-center"><button @click="addLine" class="flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95"><span class="text-xl leading-none text-blue-500">+</span> {{ S.btnAdd }}</button></div>
       <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
         <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-          <span v-if="loading" class="animate-spin text-2xl">C</span><span v-else>💾 {{ S.btnSubmit }}</span>
+          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div><span v-else>💾 {{ S.btnSubmit }}</span>
         </button>
       </div>
     </div>

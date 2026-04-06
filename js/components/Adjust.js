@@ -96,16 +96,19 @@ export default {
   },
   template: `
     <div class="space-y-6 pb-24">
-      <section class="glass rounded-2xl p-5 shadow-sm"><h3 class="font-bold text-lg text-slate-800">{{ S.tabs.adj }}</h3></section>
+      <section class="glass rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold text-lg text-slate-800">{{ S.tabs.adj }}</h3>
+        <p class="text-xs text-slate-400 mt-1">{{ lang === 'th' ? 'ใส่จำนวนบวกเพื่อเพิ่ม หรือลบเพื่อลด' : 'Enter positive to add, negative to remove' }}</p>
+      </section>
       <div class="space-y-3">
         <div v-for="(line, idx) in lines" :key="idx" class="glass rounded-2xl p-4 shadow-sm relative animate-fade-in-up">
           <button @click="removeLine(idx)" class="absolute top-2 right-2 text-slate-400 hover:text-red-500 text-xl font-bold">×</button>
           <div class="grid grid-cols-12 gap-3 mt-2">
             <div class="col-span-8">
-              <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="S.pick" @change="onMaterialSelect(line)" />
+              <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="S.pick" :allow-add="true" @change="onMaterialSelect(line)" />
             </div>
             <div class="col-span-4">
-              <input type="number" v-model="line.qty" placeholder="±Qty" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
+              <input type="number" v-model="line.qty" :placeholder="lang==='th'?'±จำนวน':'±Delta'" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
             </div>
           </div>
           <div class="mt-3 flex items-center gap-2 text-xs">
@@ -121,7 +124,7 @@ export default {
       </div>
       <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
         <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-          <span v-if="loading" class="animate-spin text-2xl">C</span><span v-else>💾 {{ S.btnSubmit }}</span>
+          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div><span v-else>💾 {{ S.btnSubmit }}</span>
         </button>
       </div>
     </div>

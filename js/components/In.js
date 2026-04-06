@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
-import { collection, doc, runTransaction } from 'firebase/firestore';
+import { collection, doc, runTransaction, getDoc } from 'firebase/firestore';
 import { STR, toast, todayStr } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
@@ -9,17 +9,38 @@ export default {
   components: { ItemPicker },
   setup(props) {
     const date = ref(todayStr());
-    const lines = ref([{ name: '', qty: '' }]);
+    const lines = ref([{ name: '', qty: '', stock: null, stockLoading: false }]);
     const loading = ref(false);
     
     const S = computed(() => STR[props.lang]);
 
     const addLine = () => {
-      lines.value.push({ name: '', qty: '' });
+      lines.value.push({ name: '', qty: '', stock: null, stockLoading: false });
     };
 
     const removeLine = (index) => {
       lines.value.splice(index, 1);
+    };
+
+    const onMaterialSelect = async (line) => {
+      if (!line.name) return;
+      line.stockLoading = true;
+      try {
+        const safeId = line.name.replace(/\//g, '_');
+        const snap = await getDoc(doc(db, 'materials', safeId));
+        if (snap.exists()) {
+          const data = snap.data();
+          const s = Number(data.stock || 0);
+          const m = Number(data.min || 0);
+          let color = 'bg-green-100 text-green-700';
+          if (s <= 0 || s <= m) color = 'bg-red-100 text-red-700';
+          else if (s <= 2 * m) color = 'bg-yellow-100 text-yellow-700';
+          line.stock = { val: s, color };
+        } else {
+          line.stock = { val: props.lang === 'th' ? 'ใหม่' : 'New', color: 'bg-blue-100 text-blue-600' };
+        }
+      } catch (e) { console.error(e); }
+      finally { line.stockLoading = false; }
     };
 
     const submit = async () => {
@@ -89,7 +110,7 @@ export default {
       }
     };
 
-    return { S, date, lines, loading, addLine, removeLine, submit };
+    return { S, date, lines, loading, addLine, removeLine, submit, onMaterialSelect };
   },
   template: `
     <div class="space-y-6 pb-20">
@@ -106,11 +127,17 @@ export default {
           <button @click="removeLine(idx)" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">×</button>
           <div class="grid grid-cols-12 gap-3 mt-2">
             <div class="col-span-8">
-              <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang === 'th' ? 'ค้นหาวัสดุ...' : 'Search material...'" />
+              <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang === 'th' ? 'ค้นหาวัสดุ...' : 'Search material...'" :allow-add="true" @change="onMaterialSelect(line)" />
             </div>
             <div class="col-span-4">
               <input type="number" v-model="line.qty" placeholder="0" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" />
             </div>
+          </div>
+          <div class="mt-2 flex items-center gap-2 text-xs">
+            <span class="text-slate-400 font-bold uppercase">{{ lang === 'th' ? 'คงเหลือ' : 'Stock' }}</span>
+            <div v-if="line.stockLoading" class="animate-spin w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full"></div>
+            <span v-else-if="line.stock" :class="line.stock.color" class="px-2 py-0.5 rounded-md font-extrabold">{{ line.stock.val }}</span>
+            <span v-else class="text-slate-300">—</span>
           </div>
         </div>
       </div>
@@ -123,7 +150,7 @@ export default {
 
       <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
         <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-          <span v-if="loading" class="animate-spin text-2xl">C</span>
+          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
           <span v-else>💾 {{ S.btnSubmit }}</span>
         </button>
       </div>

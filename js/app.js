@@ -1,7 +1,13 @@
 import { createApp, ref, computed, onMounted } from 'vue';
 import { STR, currentLang, preloadLookups } from './shared.js';
 import { auth, googleProvider } from './firebase.js';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import {
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
 
 // Components
 import Dashboard from './components/Dashboard.js';
@@ -28,7 +34,30 @@ const App = {
         await signInWithPopup(auth, googleProvider);
       } catch (e) {
         console.error(e);
-        alert("Login failed: " + e.message);
+        if (e.code === 'auth/popup-closed-by-user') return;
+        if (
+          e.code === 'auth/popup-blocked' ||
+          e.code === 'auth/operation-not-supported-in-this-environment'
+        ) {
+          try {
+            await signInWithRedirect(auth, googleProvider);
+          } catch (e2) {
+            console.error(e2);
+            alert('Sign-in failed: ' + e2.message);
+          }
+          return;
+        }
+        if (e.code === 'auth/unauthorized-domain') {
+          alert(
+            'This origin is not allowed for Google sign-in.\n\n' +
+              'In Firebase Console → Authentication → Settings → Authorized domains, add:\n' +
+              '• localhost\n' +
+              '• 127.0.0.1\n\n' +
+              'Use the same URL you opened in the browser (localhost vs 127.0.0.1 must match).'
+          );
+          return;
+        }
+        alert('Login failed: ' + e.message);
       }
     };
 
@@ -37,18 +66,23 @@ const App = {
       window.location.reload();
     };
 
-    onMounted(() => {
-      // Listen for login state changes
+    onMounted(async () => {
+      try {
+        await getRedirectResult(auth);
+      } catch (e) {
+        console.error(e);
+      }
+
       onAuthStateChanged(auth, (u) => {
         user.value = u;
         loadingAuth.value = false;
         if (u) {
-          preloadLookups(); // Load data only after login
+          preloadLookups();
         }
       });
 
       window.addEventListener('switch-tab', (e) => {
-        if(e.detail) currentTab.value = e.detail;
+        if (e.detail) currentTab.value = e.detail;
       });
     });
 

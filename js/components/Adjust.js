@@ -1,121 +1,150 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, doc, runTransaction, getDoc } from 'firebase/firestore';
-import { STR, toast } from '../shared.js';
+import { STR, toast, materialStockStyle, preloadLookups } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
   props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
-    const lines = ref([{ name: '', qty: '', stock: null, stockLoading: false }]);
+    const lines = ref([
+      { name: '', physical: '', sysStock: null, stockLoading: false }
+    ]);
     const loading = ref(false);
     const S = computed(() => STR[props.lang]);
 
-    const addLine = () => lines.value.push({ name: '', qty: '', stock: null });
+    const addLine = () =>
+      lines.value.push({ name: '', physical: '', sysStock: null, stockLoading: false });
     const removeLine = (i) => lines.value.splice(i, 1);
+
+    const lineDeltaPreview = (line) => {
+      if (line.sysStock == null || line.physical === '' || line.physical === null) return null;
+      const counted = Number(line.physical);
+      if (Number.isNaN(counted)) return null;
+      const prev = Number(line.sysStock.val);
+      return counted - prev;
+    };
 
     const onMaterialSelect = async (line) => {
       if (!line.name) return;
       line.stockLoading = true;
+      line.physical = '';
+      line.sysStock = null;
       try {
         const safeId = line.name.replace(/\//g, '_');
         const snap = await getDoc(doc(db, 'materials', safeId));
-        
         if (snap.exists()) {
           const data = snap.data();
           const s = Number(data.stock || 0);
           const m = Number(data.min || 0);
-          let color = 'bg-green-100 text-green-700';
-          if (s <= 0 || s <= m) color = 'bg-red-100 text-red-700';
-          else if (s <= 2 * m) color = 'bg-yellow-100 text-yellow-700';
-          line.stock = { val: s, color };
+          line.sysStock = materialStockStyle(s, m);
         } else {
-          line.stock = { val: 0, color: 'bg-gray-100 text-slate-400' };
+          line.sysStock = null;
+          toast(props.lang === 'th' ? 'ไม่พบรหัสนี้ในระบบ' : 'Material not found — add it from Stock In or Settings first');
         }
-      } catch (e) { console.error(e); } 
-      finally { line.stockLoading = false; }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        line.stockLoading = false;
+      }
     };
 
     const submit = async () => {
-      const validLines = lines.value.filter(l => l.name && l.qty != null && l.qty !== '').map(l => ({ name: l.name, qty: Number(l.qty) }));
-      if (validLines.length === 0) return toast(props.lang==='th'?'กรุณาเพิ่มรายการ':'Add at least one line');
+      const validLines = lines.value.filter(
+        (l) => l.name && l.physical !== '' && l.physical !== null && !Number.isNaN(Number(l.physical))
+      );
+      if (validLines.length === 0) {
+        return toast(
+          props.lang === 'th' ? 'กรุณาเลือกวัสดุและใส่จำนวนนับจริง' : 'Pick a material and enter the physical count'
+        );
+      }
 
       loading.value = true;
       try {
         await runTransaction(db, async (transaction) => {
-            // --- STEP 1: READ PHASE ---
-            const updates = [];
-            for (const line of validLines) {
-                const safeId = line.name.replace(/\//g, '_');
-                const matRef = doc(db, 'materials', safeId);
-                const matDoc = await transaction.get(matRef);
-                
-                let newStock = line.qty; 
-                let exists = false;
-
-                if (matDoc.exists()) {
-                    newStock = Number(matDoc.data().stock || 0) + line.qty;
-                    exists = true;
-                }
-                updates.push({ ref: matRef, stock: newStock, exists, name: line.name });
+          const orderItems = [];
+          for (const line of validLines) {
+            const safeId = line.name.replace(/\//g, '_');
+            const matRef = doc(db, 'materials', safeId);
+            const matDoc = await transaction.get(matRef);
+            if (!matDoc.exists()) {
+              throw new Error(
+                props.lang === 'th' ? `ไม่มีวัสดุ: ${line.name}` : `Unknown material: ${line.name}`
+              );
             }
 
-            // --- STEP 2: WRITE PHASE ---
-            for (const u of updates) {
-                if (u.exists) {
-                    transaction.update(u.ref, { stock: u.stock });
-                } else {
-                    transaction.set(u.ref, { name: u.name, stock: u.stock, min: 5 });
-                }
+            const prev = Number(matDoc.data().stock || 0);
+            const counted = Math.round(Number(line.physical));
+            if (counted < 0) {
+              throw new Error(props.lang === 'th' ? 'จำนวนนับต้องไม่ติดลบ' : 'Physical count cannot be negative');
             }
 
-            // Log History
-            const docNo = 'ADJ-' + Date.now().toString().slice(-6);
-            const newOrderRef = doc(collection(db, 'orders'));
-            transaction.set(newOrderRef, {
-                type: 'ADJUST',
-                docNo: docNo,
-                date: new Date().toISOString().split('T')[0],
-                requester: props.user?.displayName || 'Admin',
-                items: validLines,
-                timestamp: new Date().toISOString()
+            const delta = counted - prev;
+            transaction.update(matRef, { stock: counted });
+            orderItems.push({
+              name: line.name,
+              qty: delta,
+              prevStock: prev,
+              newStock: counted
             });
+          }
+
+          const docNo = 'ADJ-' + Date.now().toString().slice(-6);
+          const newOrderRef = doc(collection(db, 'orders'));
+          transaction.set(newOrderRef, {
+            type: 'ADJUST',
+            docNo,
+            date: new Date().toISOString().split('T')[0],
+            requester: props.user?.displayName || props.user?.email || 'Admin',
+            items: orderItems,
+            timestamp: new Date().toISOString()
+          });
         });
 
-        toast(props.lang==='th'?'บันทึกแล้ว':'Saved');
-        lines.value = [{ name: '', qty: '', stock: null }];
-      } catch (e) { 
+        toast(props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved');
+        lines.value = [{ name: '', physical: '', sysStock: null, stockLoading: false }];
+        await preloadLookups(true);
+      } catch (e) {
         console.error(e);
-        toast('Failed to submit: ' + e.message); 
-      } 
-      finally { loading.value = false; }
+        toast('Failed to submit: ' + e.message);
+      } finally {
+        loading.value = false;
+      }
     };
 
-    return { S, lines, loading, addLine, removeLine, onMaterialSelect, submit };
+    return { S, lines, loading, addLine, removeLine, onMaterialSelect, submit, lineDeltaPreview };
   },
   template: `
     <div class="space-y-6 pb-24">
       <section class="glass rounded-2xl p-5 shadow-sm">
         <h3 class="font-bold text-lg text-slate-800">{{ S.tabs.adj }}</h3>
-        <p class="text-xs text-slate-400 mt-1">{{ lang === 'th' ? 'ใส่จำนวนบวกเพื่อเพิ่ม หรือลบเพื่อลด' : 'Enter positive to add, negative to remove' }}</p>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">{{ S.adjHint }}</p>
       </section>
       <div class="space-y-3">
         <div v-for="(line, idx) in lines" :key="idx" class="glass rounded-2xl p-4 shadow-sm relative animate-fade-in-up">
           <button @click="removeLine(idx)" class="absolute top-2 right-2 text-slate-400 hover:text-red-500 text-xl font-bold">×</button>
           <div class="grid grid-cols-12 gap-3 mt-2">
-            <div class="col-span-8">
+            <div class="col-span-12 sm:col-span-7">
               <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="S.pick" :allow-add="true" @change="onMaterialSelect(line)" />
             </div>
-            <div class="col-span-4">
-              <input type="number" v-model="line.qty" :placeholder="lang==='th'?'±จำนวน':'±Delta'" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
+            <div class="col-span-12 sm:col-span-5">
+              <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">{{ S.adjPhysical }}</label>
+              <input type="number" min="0" step="1" v-model="line.physical" :placeholder="lang==='th' ? 'จำนวนที่นับได้' : 'Counted qty'" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
             </div>
           </div>
-          <div class="mt-3 flex items-center gap-2 text-xs">
-            <span class="text-slate-500 font-bold">Current:</span>
-            <div v-if="line.stockLoading" class="animate-spin w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full"></div>
-            <span v-else-if="line.stock" :class="line.stock.color" class="px-2 py-0.5 rounded-md font-extrabold">{{ line.stock.val }}</span>
-            <span v-else class="text-slate-300">-</span>
+          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 font-bold">{{ S.adjSys }}</span>
+              <div v-if="line.stockLoading" class="animate-spin w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full"></div>
+              <span v-else-if="line.sysStock" :class="line.sysStock.color" class="px-2 py-0.5 rounded-md font-extrabold">{{ line.sysStock.val }}</span>
+              <span v-else class="text-slate-300">—</span>
+            </div>
+            <div v-if="lineDeltaPreview(line) !== null" class="text-slate-600 font-bold">
+              Δ <span :class="lineDeltaPreview(line) < 0 ? 'text-red-600' : lineDeltaPreview(line) > 0 ? 'text-emerald-600' : 'text-slate-500'">{{ lineDeltaPreview(line) > 0 ? '+' : '' }}{{ lineDeltaPreview(line) }}</span>
+              <span class="text-slate-400 font-normal mx-1">→</span>
+              <span class="font-mono">{{ line.physical }}</span>
+            </div>
           </div>
         </div>
       </div>

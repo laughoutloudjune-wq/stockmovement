@@ -4,6 +4,20 @@ import { collection, getDocs } from 'firebase/firestore';
 
 export const todayStr = () => new Date().toISOString().split("T")[0];
 
+/** Same rules everywhere: picker badges, IN/OUT/Adjust line previews */
+export function materialStockStyle(stock, min) {
+  const s = Number(stock || 0);
+  const m = Number(min ?? 0);
+  let color = 'bg-green-100 text-green-700';
+  if (s <= 0 || s <= m) color = 'bg-red-100 text-red-700';
+  else if (s <= 2 * m) color = 'bg-yellow-100 text-yellow-700';
+  return { val: s, color };
+}
+
+export function materialStockBadgeClass(stock, min) {
+  return materialStockStyle(stock, min).color;
+}
+
 // 2. Global State (Reactive)
 export const LOOKUPS = reactive({ 
   MATERIALS: [], 
@@ -81,6 +95,7 @@ export const STR = {
     noLow: "ไม่มีรายการใกล้หมด 🎉", pick: "ค้นหา...", pickAdd: "ค้นหาหรือเพิ่ม...", loading: "กำลังโหลด...",
     btnSubmit: "บันทึก", btnAdd: "เพิ่มรายการ", 
     inTitle: "รับเข้าวัสดุ", inDate: "วันที่รับเข้า",
+    adjSys: "ในระบบ", adjPhysical: "นับจริง", adjHint: "นับสต็อกจริง ระบบจะปรับเป็นตัวเลขนี้และบันทึกผลต่างในรายงาน",
     outTitle: "เบิกจ่ายวัสดุ", outDate: "วันที่เบิก", proj: "โครงการ", contractor: "ผู้รับเหมา", requester: "ผู้เบิก", note: "หมายเหตุ",
     purProj: "โครงการ", purNeedBy: "วันที่ต้องการ", purContractor: "ผู้รับเหมา", purPriority: "ความเร่งด่วน", purNote: "หมายเหตุ", purOlder: "ประวัติการขอซื้อ",
     reportTitle: "รายงาน", reportGen: "สร้างรายงาน"
@@ -92,6 +107,7 @@ export const STR = {
     noLow: "No low stock 🎉", pick: "Search...", pickAdd: "Search or Add...", loading: "Loading...",
     btnSubmit: "Submit", btnAdd: "Add Line",
     inTitle: "Stock In", inDate: "Date Received",
+    adjSys: "System", adjPhysical: "Physical count", adjHint: "Enter the quantity you counted. Stock will be set to this value; the report shows system → counted and the difference.",
     outTitle: "Stock Out", outDate: "Date Issued", proj: "Project", contractor: "Contractor", requester: "Requester", note: "Note",
     purProj: "Project", purNeedBy: "Need By", purContractor: "Contractor", purPriority: "Priority", purNote: "Note", purOlder: "History",
     reportTitle: "Report", reportGen: "Generate"

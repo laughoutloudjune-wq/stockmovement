@@ -1,13 +1,15 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { toast, todayStr } from '../shared.js';
+import { toast, todayStr, STR } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
   props: ['lang', 'user'],
   components: { ItemPicker },
-  setup() {
+  setup(props) {
+    const S = computed(() => STR[props.lang]);
+
     const filters = ref({
       start: todayStr().slice(0, 8) + '01',
       end: todayStr(),
@@ -43,6 +45,9 @@ export default {
             contractor: r.contractor || '-',
             requester: r.requester || '-',
             qty: i.qty ?? '-',
+            showAdjust: r.type === 'ADJUST' && i.prevStock != null && i.newStock != null,
+            prevStock: i.prevStock,
+            newStock: i.newStock,
             itemNote: itemNote(i),
             orderNote: orderNote(r)
           })))
@@ -101,7 +106,7 @@ export default {
     const exportExcel = () => {
       if (results.value.length === 0) return toast('No data to export');
 
-      let csv = '\uFEFFDate,DocNo,Type,Project,SubProject,Requester,RequesterEmail,Contractor,OrderStatus,NeedBy,Priority,Item,Qty,ItemSupplier,ItemStatus,ItemNote,ItemRemark,OrderNote,OrderRemark,Timestamp\n';
+      let csv = '\uFEFFDate,DocNo,Type,Project,SubProject,Requester,RequesterEmail,Contractor,OrderStatus,NeedBy,Priority,Item,Qty,PrevStock,NewStock,ItemSupplier,ItemStatus,ItemNote,ItemRemark,OrderNote,OrderRemark,Timestamp\n';
 
       results.value.forEach(r => {
         const date = orderDate(r);
@@ -110,7 +115,7 @@ export default {
           csv += [
             date, r.docNo || '', r.type || '', r.project || '', r.subProject || '',
             r.requester || '', r.requesterEmail || '', r.contractor || '', r.status || '',
-            r.needBy || '', r.priority || '', '', '', '', '', '', '',
+            r.needBy || '', r.priority || '', '', '', '', '', '', '', '',
             (r.note || '').replace(/,/g, ' '),
             (r.remark || '').replace(/,/g, ' '),
             r.timestamp || ''
@@ -119,12 +124,16 @@ export default {
         }
 
         items.forEach(item => {
+          const prevS = item.prevStock != null ? item.prevStock : '';
+          const newS = item.newStock != null ? item.newStock : '';
           csv += [
             date, r.docNo || '', r.type || '', r.project || '', r.subProject || '',
             r.requester || '', r.requesterEmail || '', r.contractor || '', r.status || '',
             r.needBy || '', r.priority || '',
             String(item.name || '').replace(/,/g, ' '),
             item.qty || '',
+            prevS,
+            newS,
             String(item.supplier || '').replace(/,/g, ' '),
             String(item.status || '').replace(/,/g, ' '),
             String(item.note || '').replace(/,/g, ' '),
@@ -186,7 +195,21 @@ export default {
           status: editForm.value.status || '',
           note: editForm.value.note || '',
           remark: editForm.value.note || '',
-          items: (editForm.value.items || []).filter(i => i.name && i.qty)
+          items: (editForm.value.items || [])
+            .filter(i => i.name && i.qty !== '' && i.qty != null)
+            .map(i => {
+              const row = {
+                name: i.name,
+                qty: Number(i.qty),
+                supplier: i.supplier || '',
+                status: i.status || '',
+                note: i.note || '',
+                remark: i.remark || i.note || ''
+              };
+              if (i.prevStock != null && i.prevStock !== '') row.prevStock = Number(i.prevStock);
+              if (i.newStock != null && i.newStock !== '') row.newStock = Number(i.newStock);
+              return row;
+            })
         });
         toast('Updated');
         isEditOpen.value = false;
@@ -205,7 +228,7 @@ export default {
       filters, results, loading, generate, remove, exportExcel,
       openEdit, isEditOpen, editForm, saveEdit, addLine, removeLine,
       expanded, toggleExpand, orderDate, orderNote, itemNote, projectLabel,
-      isMaterialLedger, ledgerRows
+      isMaterialLedger, ledgerRows, S
     };
   },
   template: `
@@ -296,7 +319,14 @@ export default {
                 <span class="text-slate-700">{{ row.project }}</span>
                 <span class="truncate text-slate-600" :title="row.contractor">{{ row.contractor }}</span>
                 <span class="truncate text-slate-600">{{ row.requester }}</span>
-                <span class="text-right font-mono font-bold text-slate-800">{{ row.qty }}</span>
+                <span class="text-right">
+                  <template v-if="row.showAdjust">
+                    <div class="text-[9px] font-normal text-slate-400 uppercase leading-tight">{{ S.adjSys }}→{{ S.adjPhysical }}</div>
+                    <div class="font-mono font-bold text-slate-800">{{ row.prevStock }} → {{ row.newStock }}</div>
+                    <div class="text-[10px] font-bold" :class="Number(row.qty) < 0 ? 'text-red-600' : Number(row.qty) > 0 ? 'text-emerald-600' : 'text-slate-500'">Δ {{ Number(row.qty) > 0 ? '+' : '' }}{{ row.qty }}</div>
+                  </template>
+                  <span v-else class="font-mono font-bold text-slate-800">{{ row.qty }}</span>
+                </span>
                 <span class="truncate text-slate-600">{{ row.itemNote }}</span>
                 <span class="truncate text-slate-600">{{ row.orderNote }}</span>
               </div>
@@ -364,18 +394,24 @@ export default {
 
           <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
             <div class="px-3 py-2 border-b border-slate-200 bg-slate-100/70">
-              <div class="grid grid-cols-[minmax(220px,1fr)_90px_130px_1fr] gap-3 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 min-w-[620px]">
+              <div class="grid grid-cols-[minmax(220px,1fr)_minmax(110px,1fr)_90px_1fr] gap-3 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 min-w-[680px]">
                 <span>Material</span>
-                <span class="text-right">Qty</span>
+                <span class="text-right">{{ r.type === 'ADJUST' ? (S.adjSys + ' → ' + S.adjPhysical + ' / Δ') : 'Qty' }}</span>
                 <span>Status</span>
                 <span>Item Note</span>
               </div>
             </div>
             <div class="overflow-x-auto">
               <div v-for="(item, idx) in (r.items || [])" :key="idx" class="px-3 py-2 border-b border-slate-100 last:border-b-0 odd:bg-white/80">
-                <div class="grid grid-cols-[minmax(220px,1fr)_90px_130px_1fr] gap-3 text-xs text-slate-700 min-w-[620px] items-center">
+                <div class="grid grid-cols-[minmax(220px,1fr)_minmax(110px,1fr)_90px_1fr] gap-3 text-xs text-slate-700 min-w-[680px] items-center">
                   <span class="break-words font-semibold">{{ item.name || '-' }}</span>
-                  <span class="font-bold font-mono text-right">{{ item.qty || '-' }}</span>
+                  <span class="font-bold font-mono text-right">
+                    <template v-if="r.type === 'ADJUST' && item.prevStock != null && item.newStock != null">
+                      <span class="block text-[10px] font-normal text-slate-500 leading-tight">{{ item.prevStock }} → {{ item.newStock }}</span>
+                      <span class="text-[11px]" :class="Number(item.qty) < 0 ? 'text-red-600' : Number(item.qty) > 0 ? 'text-emerald-600' : 'text-slate-500'">Δ {{ Number(item.qty) > 0 ? '+' : '' }}{{ item.qty }}</span>
+                    </template>
+                    <template v-else>{{ item.qty || '-' }}</template>
+                  </span>
                   <span class="truncate">{{ item.status || '-' }}</span>
                   <span class="truncate">{{ itemNote(item) }}</span>
                 </div>
@@ -390,8 +426,13 @@ export default {
             <div v-if="r.type === 'PURCHASE' && r.priority"><b>Priority:</b> {{ r.priority }}</div>
             <div><b>Order note:</b> {{ orderNote(r) }}</div>
             <div><b>Timestamp:</b> {{ r.timestamp || '-' }}</div>
-            <div v-for="(item, idx) in r.items" :key="'note-' + idx" class="bg-slate-50 rounded-lg p-2">
-              <b>{{ item.name }}</b> | Qty {{ item.qty }} | Item Status {{ item.status || '-' }} | Item Note {{ itemNote(item) }}
+            <div v-for="(item, idx) in (r.items || [])" :key="'note-' + idx" class="bg-slate-50 rounded-lg p-2">
+              <template v-if="r.type === 'ADJUST' && item.prevStock != null && item.newStock != null">
+                <b>{{ item.name }}</b> — {{ S.adjSys }} {{ item.prevStock }} → {{ S.adjPhysical }} {{ item.newStock }} (Δ {{ item.qty > 0 ? '+' : '' }}{{ item.qty }}) | {{ itemNote(item) }}
+              </template>
+              <template v-else>
+                <b>{{ item.name }}</b> | Qty {{ item.qty }} | Item Status {{ item.status || '-' }} | Item Note {{ itemNote(item) }}
+              </template>
             </div>
           </div>
         </div>

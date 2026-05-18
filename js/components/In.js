@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, doc, runTransaction, getDoc } from 'firebase/firestore';
-import { STR, toast, todayStr } from '../shared.js';
+import { STR, toast, todayStr, materialStockStyle, preloadLookups } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
@@ -32,10 +32,7 @@ export default {
           const data = snap.data();
           const s = Number(data.stock || 0);
           const m = Number(data.min || 0);
-          let color = 'bg-green-100 text-green-700';
-          if (s <= 0 || s <= m) color = 'bg-red-100 text-red-700';
-          else if (s <= 2 * m) color = 'bg-yellow-100 text-yellow-700';
-          line.stock = { val: s, color };
+          line.stock = materialStockStyle(s, m);
         } else {
           line.stock = { val: props.lang === 'th' ? 'ใหม่' : 'New', color: 'bg-blue-100 text-blue-600' };
         }
@@ -99,8 +96,9 @@ export default {
         });
 
         toast((props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved'));
-        lines.value = [{ name: '', qty: '' }];
+        lines.value = [{ name: '', qty: '', stock: null, stockLoading: false }];
         date.value = todayStr();
+        await preloadLookups(true);
 
       } catch (e) {
         console.error(e);

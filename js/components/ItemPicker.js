@@ -1,5 +1,5 @@
 import { ref, computed, nextTick } from 'vue';
-import { LOOKUPS, toast } from '../shared.js';
+import { LOOKUPS, toast, preloadLookups, materialStockBadgeClass } from '../shared.js';
 import { db } from '../firebase.js';
 import { doc, setDoc } from 'firebase/firestore';
 
@@ -44,6 +44,9 @@ export default {
     const open = async () => {
       search.value = '';
       isOpen.value = true;
+      if (listKey.value === 'MATERIALS') {
+        await preloadLookups(true);
+      }
       await nextTick();
       if (searchInput.value) searchInput.value.focus();
     };
@@ -67,14 +70,7 @@ export default {
       try {
         const safeId = name.replace(/\//g, '_');
         await setDoc(doc(db, 'materials', safeId), { name, stock: 0, min: 5 });
-
-        // Optimistically update LOOKUPS so the new item appears immediately
-        const newItem = { name, stock: 0, min: 5 };
-        const idx = LOOKUPS.MATERIALS.findIndex(m => m.name === name);
-        if (idx === -1) {
-          LOOKUPS.MATERIALS.push(newItem);
-          LOOKUPS.MATERIALS.sort((a, b) => a.name.localeCompare(b.name));
-        }
+        await preloadLookups(true);
 
         select(name);
         toast(`Added "${name}"`);
@@ -86,7 +82,7 @@ export default {
       }
     };
 
-    return { isOpen, search, filtered, showAddButton, saving, open, select, clear, addNew, searchInput };
+    return { isOpen, search, filtered, showAddButton, saving, open, select, clear, addNew, searchInput, materialStockBadgeClass };
   },
   template: `
     <div class="relative">
@@ -140,7 +136,7 @@ export default {
                   <span>{{ item.name }}</span>
                   <span
                     class="text-[10px] font-mono px-2 py-0.5 rounded ml-2 shrink-0"
-                    :class="item.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                    :class="materialStockBadgeClass(item.stock, item.min)"
                   >{{ item.stock }}</span>
                 </template>
                 <span v-else>{{ item }}</span>

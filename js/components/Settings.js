@@ -1,11 +1,9 @@
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, onUnmounted } from 'vue';
 import { db } from '../firebase.js';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { toast } from '../shared.js';
-import Migrate from './Migrate.js';
 
 export default {
-  components: { Migrate },
   setup() {
     const activeSection = ref('materials');
     const loading = ref(false);
@@ -20,27 +18,34 @@ export default {
       materials:   { col: 'materials',   label: 'Materials',   hasMin: true },
       projects:    { col: 'projects',    label: 'Projects',    hasMin: false },
       contractors: { col: 'contractors', label: 'Contractors', hasMin: false },
-      requesters:  { col: 'requesters',  label: 'Requesters',  hasMin: false },
-      migration:   { col: null,          label: 'Database',    isSpecial: true }
+      requesters:  { col: 'requesters',  label: 'Requesters',  hasMin: false }
     };
 
     const currentConfig = computed(() => CONFIG[activeSection.value]);
 
-    const loadData = async () => {
+    let unsub = null;
+
+    const loadData = () => {
+      if (unsub) unsub();
       if (currentConfig.value.isSpecial) return;
 
       loading.value = true;
       list.value = [];
       try {
-        const snap = await getDocs(collection(db, currentConfig.value.col));
-        list.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        unsub = onSnapshot(collection(db, currentConfig.value.col), (snap) => {
+          list.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          loading.value = false;
+        });
       } catch (e) {
         console.error(e);
         toast('Error loading data');
-      } finally {
         loading.value = false;
       }
     };
+
+    onUnmounted(() => {
+      if (unsub) unsub();
+    });
 
     const filteredList = computed(() => {
       if (!searchQuery.value) return list.value;
@@ -98,7 +103,6 @@ export default {
         }
 
         isModalOpen.value = false;
-        await loadData();
 
       } catch (e) {
         console.error(e);
@@ -114,7 +118,6 @@ export default {
       try {
         await deleteDoc(doc(db, currentConfig.value.col, id));
         toast('Deleted');
-        await loadData();
 
       } catch (e) {
         console.error(e);
@@ -139,51 +142,50 @@ export default {
     };
   },
   template: `
-    <div class="space-y-6 pb-24">
+    <div class="space-y-6 pb-24 pt-2">
       <div class="flex justify-between items-center px-1">
-        <h3 class="font-bold text-lg text-slate-800">Settings</h3>
+        <h3 class="text-xl font-medium text-[#1D1B20]">Settings</h3>
       </div>
 
-      <div class="glass p-1 rounded-xl flex overflow-x-auto no-scrollbar gap-1">
+      <div class="bg-[#F3EDF7] rounded-full p-1 flex gap-0.5 border border-[#CAC4D0] overflow-x-auto">
         <button
           v-for="(cfg, key) in CONFIG"
           :key="key"
           @click="switchTab(key)"
-          :class="activeSection === key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'"
-          class="flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
+          :class="activeSection === key ? 'bg-[#EADDFF] text-[#21005D]' : 'text-[#49454F] hover:bg-[#E8DEF8]'"
+          class="flex-1 px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap rounded-full md3-ripple"
         >
           {{ cfg.label }}
         </button>
       </div>
 
-      <div v-if="activeSection === 'migration'" class="animate-fade-in-up">
-        <Migrate />
-      </div>
-
-      <div v-else class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[50vh] flex flex-col animate-fade-in-up">
-        <div class="p-3 border-b border-slate-100 flex gap-2">
-          <input v-model="searchQuery" placeholder="Search..." class="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-          <button @click="openAdd" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm">+ New</button>
+      <div class="bg-[#FEF7FF] rounded-[24px] shadow-sm border border-[#CAC4D0] overflow-hidden min-h-[50vh] flex flex-col animate-fade-in-up">
+        <div class="p-4 border-b border-[#CAC4D0] flex gap-3 bg-[#F3EDF7]">
+          <div class="md3-input-container flex-1">
+            <input v-model="searchQuery" placeholder=" " class="md3-input bg-white" />
+            <label class="md3-label">Search...</label>
+          </div>
+          <button @click="openAdd" class="bg-[#6750A4] hover:bg-[#6750A4]/90 text-white rounded-full px-5 h-[56px] font-medium text-sm transition-colors shadow-md3-elevation-1 flex items-center md3-ripple">+ New</button>
         </div>
 
         <div class="flex-1 overflow-y-auto max-h-[60vh]">
-          <div v-if="loading" class="p-8 text-center text-slate-400">Loading...</div>
-          <div v-else-if="filteredList.length === 0" class="p-8 text-center text-slate-400">No items found</div>
+          <div v-if="loading" class="p-8 text-center text-[#49454F] text-sm">Loading...</div>
+          <div v-else-if="filteredList.length === 0" class="p-8 text-center text-[#49454F] text-sm">No items found</div>
 
-          <div v-else class="divide-y divide-slate-50">
-            <div v-for="item in filteredList" :key="item.id" class="p-3 flex justify-between items-center hover:bg-slate-50 transition-colors group">
-              <div>
-                <div class="font-bold text-slate-700 text-sm">{{ item.name }}</div>
-                <div v-if="activeSection === 'materials'" class="text-xs text-slate-400">
-                  Min: <span class="font-mono text-slate-600">{{ item.min }}</span> | Stock: <span class="font-mono text-slate-600">{{ item.stock }}</span>
+          <div v-else class="divide-y divide-[#CAC4D0]">
+            <div v-for="item in filteredList" :key="item.id" class="p-4 flex justify-between items-center hover:bg-[#F3EDF7] transition-colors group">
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-medium text-[#1D1B20]">{{ item.name }}</div>
+                <div v-if="activeSection === 'materials'" class="text-xs text-[#49454F] mt-0.5">
+                  Min: <span class="font-mono text-[#1D1B20]">{{ item.min }}</span> · Stock: <span class="font-mono text-[#1D1B20]">{{ item.stock }}</span>
                 </div>
-                <div v-if="activeSection === 'projects'" class="text-xs text-slate-400">
-                  Sub Projects: <span class="font-mono text-slate-600">{{ (item.subProjects || []).length }}</span>
+                <div v-if="activeSection === 'projects'" class="text-xs text-[#49454F] mt-0.5">
+                  Sub Projects: <span class="font-mono text-[#1D1B20]">{{ (item.subProjects || []).length }}</span>
                 </div>
               </div>
               <div class="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                <button @click="openEdit(item)" class="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold">Edit</button>
-                <button @click="remove(item.id)" class="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold">Delete</button>
+                <button @click="openEdit(item)" class="text-[#21005D] bg-[#EADDFF] rounded-full px-4 py-2 text-xs font-medium hover:bg-[#E8DEF8] transition-colors md3-ripple">Edit</button>
+                <button @click="remove(item.id)" class="text-[#B3261E] bg-[#F9DEDC] rounded-full px-4 py-2 text-xs font-medium hover:bg-[#F2B8B5] transition-colors md3-ripple">Delete</button>
               </div>
             </div>
           </div>
@@ -192,30 +194,36 @@ export default {
 
       <teleport to="body">
         <div v-if="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" @click="isModalOpen = false"></div>
-          <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5 animate-fade-in-up">
-            <h3 class="font-bold text-lg mb-4">{{ editMode ? 'Edit' : 'Add' }} {{ currentConfig.label }}</h3>
-            <div class="space-y-3">
+          <div class="absolute inset-0 bg-[#1D1B20]/40 backdrop-blur-sm" @click="isModalOpen = false"></div>
+          <div class="relative w-full max-w-sm bg-[#FEF7FF] rounded-[28px] shadow-md3-elevation-3 p-6 animate-fade-in-up">
+            <h3 class="text-2xl font-normal text-[#1D1B20] mb-6">{{ editMode ? 'Edit' : 'Add' }} {{ currentConfig.label }}</h3>
+            <div class="space-y-4">
               <div>
-                <label class="block text-xs font-bold text-slate-500 mb-1">Name</label>
-                <input v-model="form.name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" :disabled="editMode && activeSection === 'materials'" />
-                <p v-if="editMode && activeSection === 'materials'" class="text-[10px] text-orange-500 mt-1">Material names cannot be changed.</p>
+                <div class="md3-input-container">
+                  <input v-model="form.name" placeholder=" " class="md3-input" :disabled="editMode && activeSection === 'materials'" />
+                  <label class="md3-label">Name</label>
+                </div>
+                <p v-if="editMode && activeSection === 'materials'" class="text-[10px] text-[#B3261E] mt-1.5 ml-4">Material names cannot be changed.</p>
               </div>
 
               <div v-if="activeSection === 'materials'">
-                <label class="block text-xs font-bold text-slate-500 mb-1">Min Stock Alert</label>
-                <input type="number" v-model="form.min" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                <div class="md3-input-container">
+                  <input type="number" v-model="form.min" placeholder=" " class="md3-input" />
+                  <label class="md3-label">Min Stock Alert</label>
+                </div>
               </div>
 
               <div v-if="activeSection === 'projects'">
-                <label class="block text-xs font-bold text-slate-500 mb-1">Sub Projects (1 per line)</label>
-                <textarea v-model="form.subProjectsText" rows="6" placeholder="แปลง 92-97&#10;แปลง 98-102" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                <div class="md3-input-container h-auto">
+                  <textarea v-model="form.subProjectsText" rows="5" placeholder=" " class="md3-input py-3 resize-y"></textarea>
+                  <label class="md3-label">Sub Projects (1 per line)</label>
+                </div>
               </div>
             </div>
 
-            <div class="flex gap-2 mt-6">
-              <button @click="isModalOpen = false" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl hover:bg-slate-200">Cancel</button>
-              <button @click="save" :disabled="loading" class="flex-1 bg-blue-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-600">{{ loading ? 'Saving...' : 'Save' }}</button>
+            <div class="flex justify-end gap-2 mt-8">
+              <button @click="isModalOpen = false" class="text-[#6750A4] font-medium px-4 py-2.5 rounded-full hover:bg-[#6750A4]/10 transition-colors md3-ripple">Cancel</button>
+              <button @click="save" :disabled="loading" class="bg-[#6750A4] text-white font-medium px-6 py-2.5 rounded-full shadow-sm hover:bg-[#6750A4]/90 active:scale-[0.98] transition-all disabled:opacity-50 md3-ripple">{{ loading ? 'Saving...' : 'Save' }}</button>
             </div>
           </div>
         </div>
@@ -223,4 +231,3 @@ export default {
     </div>
   `
 };
-

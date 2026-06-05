@@ -234,67 +234,80 @@ export default {
     };
   },
   template: `
-    <div class="space-y-6 pb-24">
-      <section class="glass rounded-2xl p-5 shadow-sm space-y-4">
-        <h3 class="font-bold text-lg text-slate-800">Report (Orders)</h3>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 mb-1">From</label>
-            <input type="date" v-model="filters.start" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+    <div class="space-y-6 pb-28 md:pb-8 pt-4">
+      <!-- Filter Section -->
+      <section class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 space-y-5">
+        <h3 class="font-semibold text-lg text-slate-800">{{ S.tabs?.report || 'Report (Orders)' }}</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md3-input-container">
+            <input type="date" v-model="filters.start" class="md3-input" placeholder=" " />
+            <label class="md3-label !bg-white">From</label>
           </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 mb-1">To</label>
-            <input type="date" v-model="filters.end" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-bold text-slate-500 mb-1">Filter Item/SKU</label>
-            <ItemPicker v-model="filters.material" source="MATERIALS" placeholder="All Items (Optional)" />
+          <div class="md3-input-container">
+            <input type="date" v-model="filters.end" class="md3-input" placeholder=" " />
+            <label class="md3-label !bg-white">To</label>
           </div>
 
-          <div class="col-span-2">
-            <input v-model="filters.search" placeholder="Search doc, project, contractor, requester, note..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          <div class="md:col-span-2 md3-input-container md3-picker">
+            <ItemPicker v-model="filters.material" source="MATERIALS" placeholder="All Items (Optional)" class="md3-input" :class="{'has-val': !!filters.material}" />
+            <label class="md3-label !bg-white">Filter Item/SKU</label>
           </div>
 
-          <div class="col-span-2 flex gap-2">
-            <select v-model="filters.type" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none flex-1">
-              <option value="ALL">All Types</option>
-              <option value="OUT">OUT</option>
-              <option value="IN">IN</option>
-              <option value="ADJUST">ADJUST</option>
-              <option value="PURCHASE">PURCHASE</option>
-            </select>
-            <button @click="generate" class="bg-blue-500 text-white font-bold px-6 rounded-xl shadow-md active:scale-95 transition-transform">Search</button>
+          <div class="md:col-span-2 md3-input-container">
+            <input v-model="filters.search" class="md3-input" placeholder=" " />
+            <label class="md3-label !bg-white">Search doc, project, contractor...</label>
+          </div>
+
+          <div class="md:col-span-2 flex gap-3 flex-col sm:flex-row">
+            <div class="md3-input-container flex-1">
+              <select v-model="filters.type" class="md3-input">
+                <option value="ALL">All Types</option>
+                <option value="OUT">OUT</option>
+                <option value="IN">IN</option>
+                <option value="ADJUST">ADJUST</option>
+                <option value="PURCHASE">PURCHASE</option>
+              </select>
+              <label class="md3-label !bg-white">Type</label>
+            </div>
+            <button @click="generate" class="bg-blue-500 text-white font-semibold px-8 py-3.5 rounded-full shadow-md active:scale-95 transition-transform shrink-0 md3-ripple">Search</button>
           </div>
         </div>
       </section>
 
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2">
-          <span class="px-3 py-1 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-600 shadow-sm">
+      <!-- Status Bar -->
+      <div class="flex items-center justify-between gap-2 px-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="px-4 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-sm">
             {{ loading ? 'Loading...' : results.length + ' records' }}
           </span>
-          <span v-if="filters.type !== 'ALL'" class="px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-xs font-bold text-blue-700">
-            Type: {{ filters.type }}
+          <span v-if="filters.type !== 'ALL'" class="px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-xs font-semibold text-blue-700">
+            {{ filters.type }}
           </span>
         </div>
-        <button v-if="results.length > 0" @click="exportExcel" class="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition-colors">Export CSV</button>
+        <button v-if="results.length > 0" @click="exportExcel" class="flex items-center gap-2 bg-green-50 text-green-700 hover:bg-green-100 text-xs font-semibold px-4 py-2 rounded-full transition-colors md3-ripple">
+          Export CSV
+        </button>
       </div>
 
-      <div class="space-y-3">
-        <div v-if="loading" class="space-y-3 animate-pulse">
-          <div v-for="i in 3" :key="'loading-' + i" class="h-40 bg-slate-200 rounded-xl"></div>
+      <!-- Results Area -->
+      <div class="space-y-4">
+        <div v-if="loading" class="space-y-4 animate-pulse">
+          <div v-for="i in 3" :key="'loading-' + i" class="h-40 bg-slate-100 rounded-2xl"></div>
         </div>
-        <div v-if="results.length === 0 && !loading" class="text-center py-10 text-slate-400">No records found</div>
+        <div v-if="results.length === 0 && !loading" class="text-center py-16 text-slate-400 font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+          No records found
+        </div>
 
-        <div v-if="isMaterialLedger && results.length > 0" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 bg-slate-100/70 flex items-center justify-between">
-            <div class="text-sm font-bold text-slate-700">Material Ledger</div>
-            <div class="text-xs text-slate-500">{{ filters.material }}</div>
+        <!-- Ledger View -->
+        <div v-if="isMaterialLedger && results.length > 0" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div class="text-sm font-bold text-slate-800">Material Ledger</div>
+            <div class="text-xs font-medium text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">{{ filters.material }}</div>
           </div>
           <div class="overflow-x-auto">
             <div class="min-w-[980px]">
-              <div class="grid grid-cols-[100px_110px_80px_minmax(160px,1fr)_minmax(120px,1fr)_120px_80px_150px_150px] gap-3 px-4 py-2 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 border-b border-slate-200 bg-slate-50">
+              <div class="grid grid-cols-[100px_110px_80px_minmax(160px,1fr)_minmax(120px,1fr)_120px_80px_150px_150px] gap-3 px-5 py-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 border-b border-slate-100 bg-slate-50">
                 <span>Date</span>
                 <span>Doc No</span>
                 <span>Type</span>
@@ -305,11 +318,11 @@ export default {
                 <span>Item Note</span>
                 <span>Order Note</span>
               </div>
-              <div v-for="row in ledgerRows" :key="row.id" class="grid grid-cols-[100px_110px_80px_minmax(160px,1fr)_minmax(120px,1fr)_120px_80px_150px_150px] gap-3 px-4 py-2.5 text-xs border-b border-slate-100 last:border-b-0 odd:bg-white even:bg-slate-50/50 items-center">
-                <span class="text-slate-600">{{ row.date || '-' }}</span>
-                <span class="font-semibold text-slate-700">{{ row.docNo }}</span>
+              <div v-for="row in ledgerRows" :key="row.id" class="grid grid-cols-[100px_110px_80px_minmax(160px,1fr)_minmax(120px,1fr)_120px_80px_150px_150px] gap-3 px-5 py-3.5 text-xs border-b border-slate-50 last:border-b-0 hover:bg-slate-50 transition-colors items-center">
+                <span class="text-slate-600 font-medium">{{ row.date || '-' }}</span>
+                <span class="font-bold text-slate-800">{{ row.docNo }}</span>
                 <span>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide"
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
                     :class="{
                       'bg-green-100 text-green-700': row.type==='IN',
                       'bg-red-100 text-red-700': row.type==='OUT',
@@ -323,175 +336,178 @@ export default {
                 <span class="truncate text-slate-600">{{ row.requester }}</span>
                 <span class="text-right">
                   <template v-if="row.showAdjust">
-                    <div class="text-[9px] font-normal text-slate-400 uppercase leading-tight">{{ S.adjSys }}→{{ S.adjPhysical }}</div>
+                    <div class="text-[9px] font-medium text-slate-400 uppercase leading-tight">{{ S.adjSys }}→{{ S.adjPhysical }}</div>
                     <div class="font-mono font-bold text-slate-800">{{ row.prevStock }} → {{ row.newStock }}</div>
-                    <div class="text-[10px] font-bold" :class="Number(row.qty) < 0 ? 'text-red-600' : Number(row.qty) > 0 ? 'text-emerald-600' : 'text-slate-500'">Δ {{ Number(row.qty) > 0 ? '+' : '' }}{{ row.qty }}</div>
+                    <div class="text-[10px] font-bold" :class="Number(row.qty) < 0 ? 'text-red-500' : Number(row.qty) > 0 ? 'text-emerald-500' : 'text-slate-400'">Δ {{ Number(row.qty) > 0 ? '+' : '' }}{{ row.qty }}</div>
                   </template>
-                  <span v-else class="font-mono font-bold text-slate-800">{{ row.qty }}</span>
+                  <span v-else class="font-mono font-bold text-slate-800 text-sm">{{ row.qty }}</span>
                 </span>
-                <span class="truncate text-slate-600">{{ row.itemNote }}</span>
-                <span class="truncate text-slate-600">{{ row.orderNote }}</span>
+                <span class="truncate text-slate-500">{{ row.itemNote }}</span>
+                <span class="truncate text-slate-500">{{ row.orderNote }}</span>
               </div>
-              <div v-if="ledgerRows.length === 0" class="px-4 py-5 text-xs text-slate-400">No matching ledger entries</div>
+              <div v-if="ledgerRows.length === 0" class="px-5 py-8 text-center text-sm font-medium text-slate-400">No matching ledger entries</div>
             </div>
           </div>
         </div>
 
+        <!-- Order View -->
         <template v-else>
-        <div v-for="r in results" :key="r.id" class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 relative group transition-all hover:shadow-md">
-          <div class="flex justify-between items-start mb-3">
-            <div class="cursor-pointer" @click="toggleExpand(r)">
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                :class="{
-                  'bg-green-100 text-green-700': r.type==='IN',
-                  'bg-red-100 text-red-700': r.type==='OUT',
-                  'bg-yellow-100 text-yellow-700': r.type==='ADJUST',
-                  'bg-blue-100 text-blue-700': r.type==='PURCHASE'
-                }"
-              >{{ r.type }}</span>
-              <span class="text-xs text-slate-500 font-bold ml-2">{{ orderDate(r) }}</span>
-              <div class="text-[10px] text-slate-400">{{ r.docNo }}</div>
+          <div v-for="r in results" :key="r.id" class="bg-white rounded-2xl shadow-sm border border-slate-100 relative group transition-shadow hover:shadow-md overflow-hidden">
+            <!-- Header -->
+            <div class="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center cursor-pointer" @click="toggleExpand(r)">
+              <div class="flex items-center gap-3">
+                <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                  :class="{
+                    'bg-green-100 text-green-700': r.type==='IN',
+                    'bg-red-100 text-red-700': r.type==='OUT',
+                    'bg-yellow-100 text-yellow-700': r.type==='ADJUST',
+                    'bg-blue-100 text-blue-700': r.type==='PURCHASE'
+                  }"
+                >{{ r.type }}</span>
+                <span class="text-sm text-slate-800 font-bold">{{ orderDate(r) }}</span>
+                <span class="text-[11px] text-slate-400 font-medium bg-slate-100 px-2 py-0.5 rounded-md">{{ r.docNo }}</span>
+              </div>
+              <div class="flex gap-1.5 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                <button @click.stop="openEdit(r)" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors md3-ripple">Edit</button>
+                <button @click.stop="remove(r.id)" class="text-red-600 bg-red-50 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-red-100 transition-colors md3-ripple">Delete</button>
+              </div>
             </div>
-            <div class="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-              <button @click="openEdit(r)" class="text-blue-500 bg-blue-50 p-1.5 rounded-lg text-xs font-bold">Edit</button>
-              <button @click="remove(r.id)" class="text-red-500 bg-red-50 p-1.5 rounded-lg text-xs font-bold">Del</button>
-            </div>
-          </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Project</div>
-              <div class="text-sm font-semibold text-slate-700">{{ projectLabel(r) }}</div>
+            <!-- Content Grid -->
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="bg-[#F3EDF7] rounded-xl px-4 py-3">
+                <div class="text-[10px] uppercase font-bold tracking-wide text-slate-500 mb-1">Project</div>
+                <div class="text-sm font-semibold text-slate-800">{{ projectLabel(r) }}</div>
+              </div>
+              <div class="bg-[#F3EDF7] rounded-xl px-4 py-3">
+                <div class="text-[10px] uppercase font-bold tracking-wide text-slate-500 mb-1">Contractor / Requester</div>
+                <div class="text-sm font-semibold text-slate-800 truncate">{{ r.contractor || r.requester || '—' }}</div>
+              </div>
+              <div v-if="r.note || r.remark" class="bg-[#F3EDF7] rounded-xl px-4 py-3 md:col-span-2">
+                <div class="text-[10px] uppercase font-bold tracking-wide text-slate-500 mb-1">Order Note</div>
+                <div class="text-sm text-slate-700">{{ orderNote(r) }}</div>
+              </div>
             </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Requester</div>
-              <div class="text-sm font-semibold text-slate-700 truncate">{{ r.requester || '-' }}</div>
-              <div class="text-[11px] text-slate-500 truncate">{{ r.requesterEmail || '-' }}</div>
-            </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Contractor</div>
-              <div class="text-sm font-semibold text-slate-700 truncate" :title="r.contractor || ''">{{ r.contractor || '—' }}</div>
-            </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Order Note</div>
-              <div class="text-sm text-slate-700 truncate">{{ orderNote(r) }}</div>
-            </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 md:col-span-2">
-              <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
-                <div>
-                  <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Status</div>
-                  <div class="text-sm text-slate-700">{{ r.status || '—' }}</div>
-                </div>
-                <div v-if="r.type === 'PURCHASE' && (r.needBy || r.priority)">
-                  <div class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Need by / Priority</div>
-                  <div class="text-sm text-slate-700">
-                    <span v-if="r.needBy">{{ r.needBy }}</span>
-                    <span v-if="r.needBy && r.priority" class="text-slate-400 mx-1">·</span>
-                    <span v-if="r.priority">{{ r.priority }}</span>
+
+            <!-- Line Items Table -->
+            <div class="px-5 pb-5">
+              <div class="border border-slate-100 rounded-xl overflow-hidden">
+                <div class="px-4 py-2 bg-slate-50 border-b border-slate-100">
+                  <div class="grid grid-cols-[minmax(200px,1fr)_minmax(100px,1fr)_90px_1fr] gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[600px]">
+                    <span>Material</span>
+                    <span class="text-right">{{ r.type === 'ADJUST' ? (S.adjSys + ' → ' + S.adjPhysical + ' / Δ') : 'Qty' }}</span>
+                    <span>Status</span>
+                    <span>Item Note</span>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-            <div class="px-3 py-2 border-b border-slate-200 bg-slate-100/70">
-              <div class="grid grid-cols-[minmax(220px,1fr)_minmax(110px,1fr)_90px_1fr] gap-3 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 min-w-[680px]">
-                <span>Material</span>
-                <span class="text-right">{{ r.type === 'ADJUST' ? (S.adjSys + ' → ' + S.adjPhysical + ' / Δ') : 'Qty' }}</span>
-                <span>Status</span>
-                <span>Item Note</span>
-              </div>
-            </div>
-            <div class="overflow-x-auto">
-              <div v-for="(item, idx) in (r.items || [])" :key="idx" class="px-3 py-2 border-b border-slate-100 last:border-b-0 odd:bg-white/80">
-                <div class="grid grid-cols-[minmax(220px,1fr)_minmax(110px,1fr)_90px_1fr] gap-3 text-xs text-slate-700 min-w-[680px] items-center">
-                  <span class="break-words font-semibold">{{ item.name || '-' }}</span>
-                  <span class="font-bold font-mono text-right">
-                    <template v-if="r.type === 'ADJUST' && item.prevStock != null && item.newStock != null">
-                      <span class="block text-[10px] font-normal text-slate-500 leading-tight">{{ item.prevStock }} → {{ item.newStock }}</span>
-                      <span class="text-[11px]" :class="Number(item.qty) < 0 ? 'text-red-600' : Number(item.qty) > 0 ? 'text-emerald-600' : 'text-slate-500'">Δ {{ Number(item.qty) > 0 ? '+' : '' }}{{ item.qty }}</span>
-                    </template>
-                    <template v-else>{{ item.qty || '-' }}</template>
-                  </span>
-                  <span class="truncate">{{ item.status || '-' }}</span>
-                  <span class="truncate">{{ itemNote(item) }}</span>
+                <div class="overflow-x-auto">
+                  <div v-for="(item, idx) in (r.items || [])" :key="idx" class="px-4 py-2.5 border-b border-slate-50 last:border-b-0 hover:bg-slate-50/50">
+                    <div class="grid grid-cols-[minmax(200px,1fr)_minmax(100px,1fr)_90px_1fr] gap-3 text-xs text-slate-800 min-w-[600px] items-center">
+                      <span class="break-words font-semibold">{{ item.name || '-' }}</span>
+                      <span class="font-bold font-mono text-right">
+                        <template v-if="r.type === 'ADJUST' && item.prevStock != null && item.newStock != null">
+                          <span class="block text-[10px] font-medium text-slate-400">{{ item.prevStock }} → {{ item.newStock }}</span>
+                          <span class="text-[11px]" :class="Number(item.qty) < 0 ? 'text-red-500' : Number(item.qty) > 0 ? 'text-emerald-500' : 'text-slate-400'">Δ {{ Number(item.qty) > 0 ? '+' : '' }}{{ item.qty }}</span>
+                        </template>
+                        <template v-else><span class="text-sm">{{ item.qty || '-' }}</span></template>
+                      </span>
+                      <span class="truncate text-slate-500">{{ item.status || '-' }}</span>
+                      <span class="truncate text-slate-500">{{ itemNote(item) }}</span>
+                    </div>
+                  </div>
+                  <div v-if="!r.items || r.items.length === 0" class="px-4 py-4 text-xs text-slate-400 italic text-center">No items</div>
                 </div>
               </div>
-              <div v-if="!r.items || r.items.length === 0" class="px-3 py-3 text-xs text-slate-400 italic">No items</div>
             </div>
-          </div>
 
-          <div v-if="expanded === r.id" class="mt-3 pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
-            <div v-if="r.contractor"><b>Contractor:</b> {{ r.contractor }}</div>
-            <div v-if="r.type === 'PURCHASE' && r.needBy"><b>Need by:</b> {{ r.needBy }}</div>
-            <div v-if="r.type === 'PURCHASE' && r.priority"><b>Priority:</b> {{ r.priority }}</div>
-            <div><b>Order note:</b> {{ orderNote(r) }}</div>
-            <div><b>Timestamp:</b> {{ r.timestamp || '-' }}</div>
-            <div v-for="(item, idx) in (r.items || [])" :key="'note-' + idx" class="bg-slate-50 rounded-lg p-2">
-              <template v-if="r.type === 'ADJUST' && item.prevStock != null && item.newStock != null">
-                <b>{{ item.name }}</b> — {{ S.adjSys }} {{ item.prevStock }} → {{ S.adjPhysical }} {{ item.newStock }} (Δ {{ item.qty > 0 ? '+' : '' }}{{ item.qty }}) | {{ itemNote(item) }}
-              </template>
-              <template v-else>
-                <b>{{ item.name }}</b> | Qty {{ item.qty }} | Item Status {{ item.status || '-' }} | Item Note {{ itemNote(item) }}
-              </template>
-            </div>
           </div>
-        </div>
         </template>
       </div>
 
+      <!-- Edit Modal -->
       <teleport to="body">
-        <div v-if="isEditOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" @click="isEditOpen = false"></div>
+        <div v-if="isEditOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-[#1D1B20]/40 backdrop-blur-sm" @click="isEditOpen = false"></div>
 
-          <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 animate-fade-in-up max-h-[90vh] overflow-y-auto">
-            <h3 class="font-bold text-lg mb-4 text-slate-800">Edit Order</h3>
-
-            <div class="space-y-4">
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 mb-1">Date</label>
-                  <input type="date" v-model="editForm.date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          <div class="relative w-full max-w-2xl bg-[#FEF7FF] rounded-[28px] shadow-md3-elevation-3 flex flex-col max-h-[90vh] animate-fade-in-up overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+              <h3 class="font-semibold text-lg text-slate-800">Edit Order</h3>
+              <button @click="isEditOpen = false" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 md3-ripple">×</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-5 bg-[#FEF7FF]">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md3-input-container">
+                  <input type="date" v-model="editForm.date" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Date</label>
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 mb-1">Need By</label>
-                  <input type="date" v-model="editForm.needBy" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                <div class="md3-input-container">
+                  <input type="date" v-model="editForm.needBy" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Need By</label>
+                </div>
+                
+                <div class="md3-input-container md3-picker">
+                  <ItemPicker v-model="editForm.project" source="PROJECTS" class="md3-input" :class="{'has-val': !!editForm.project}" />
+                  <label class="md3-label !bg-[#FEF7FF]">Project</label>
+                </div>
+                <div class="md3-input-container">
+                  <input v-model="editForm.subProject" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Sub Project</label>
+                </div>
+
+                <div class="md3-input-container md3-picker">
+                  <ItemPicker v-model="editForm.requester" source="REQUESTERS" class="md3-input" :class="{'has-val': !!editForm.requester}" />
+                  <label class="md3-label !bg-[#FEF7FF]">Requester</label>
+                </div>
+                <div class="md3-input-container md3-picker">
+                  <ItemPicker v-model="editForm.contractor" source="CONTRACTORS" class="md3-input" :class="{'has-val': !!editForm.contractor}" />
+                  <label class="md3-label !bg-[#FEF7FF]">Contractor</label>
+                </div>
+
+                <div class="md3-input-container">
+                  <input v-model="editForm.priority" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Priority</label>
+                </div>
+                <div class="md3-input-container">
+                  <input v-model="editForm.status" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Status</label>
+                </div>
+
+                <div class="md:col-span-2 md3-input-container">
+                  <input v-model="editForm.note" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Note</label>
                 </div>
               </div>
 
-              <div><label class="block text-xs font-bold text-slate-500 mb-1">Project</label><ItemPicker v-model="editForm.project" source="PROJECTS" /></div>
-              <div><label class="block text-xs font-bold text-slate-500 mb-1">Sub Project</label><input v-model="editForm.subProject" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none" /></div>
-              <div><label class="block text-xs font-bold text-slate-500 mb-1">Requester</label><ItemPicker v-model="editForm.requester" source="REQUESTERS" /></div>
-              <div><label class="block text-xs font-bold text-slate-500 mb-1">Requester Email</label><input v-model="editForm.requesterEmail" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none" /></div>
-              <div><label class="block text-xs font-bold text-slate-500 mb-1">Contractor</label><ItemPicker v-model="editForm.contractor" source="CONTRACTORS" /></div>
-              <div class="grid grid-cols-2 gap-3">
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">Priority</label><input v-model="editForm.priority" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none" /></div>
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">Status</label><input v-model="editForm.status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none" /></div>
-              </div>
-              <div><label class="block text-xs font-bold text-slate-500 mb-1">Note</label><input v-model="editForm.note" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none" /></div>
-
-              <div class="space-y-2 pt-2 border-t border-slate-100">
-                <label class="block text-xs font-bold text-slate-500">Items</label>
-                <div v-for="(line, idx) in editForm.items" :key="idx" class="space-y-2 bg-slate-50 p-2 rounded-lg">
-                  <div class="flex gap-2 items-center">
-                    <div class="flex-1"><ItemPicker v-model="line.name" source="MATERIALS" /></div>
-                    <input type="number" v-model="line.qty" class="w-16 bg-white border border-slate-200 rounded-lg px-2 py-1 text-center font-bold text-sm outline-none" />
-                    <button @click="removeLine(idx)" class="text-red-500 font-bold px-2">x</button>
+              <div class="pt-4 border-t border-slate-200">
+                <h4 class="text-sm font-bold text-slate-800 mb-3">Line Items</h4>
+                <div class="space-y-3">
+                  <div v-for="(line, idx) in editForm.items" :key="idx" class="bg-white border border-slate-200 rounded-2xl p-4 relative group">
+                    <button @click="removeLine(idx)" class="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center bg-red-100 text-red-600 rounded-full text-xs font-bold shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                    <div class="flex gap-3 mb-3">
+                      <div class="md3-input-container md3-picker flex-1">
+                        <ItemPicker v-model="line.name" source="MATERIALS" class="md3-input" :class="{'has-val': !!line.name}" />
+                        <label class="md3-label !bg-white">Material</label>
+                      </div>
+                      <div class="md3-input-container w-24">
+                        <input type="number" v-model="line.qty" class="md3-input text-center font-bold" placeholder=" " />
+                        <label class="md3-label !bg-white">Qty</label>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div class="md3-input-container"><input v-model="line.supplier" class="md3-input" placeholder=" "/><label class="md3-label !bg-white">Supplier</label></div>
+                      <div class="md3-input-container"><input v-model="line.status" class="md3-input" placeholder=" "/><label class="md3-label !bg-white">Item Status</label></div>
+                      <div class="md3-input-container"><input v-model="line.note" class="md3-input" placeholder=" "/><label class="md3-label !bg-white">Item Note</label></div>
+                    </div>
                   </div>
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <input v-model="line.supplier" placeholder="Supplier" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none" />
-                    <input v-model="line.status" placeholder="Item status" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none" />
-                    <input v-model="line.note" placeholder="Item note" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none" />
-                  </div>
+                  <button @click="addLine" class="w-full py-3.5 border-2 border-dashed border-slate-200 rounded-2xl text-blue-600 text-sm font-bold hover:bg-blue-50 transition-colors md3-ripple">+ Add Item</button>
                 </div>
-                <button @click="addLine" class="w-full py-3 border border-dashed border-slate-300 rounded-xl text-slate-400 text-sm font-bold hover:bg-slate-50 transition-colors">+ Add Item</button>
               </div>
             </div>
 
-            <div class="flex gap-2 mt-6">
-              <button @click="isEditOpen = false" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-200">Cancel</button>
-              <button @click="saveEdit" class="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-600">Save Changes</button>
+            <div class="p-4 bg-white border-t border-slate-100 flex gap-3 z-10 shrink-0">
+              <button @click="isEditOpen = false" class="flex-1 py-3.5 rounded-full text-slate-600 font-semibold hover:bg-slate-50 transition-colors md3-ripple">Cancel</button>
+              <button @click="saveEdit" class="flex-1 bg-blue-500 text-white font-semibold py-3.5 rounded-full shadow-md active:scale-95 transition-transform md3-ripple">Save Changes</button>
             </div>
           </div>
         </div>

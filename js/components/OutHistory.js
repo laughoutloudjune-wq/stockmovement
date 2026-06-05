@@ -69,20 +69,20 @@ export default {
     return { list, filteredList, loading, search, load };
   },
   template: `
-    <div class="space-y-4 pb-20">
+    <div class="space-y-4 pb-12 pt-2">
       <div class="flex justify-between items-center px-1 gap-3">
-        <h3 class="font-bold text-lg text-slate-800 shrink-0">📜 History (OUT)</h3>
-        <button @click="load" class="text-blue-500 font-bold text-sm bg-blue-50 px-3 py-1 rounded-lg shrink-0">Refresh</button>
+        <h3 class="text-base font-semibold text-slate-800 shrink-0">📜 History (OUT)</h3>
+        <button @click="load" class="bg-blue-100 text-blue-700 rounded-full px-4 py-1.5 text-xs font-semibold hover:bg-blue-200 transition-colors active:scale-[0.98] shrink-0">Refresh</button>
       </div>
 
       <input
         v-model="search"
         placeholder="Search doc, project, contractor, requester..."
-        class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+        class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
       />
 
       <div v-if="loading" class="space-y-4 animate-pulse">
-        <div v-for="i in 3" class="h-24 bg-slate-200 rounded-2xl"></div>
+        <div v-for="i in 3" class="h-24 bg-slate-100 rounded-2xl"></div>
       </div>
 
       <div v-else-if="filteredList.length === 0" class="text-center py-10 text-slate-400 text-sm">
@@ -92,23 +92,23 @@ export default {
       <div v-else class="space-y-6">
         <div v-for="g in filteredList" :key="g.date">
           <div class="flex justify-center mb-3">
-            <span class="bg-slate-200/80 backdrop-blur text-slate-600 text-xs font-bold px-3 py-1 rounded-full shadow-sm">{{ g.date }}</span>
+            <span class="bg-slate-200/80 backdrop-blur text-slate-600 text-xs font-semibold px-3 py-1 rounded-full shadow-sm">{{ g.date }}</span>
           </div>
           <div class="space-y-3">
-            <div v-for="item in g.items" :key="item.doc" class="glass rounded-xl p-4 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-              <div class="flex justify-between mb-2">
-                <span class="font-bold text-slate-800 text-sm">OUT #{{ item.doc }}</span>
-                <span class="text-xs text-slate-400">{{ (item.ts.split('T')[1] || item.ts.split(' ')[1] || '').slice(0, 5) }}</span>
+            <div v-for="item in g.items" :key="item.doc" class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+              <div class="flex justify-between mb-2.5">
+                <span class="font-semibold text-slate-800 text-sm">OUT #{{ item.doc }}</span>
+                <span class="text-xs text-slate-500">{{ (item.ts.split('T')[1] || item.ts.split(' ')[1] || '').slice(0, 5) }}</span>
               </div>
-              <div class="flex flex-wrap gap-2">
-                <span class="px-2 py-1 bg-white border border-slate-100 rounded-md text-xs text-slate-600"><b>Proj:</b> {{ item.project || '-' }}</span>
-                <span class="px-2 py-1 bg-white border border-slate-100 rounded-md text-xs text-slate-600"><b>To:</b> {{ item.contractor }}</span>
-                <span class="px-2 py-1 bg-white border border-slate-100 rounded-md text-xs text-slate-600"><b>By:</b> {{ item.requester }}</span>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="px-2.5 py-1 bg-slate-50 rounded-full text-xs text-slate-600 border border-slate-100"><b>Proj:</b> {{ item.project || '-' }}</span>
+                <span class="px-2.5 py-1 bg-slate-50 rounded-full text-xs text-slate-600 border border-slate-100"><b>To:</b> {{ item.contractor }}</span>
+                <span class="px-2.5 py-1 bg-slate-50 rounded-full text-xs text-slate-600 border border-slate-100"><b>By:</b> {{ item.requester }}</span>
               </div>
-              <div class="flex justify-between items-end mt-2">
-                <span v-if="item.note" class="text-xs text-slate-400 italic truncate mr-2">{{ item.note }}</span>
+              <div class="flex justify-between items-end mt-3 pt-3 border-t border-slate-50">
+                <span v-if="item.note" class="text-xs text-slate-500 italic truncate mr-2">{{ item.note }}</span>
                 <span v-else class="flex-1"></span>
-                <span class="text-xs font-bold text-blue-500 shrink-0">{{ item.itemCount }} item{{ item.itemCount !== 1 ? 's' : '' }}</span>
+                <span class="text-xs font-semibold text-blue-600 shrink-0 bg-blue-50 px-2 py-0.5 rounded-full">{{ item.itemCount }} item{{ item.itemCount !== 1 ? 's' : '' }}</span>
               </div>
             </div>
           </div>

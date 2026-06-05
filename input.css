@@ -2,16 +2,112 @@
 @tailwind components;
 @tailwind utilities;
 
-body { background: #f0f4f8; }
-.glass {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.4);
+/* ── MD3 Foundation ── */
+:root {
+  --md-motion-easing-standard: cubic-bezier(0.2, 0.0, 0, 1.0);
+  --md-motion-duration-short: 200ms;
+  --md-motion-duration-medium: 300ms;
 }
+
+body {
+  background: theme('colors.md-sys-color-background');
+  color: theme('colors.md-sys-color-on-background');
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* ── Scrollbar Hiding ── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+/* ── MD3 Ripple Effect ── */
+.md3-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.md3-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s var(--md-motion-easing-standard), 
+              height 0.4s var(--md-motion-easing-standard),
+              opacity 0.4s;
+  opacity: 0;
+}
+.md3-ripple:active::after {
+  width: 250%;
+  height: 250%;
+  opacity: 0.12;
+  transition: width 0s, height 0s, opacity 0s;
+}
 
+/* ── MD3 Outlined Text Field (Floating Label) ── */
+.md3-input-container {
+  position: relative;
+  width: 100%;
+}
+.md3-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid theme('colors.md-sys-color-outline');
+  border-radius: 4px;
+  background: transparent;
+  padding: 16px;
+  font-size: 16px;
+  color: theme('colors.md-sys-color-on-surface');
+  outline: none;
+  transition: border-color 200ms var(--md-motion-easing-standard), border-width 200ms var(--md-motion-easing-standard);
+}
+.md3-input:focus,
+.md3-input-container:focus-within .md3-input {
+  border: 2px solid theme('colors.md-sys-color-primary');
+  padding: 15px; /* Offset for the 2px border so text doesn't jump */
+}
+.md3-label {
+  position: absolute;
+  left: 12px;
+  top: 16px;
+  background: theme('colors.md-sys-color-surface'); /* Match background of container */
+  padding: 0 4px;
+  color: theme('colors.md-sys-color-on-surface-variant');
+  font-size: 16px;
+  pointer-events: none;
+  transition: transform 200ms var(--md-motion-easing-standard), font-size 200ms var(--md-motion-easing-standard), color 200ms var(--md-motion-easing-standard);
+  transform-origin: left top;
+}
+.md3-input:focus ~ .md3-label,
+.md3-input:not(:placeholder-shown) ~ .md3-label,
+.md3-input-container:focus-within .md3-label,
+select.md3-input ~ .md3-label,
+.md3-input.has-val ~ .md3-label,
+.md3-picker .md3-label {
+  transform: translateY(-24px);
+  font-size: 12px;
+}
+.md3-input:focus ~ .md3-label,
+.md3-input-container:focus-within .md3-label {
+  color: theme('colors.md-sys-color-primary');
+}
+
+/* ── Safe area for bottom nav ── */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* ── Vue cloak ── */
 [v-cloak] { display: none; }
+
+/* ── Toast ── */
+#toast {
+  font-size: 0.875rem;
+  padding: 12px 20px;
+  border-radius: 4px;
+  background: #313033; /* MD3 inverse surface */
+  color: #F4EFF4; /* MD3 inverse on surface */
+  box-shadow: theme('boxShadow.md3-elevation-3');
+  transition: opacity 300ms var(--md-motion-easing-standard);
+}

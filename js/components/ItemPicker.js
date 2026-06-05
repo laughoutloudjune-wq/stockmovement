@@ -83,44 +83,46 @@ export default {
     return { isOpen, search, filtered, showAddButton, saving, open, select, clear, addNew, searchInput, materialStockBadgeClass };
   },
   template: `
-    <div class="relative">
+    <div class="relative w-full h-full flex items-center gap-2">
       <input
         type="text"
         :value="modelValue"
         readonly
         @click="open"
         :placeholder="placeholder || 'Select...'"
-        class="w-full bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer truncate"
-        :class="modelValue ? 'pr-8' : ''"
+        class="flex-1 bg-transparent border-none outline-none text-[#1D1B20] text-[16px] cursor-pointer truncate"
+        style="padding: 0; margin: 0; box-shadow: none;"
       />
       <button
         v-if="modelValue"
         @click.stop="clear"
-        class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 font-bold text-base leading-none transition-colors"
-        title="Clear"
+        aria-label="Clear selection"
+        class="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#E7E0EC] text-[#49454F] transition-colors md3-ripple"
       >×</button>
 
       <teleport to="body">
-        <div v-if="isOpen" class="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4">
+        <div v-if="isOpen" class="fixed inset-0 z-[100] flex items-end sm:items-start justify-center sm:pt-20 px-0 sm:px-4">
 
-          <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="isOpen = false"></div>
+          <div class="absolute inset-0 bg-[#1D1B20]/40 backdrop-blur-sm" @click="isOpen = false"></div>
 
-          <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col max-h-[55vh] animate-fade-in-up overflow-hidden ring-1 ring-black/5">
+          <div class="relative w-full sm:max-w-md bg-[#FEF7FF] rounded-t-[28px] sm:rounded-[28px] shadow-md3-elevation-3 flex flex-col max-h-[70vh] sm:max-h-[55vh] animate-fade-in-up overflow-hidden">
 
-            <div class="p-3 border-b border-slate-100 flex gap-2 bg-white z-10 shrink-0">
+            <!-- Search Header -->
+            <div class="p-3 border-b border-[#CAC4D0] flex gap-2 bg-[#F3EDF7] z-10 shrink-0">
               <input
                 v-model="search"
                 ref="searchInput"
                 placeholder="Type to search..."
-                class="flex-1 bg-slate-100 border-none rounded-xl px-4 py-3 text-base font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                class="flex-1 bg-[#FFFFFF] border-none rounded-[16px] px-4 py-3 text-[16px] font-medium focus:ring-2 focus:ring-[#6750A4] outline-none transition-colors"
               />
-              <button @click="isOpen = false" class="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">
+              <button @click="isOpen = false" class="px-4 py-2 text-[#49454F] font-medium hover:bg-[#E8DEF8] rounded-full text-sm transition-colors md3-ripple">
                 Cancel
               </button>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-2 space-y-1 overscroll-contain">
-              <div v-if="filtered.length === 0 && !showAddButton" class="p-8 text-center text-slate-400 text-sm italic">
+            <!-- Results List -->
+            <div class="flex-1 overflow-y-auto p-2 space-y-0.5 overscroll-contain bg-[#FEF7FF]">
+              <div v-if="filtered.length === 0 && !showAddButton" class="p-8 text-center text-[#49454F] text-sm">
                 No matches found for "{{ search }}"
               </div>
 
@@ -128,12 +130,12 @@ export default {
                 v-for="(item, idx) in filtered"
                 :key="idx"
                 @click="select(item)"
-                class="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 text-slate-700 text-sm font-bold transition-colors border border-transparent hover:border-blue-100 truncate flex justify-between items-center"
+                class="w-full text-left px-4 py-3 rounded-[12px] hover:bg-[#EADDFF] focus:bg-[#EADDFF] text-[#1D1B20] text-sm font-medium transition-colors truncate flex justify-between items-center md3-ripple"
               >
                 <template v-if="typeof item === 'object'">
                   <span>{{ item.name }}</span>
                   <span
-                    class="text-[10px] font-mono px-2 py-0.5 rounded ml-2 shrink-0"
+                    class="text-[10px] font-bold px-2 py-0.5 rounded-full ml-2 shrink-0"
                     :class="materialStockBadgeClass(item.stock, item.min)"
                   >{{ item.stock }}</span>
                 </template>
@@ -145,13 +147,12 @@ export default {
                 v-if="showAddButton"
                 @click="addNew"
                 :disabled="saving"
-                class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-blue-300 bg-blue-50/60 hover:bg-blue-100 text-blue-600 font-bold text-sm transition-colors disabled:opacity-60"
+                class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-[12px] border border-[#79747E] bg-[#F7F2FA] hover:bg-[#EADDFF] text-[#6750A4] font-medium text-sm transition-colors disabled:opacity-60 md3-ripple"
               >
                 <span class="text-lg leading-none shrink-0">{{ saving ? '…' : '+' }}</span>
                 <span class="truncate text-left">
-                  {{ saving ? 'Adding…' : 'Add new SKU: "' + search.trim() + '"' }}
+                  {{ saving ? 'Adding…' : 'Add new: "' + search.trim() + '"' }}
                 </span>
-                <span class="ml-auto text-[10px] font-normal text-blue-400 shrink-0">stock 0 · min 5</span>
               </button>
             </div>
 

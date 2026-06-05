@@ -3,46 +3,27 @@ import { db } from '../firebase.js';
 import { collection, doc, runTransaction, getDoc } from 'firebase/firestore'; 
 import { STR, LOOKUPS, toast, todayStr, materialStockStyle } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
+import { useStockForm } from '../useStockForm.js';
 
 export default {
   props: ['lang', 'user'],
   components: { ItemPicker },
   setup(props) {
     const form = ref({ date: todayStr(), project: '', subProject: '', contractor: '', note: '' });
-    const lines = ref([{ name: '', qty: '', note: '', stock: null, stockLoading: false }]);
+    const { lines, addLine, removeLine, onMaterialSelect } = useStockForm(() => ({ name: '', qty: '', note: '', stock: null }));
     const loading = ref(false);
     const S = computed(() => STR[props.lang]);
 
-    const addLine = () => lines.value.push({ name: '', qty: '', note: '', stock: null, stockLoading: false });
-    const removeLine = (index) => lines.value.splice(index, 1);
     const subProjects = computed(() => LOOKUPS.PROJECT_META[form.value.project] || []);
     const onProjectChange = () => { form.value.subProject = ''; };
     const goToReport = () => window.dispatchEvent(new CustomEvent('switch-tab', { detail: 'report' }));
 
-    const onMaterialSelect = async (line) => {
-      if (!line.name) return;
-      line.stockLoading = true;
-      try {
-        const safeId = line.name.replace(/\//g, '_');
-        const snap = await getDoc(doc(db, 'materials', safeId));
-        if (snap.exists()) {
-          const data = snap.data();
-          const s = Number(data.stock || 0);
-          const m = Number(data.min || 0);
-          line.stock = materialStockStyle(s, m);
-        } else {
-          line.stock = { val: 0, color: 'bg-gray-100 text-gray-500' };
-        }
-      } catch (e) { console.error(e); } 
-      finally { line.stockLoading = false; }
-    };
-
     const submit = async () => {
-      const validLines = lines.value.filter(l => l.name && l.qty).map(l => ({ 
+      const validLines = lines.value.filter(l => l.name && l.qty && Number(l.qty) > 0).map(l => ({ 
         name: l.name, qty: Number(l.qty), note: l.note || '' 
       }));
 
-      if (validLines.length === 0) return toast(props.lang === 'th' ? 'กรุณาเพิ่มรายการ' : 'Add at least one line');
+      if (validLines.length === 0) return toast(props.lang === 'th' ? 'กรุณาเพิ่มรายการและจำนวนต้องมากกว่า 0' : 'Add at least one line with qty > 0');
       
       loading.value = true;
       try {
@@ -100,81 +81,86 @@ export default {
     return { S, form, lines, loading, subProjects, onProjectChange, addLine, removeLine, onMaterialSelect, submit, goToReport };
   },
   template: `
-    <div class="space-y-6 pb-24">
-      <section class="glass rounded-2xl p-5 shadow-sm space-y-4">
+    <div class="space-y-6 pb-28">
+      <section class="bg-[#F3EDF7] rounded-[12px] p-4 space-y-4 shadow-sm">
         <div class="flex justify-between items-center">
-          <h3 class="font-bold text-lg text-slate-800">{{ S.outTitle }}</h3>
-          <button @click="goToReport" class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
-            📜 History
-          </button>
+          <h3 class="text-base font-medium text-[#1D1B20]">{{ S.outTitle }}</h3>
+          <button @click="goToReport" class="bg-[#EADDFF] text-[#21005D] rounded-full px-4 py-1.5 text-sm font-medium transition-colors md3-ripple">{{ S.history }}</button>
         </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="min-w-0">
-             <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.requester }}</label>
-             <div class="flex items-center gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2.5">
-                <img :src="user.photoURL" class="w-6 h-6 rounded-full border border-white shadow-sm" />
-                <div class="flex flex-col">
-                  <span class="text-sm font-bold text-slate-700 leading-tight">{{ user.displayName }}</span>
-                  <span class="text-[10px] text-slate-400 leading-tight">{{ user.email }}</span>
-                </div>
-             </div>
+        
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-6 md:col-span-4">
+            <div class="md3-input-container">
+              <input type="date" v-model="form.date" class="md3-input" placeholder=" " />
+              <label class="md3-label !bg-[#F3EDF7]">{{ S.outDate }}</label>
+            </div>
           </div>
-          <div class="min-w-0">
-            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.outDate }}</label>
-            <input type="date" v-model="form.date" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
+          <div class="col-span-6 md:col-span-4">
+            <div class="md3-input-container md3-picker">
+              <ItemPicker v-model="form.project" source="PROJECTS" placeholder=" " @change="onProjectChange" class="md3-input" :class="{'has-val': !!form.project}" />
+              <label class="md3-label !bg-[#F3EDF7]">{{ S.proj }}</label>
+            </div>
           </div>
-          <div class="min-w-0">
-            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.proj }}</label>
-            <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" @change="onProjectChange" />
-          </div>
-          <div class="min-w-0">
-            <label class="block text-xs font-bold text-slate-500 mb-1">Sub Project</label>
-            <ItemPicker
-              v-model="form.subProject"
-              :items="subProjects"
-              :placeholder="subProjects.length ? 'Select sub project...' : 'No sub project'"
-            />
-          </div>
-          <div class="min-w-0">
-            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.contractor }}</label>
-            <ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pickAdd" />
-          </div>
-          <div class="md:col-span-2 min-w-0">
-            <label class="block text-xs font-bold text-slate-500 mb-1">{{ S.note }}</label>
-            <input v-model="form.note" :placeholder="lang==='th'?'หมายเหตุ (ถ้ามี)':'Note (Optional)'" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
+          <div class="col-span-12 md:col-span-4">
+            <div class="md3-input-container md3-picker">
+              <ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pick" class="md3-input" :class="{'has-val': !!form.contractor}" />
+              <label class="md3-label !bg-[#F3EDF7]">{{ S.contractor || 'Contractor' }}</label>
+            </div>
           </div>
         </div>
       </section>
 
-      <div class="space-y-4">
-        <div v-for="(line, idx) in lines" :key="idx" class="glass rounded-2xl p-4 shadow-sm relative animate-fade-in-up">
-          <button @click="removeLine(idx)" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">×</button>
+      <div class="space-y-3">
+        <div v-for="(line, idx) in lines" :key="idx" class="bg-[#F3EDF7] rounded-[12px] p-4 relative animate-fade-in-up">
+          <button @click="removeLine(idx)" aria-label="Remove" class="absolute top-2 right-2 w-10 h-10 flex items-center justify-center rounded-full text-[#49454F] hover:bg-[#E8DEF8] transition-colors md3-ripple">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
           <div class="space-y-3 pt-2">
-            <div class="grid grid-cols-12 gap-3">
+            <div class="grid grid-cols-12 gap-4 mt-2">
               <div class="col-span-8 min-w-0">
-                <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang==='th'?'ระบุวัสดุ...':'Select material...'" :allow-add="true" @change="onMaterialSelect(line)" />
+                <div class="md3-input-container md3-picker">
+                  <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="lang==='th'?'ระบุวัสดุ...':'Select material...'" :allow-add="true" @change="onMaterialSelect(line)" class="md3-input" :class="{'has-val': !!line.name}" />
+                  <label class="md3-label !bg-[#F3EDF7]">{{ lang === 'th' ? 'รายการวัสดุ' : 'Material' }}</label>
+                </div>
               </div>
               <div class="col-span-4 min-w-0">
-                <input type="number" v-model="line.qty" placeholder="0" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold text-slate-800 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
+                <div class="md3-input-container">
+                  <input type="number" v-model="line.qty" placeholder=" " class="md3-input text-center font-bold" />
+                  <label class="md3-label !bg-[#F3EDF7]">{{ lang === 'th' ? 'จำนวน' : 'Qty' }}</label>
+                </div>
               </div>
             </div>
-            <div class="flex items-center justify-between gap-3">
-               <input v-model="line.note" :placeholder="lang==='th'?'หมายเหตุรายตัว...':'Line note...'" class="flex-1 bg-transparent border-b border-slate-200 text-sm py-1 outline-none text-slate-600" />
-               <div class="flex items-center gap-2 shrink-0 h-8">
-                  <span class="text-xs text-slate-400 font-bold uppercase">{{ lang==='th'?'คงเหลือ':'Stock' }}</span>
-                  <div v-if="line.stockLoading" class="animate-spin w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full"></div>
-                  <div v-else-if="line.stock" :class="line.stock.color" class="px-2 py-0.5 rounded-lg text-xs font-extrabold shadow-sm">{{ line.stock.val }}</div>
-                  <div v-else class="text-slate-300 text-xl font-bold">-</div>
-               </div>
+            <div class="flex items-center justify-between gap-3 pt-2">
+              <div class="md3-input-container flex-1">
+                <input type="text" v-model="line.note" placeholder=" " class="md3-input" />
+                <label class="md3-label !bg-[#F3EDF7]">{{ S.lineNote }}</label>
+              </div>
+              <div class="flex items-center gap-2 text-xs flex-shrink-0 min-w-[80px] justify-end">
+                <span class="text-xs font-medium text-[#49454F]">{{ lang === 'th' ? 'คงเหลือ' : 'Stock' }}</span>
+                <div v-if="line.stockLoading" class="animate-spin w-3 h-3 border-2 border-[#CAC4D0] border-t-[#6750A4] rounded-full"></div>
+                <span v-else-if="line.stock" :class="line.stock.color" class="px-2 py-0.5 rounded-[4px] font-bold text-xs">{{ line.stock.val }}</span>
+                <span v-else class="text-[#CAC4D0]">—</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <div class="flex justify-center"><button @click="addLine" class="flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95"><span class="text-xl leading-none text-blue-500">+</span> {{ S.btnAdd }}</button></div>
-      <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
-        <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div><span v-else>💾 {{ S.btnSubmit }}</span>
+
+      <div class="flex justify-center mt-6">
+        <button @click="addLine" class="flex items-center gap-2 px-6 py-2 rounded-full border border-[#79747E] text-[#6750A4] font-medium hover:bg-[#6750A4]/10 transition-colors md3-ripple">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          {{ S.btnAdd }}
+        </button>
+      </div>
+      
+      <!-- Extended FAB for Save -->
+      <div class="fixed bottom-28 right-4 md:bottom-28 z-30">
+        <button @click="submit" :disabled="loading" class="bg-[#EADDFF] text-[#21005D] h-[56px] px-4 min-w-[80px] rounded-[16px] shadow-lg flex items-center justify-center gap-2 hover:bg-[#E8DEF8] transition-colors md3-ripple disabled:opacity-50">
+          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-[#21005D] border-t-transparent rounded-full"></div>
+          <template v-else>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span class="font-medium pr-2">{{ S.btnSubmit }}</span>
+          </template>
         </button>
       </div>
     </div>

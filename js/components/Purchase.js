@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { db } from '../firebase.js';
-import { collection, addDoc, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { STR, LOOKUPS, toast, todayStr } from '../shared.js';
 
 const daysFromNow = (n) => {
@@ -54,9 +54,9 @@ export default {
 
     const submit = async () => {
       const validLines = lines.value
-        .filter(l => l.name && l.qty)
+        .filter(l => l.name && l.qty && Number(l.qty) > 0)
         .map(normalizeItem);
-      if (!validLines.length) return toast(props.lang === 'th' ? 'กรุณาเพิ่มรายการ' : 'Add line');
+      if (!validLines.length) return toast(props.lang === 'th' ? 'กรุณาเพิ่มรายการและจำนวนต้องมากกว่า 0' : 'Add at least one line with qty > 0');
 
       loading.value = true;
       try {
@@ -95,17 +95,19 @@ export default {
       }
     };
 
-    const loadHistory = async () => {
+    let unsubHistory = null;
+    const loadHistory = () => {
       historyLoading.value = true;
       try {
         const q = query(collection(db, 'orders'), where('type', '==', 'PURCHASE'));
-        const snap = await getDocs(q);
-        const rawList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rawList.sort((a, b) => (b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || ''));
-        history.value = rawList;
+        unsubHistory = onSnapshot(q, (snap) => {
+          const rawList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          rawList.sort((a, b) => (b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || ''));
+          history.value = rawList;
+          historyLoading.value = false;
+        });
       } catch (e) {
         console.error(e);
-      } finally {
         historyLoading.value = false;
       }
     };
@@ -115,7 +117,6 @@ export default {
       try {
         await deleteDoc(doc(db, 'orders', id));
         toast('Deleted');
-        await loadHistory();
       } catch (e) {
         console.error(e);
         toast('Failed to delete');
@@ -151,7 +152,6 @@ export default {
         });
         toast('Updated');
         isEditOpen.value = false;
-        await loadHistory();
       } catch (e) {
         console.error(e);
         toast('Failed to update');
@@ -213,136 +213,170 @@ export default {
   },
   template: `
     <div class="space-y-6 pb-28">
-      <section class="glass rounded-2xl p-5 shadow-sm space-y-4">
-        <h3 class="font-bold text-lg text-slate-800">{{ S.tabs.pur }}</h3>
+      <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
+        <h3 class="text-base font-semibold text-slate-800">{{ S.tabs.pur }}</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">Requester</label>
-            <div class="flex items-center gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2.5">
-              <img :src="user.photoURL" class="w-6 h-6 rounded-full border border-white shadow-sm" />
-              <div class="flex flex-col">
-                <span class="text-sm font-bold text-slate-700 leading-tight">{{ user.displayName }}</span>
-                <span class="text-[10px] text-slate-400 leading-tight">{{ user.email }}</span>
-              </div>
-            </div>
+
+
+          <div class="md3-input-container md3-picker">
+            <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" @change="onProjectChange" class="md3-input" :class="{'has-val': !!form.project}" />
+            <label class="md3-label !bg-white">{{ S.purProj }}</label>
           </div>
 
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purNeedBy }}</label>
-            <input type="date" v-model="form.needBy" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
+          <div class="md3-input-container md3-picker">
+            <ItemPicker v-model="form.subProject" :items="subProjects" :placeholder="subProjects.length ? S.pick : '-'" class="md3-input" :class="{'has-val': !!form.subProject}" />
+            <label class="md3-label !bg-white">{{ S.subProj }}</label>
           </div>
 
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purProj }}</label>
-            <ItemPicker v-model="form.project" source="PROJECTS" :placeholder="S.pick" @change="onProjectChange" />
+          <div class="md3-input-container md3-picker">
+            <ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pick" class="md3-input" :class="{'has-val': !!form.contractor}" />
+            <label class="md3-label !bg-white">{{ S.purContractor }}</label>
           </div>
 
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">Sub Project</label>
-            <ItemPicker v-model="form.subProject" :items="subProjects" :placeholder="subProjects.length ? 'Select sub project...' : 'No sub project'" />
-          </div>
-
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purContractor }}</label>
-            <ItemPicker v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pick" />
-          </div>
-
-          <div class="min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purPriority }}</label>
-            <select v-model="form.priority" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500">
+          <div class="md3-input-container">
+            <select v-model="form.priority" class="md3-input">
               <option value="Normal">Normal</option>
               <option value="Urgent">Urgent</option>
               <option value="Critical">Critical</option>
             </select>
+            <label class="md3-label !bg-white">{{ S.purPriority }}</label>
           </div>
 
-          <div class="md:col-span-2 min-w-0">
-            <label class="text-xs font-bold text-slate-500 block mb-1">{{ S.purNote }}</label>
-            <input v-model="form.note" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none shadow-sm focus:ring-2 focus:ring-blue-500" />
+          <div class="md:col-span-2 md3-input-container">
+            <input v-model="form.note" class="md3-input" placeholder=" " />
+            <label class="md3-label !bg-white">{{ S.purNote }}</label>
           </div>
         </div>
       </section>
 
+      <!-- Line Items -->
       <div class="space-y-3">
-        <div v-for="(line, idx) in lines" :key="idx" class="glass rounded-2xl p-4 shadow-sm relative animate-fade-in-up space-y-3">
-          <button @click="removeLine(idx)" class="absolute top-2 right-2 text-slate-400 hover:text-red-500 text-xl font-bold p-2">x</button>
+        <div v-for="(line, idx) in lines" :key="idx" class="bg-[#F3EDF7] rounded-[12px] p-4 relative animate-fade-in-up">
+          <button @click="removeLine(idx)" class="absolute top-2 right-2 w-10 h-10 flex items-center justify-center rounded-full text-[#49454F] hover:bg-[#E8DEF8] transition-colors md3-ripple">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
 
-          <div class="grid grid-cols-12 gap-3 mt-2">
-            <div class="col-span-8 min-w-0"><ItemPicker v-model="line.name" source="MATERIALS" :placeholder="S.pick" /></div>
-            <div class="col-span-4 min-w-0"><input type="number" v-model="line.qty" placeholder="Qty" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-center font-bold outline-none shadow-sm focus:ring-2 focus:ring-blue-500" /></div>
+          <div class="grid grid-cols-12 gap-3 mt-4">
+            <div class="col-span-8 min-w-0">
+              <div class="md3-input-container">
+                <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="S.pick" class="md3-input" />
+                <label class="md3-label !bg-[#F3EDF7]">{{ lang === 'th' ? 'รายการวัสดุ' : 'Material' }}</label>
+              </div>
+            </div>
+            <div class="col-span-4 min-w-0">
+              <div class="md3-input-container">
+                <input type="number" v-model="line.qty" placeholder=" " class="md3-input text-center font-bold" />
+                <label class="md3-label !bg-[#F3EDF7]">{{ lang === 'th' ? 'จำนวน' : 'Qty' }}</label>
+              </div>
+            </div>
           </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-1 gap-3">
-            <select v-model="line.status" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
-              <option v-for="st in ITEM_STATUS" :key="st" :value="st">{{ st }}</option>
-            </select>
+          
+          <div class="mt-4">
+            <div class="md3-input-container">
+              <input type="text" v-model="line.note" class="md3-input" placeholder=" " />
+              <label class="md3-label !bg-[#F3EDF7]">{{ S.purNote || 'Note' }}</label>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="flex justify-center"><button @click="addLine" class="px-6 py-3 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95">+ {{ S.btnAdd }}</button></div>
+      <div class="flex justify-center mt-6">
+        <button @click="addLine" class="flex items-center gap-2 px-6 py-2.5 rounded-full border border-[#79747E] text-[#6750A4] font-medium hover:bg-[#6750A4]/10 transition-colors md3-ripple">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          {{ S.btnAdd }}
+        </button>
+      </div>
 
-      <section class="mt-8 border-t border-slate-200/50 pt-6">
-        <div class="flex items-center justify-between mb-4 px-2 gap-3 flex-wrap">
-          <h3 class="font-bold text-lg text-slate-800">{{ S.purOlder || 'History' }}</h3>
-          <select v-model="historyStatusFilter" class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 outline-none shadow-sm">
-            <option value="ALL">All Status</option>
-            <option value="Requested">Requested</option>
-            <option value="Approved">Approved</option>
-            <option value="Ordered">Ordered</option>
-            <option value="Received">Received</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+      <section class="mt-10 pt-6 border-t border-slate-100">
+        <div class="flex items-center justify-between mb-6 px-1 gap-3 flex-wrap">
+          <h3 class="text-lg font-semibold text-slate-800">{{ S.purOlder }}</h3>
+          <div class="md3-input-container w-40 shrink-0">
+            <select v-model="historyStatusFilter" class="md3-input font-medium">
+              <option value="ALL">All Status</option>
+              <option value="Requested">Requested</option>
+              <option value="Approved">Approved</option>
+              <option value="Ordered">Ordered</option>
+              <option value="Received">Received</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+            <label class="md3-label !bg-[#FEF7FF]">Filter</label>
+          </div>
         </div>
-        <div v-if="historyLoading" class="space-y-3 animate-pulse"><div v-for="i in 3" class="h-20 bg-slate-200 rounded-xl"></div></div>
-        <div v-else-if="filteredHistory.length === 0" class="text-center text-slate-400 py-6">No requests found</div>
+        <div v-if="historyLoading" class="space-y-4 animate-pulse"><div v-for="i in 3" class="h-24 bg-slate-100 rounded-2xl"></div></div>
+        <div v-else-if="filteredHistory.length === 0" class="text-center py-16 text-slate-400 font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">No requests found</div>
 
         <div v-else class="space-y-4">
-          <div v-for="h in filteredHistory" :key="h.id" class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden group">
-            <div class="p-4 flex justify-between items-start gap-2 hover:bg-slate-50 transition-colors">
-              <div class="min-w-0 flex-1 cursor-pointer" @click="toggleExpand(h)">
-                <div class="font-bold text-slate-800 text-sm truncate">{{ h.docNo }} | {{ [h.project, h.subProject].filter(Boolean).join(' > ') || '-' }}</div>
-                <div class="text-xs text-slate-500 mt-1 truncate">{{ h.date }} | Need: {{ h.needBy || '-' }} | Priority: {{ h.priority || '-' }}</div>
-                <div class="text-xs text-slate-500 mt-1 truncate">Remark: {{ h.note || h.remark || '-' }}</div>
+          <div v-for="h in filteredHistory" :key="h.id" class="bg-white rounded-[24px] shadow-sm border border-[#CAC4D0] overflow-hidden hover:shadow-md transition-shadow group">
+            <div class="p-5 flex flex-col sm:flex-row justify-between items-start gap-4 hover:bg-slate-50/50 transition-colors cursor-pointer" @click="toggleExpand(h)">
+              <div class="min-w-0 flex-1 w-full">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap" :class="statusColor(h.status)">{{ h.status }}</span>
+                  <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">{{ h.date }}</span>
+                </div>
+                <div class="font-bold text-slate-800 text-base truncate">{{ h.docNo }}</div>
+                <div class="text-sm font-semibold text-slate-600 truncate mt-1">{{ [h.project, h.subProject].filter(Boolean).join(' > ') || '-' }}</div>
               </div>
-              <div class="flex flex-col items-end gap-2">
-                <span class="px-2 py-1 rounded-lg text-[10px] uppercase font-extrabold tracking-wide whitespace-nowrap" :class="statusColor(h.status)">{{ h.status }}</span>
-                <div class="flex gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button @click="openEdit(h)" class="p-1.5 bg-blue-50 text-blue-500 rounded-lg text-xs font-bold">Edit</button>
-                  <button @click="removeOrder(h.id)" class="p-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold">Del</button>
+              <div class="flex sm:flex-col items-center sm:items-end gap-2 w-full sm:w-auto shrink-0 justify-between">
+                <div class="text-right flex flex-col items-start sm:items-end text-xs font-medium text-slate-500">
+                  <div>Need: <span class="font-semibold text-slate-700">{{ h.needBy || '-' }}</span></div>
+                  <div>Priority: <span class="font-semibold text-slate-700">{{ h.priority || '-' }}</span></div>
+                </div>
+                <div class="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button @click.stop="openEdit(h)" class="px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors md3-ripple">Edit</button>
+                  <button @click.stop="removeOrder(h.id)" class="px-4 py-1.5 bg-red-50 text-red-700 rounded-full text-xs font-semibold hover:bg-red-100 transition-colors md3-ripple">Delete</button>
                 </div>
               </div>
             </div>
 
-            <div v-if="expandedDoc === h.id" class="bg-slate-50 border-t border-slate-100 p-4 animate-fade-in-up space-y-3">
-              <div class="text-xs text-slate-600">
-                Requester: <b>{{ h.requester || '-' }}</b> ({{ h.requesterEmail || '-' }})
-              </div>
-              <div class="text-xs text-slate-600">Order note: {{ h.note || h.remark || '-' }}</div>
-
-              <div class="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200">
-                <span class="text-xs font-bold text-slate-400 uppercase">Order Status:</span>
-                <select :value="h.status" @change="updateStatus(h, $event.target.value)" class="bg-transparent font-bold text-sm outline-none text-slate-700 flex-1">
-                  <option value="Requested">Requested</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Ordered">Ordered</option>
-                  <option value="Received">Received</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-
-              <div class="space-y-2">
-                <div v-for="(li, idx) in h.items" :key="idx" class="bg-white border border-slate-100 rounded-xl p-3">
-                  <div class="flex justify-between gap-2">
-                    <div class="font-bold text-sm text-slate-700 break-words">{{ li.name }}</div>
-                    <div class="font-mono font-bold text-sm">{{ li.qty }}</div>
+            <div v-if="expandedDoc === h.id" class="bg-[#F3EDF7] border-t border-[#CAC4D0] p-5 animate-fade-in-up space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100">
+                  <div class="text-[10px] uppercase font-bold tracking-wide text-slate-500 mb-1">Requester</div>
+                  <div class="text-sm font-semibold text-slate-800">{{ h.requester || '-' }} <span class="text-xs font-normal text-slate-500">({{ h.requesterEmail || '-' }})</span></div>
+                </div>
+                <div class="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100">
+                  <div class="text-[10px] uppercase font-bold tracking-wide text-slate-500 mb-1">Contractor</div>
+                  <div class="text-sm font-semibold text-slate-800">{{ h.contractor || '-' }}</div>
+                </div>
+                <div class="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 md:col-span-2">
+                  <div class="text-[10px] uppercase font-bold tracking-wide text-slate-500 mb-1">Order Note</div>
+                  <div class="text-sm text-slate-700">{{ h.note || h.remark || '-' }}</div>
+                </div>
+                <div class="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 md:col-span-2 flex items-center gap-3">
+                  <div class="text-[10px] uppercase font-bold tracking-wide text-slate-500 w-24 shrink-0">Order Status</div>
+                  <div class="md3-input-container flex-1">
+                    <select :value="h.status" @change="updateStatus(h, $event.target.value)" class="md3-input font-bold text-slate-800">
+                      <option value="Requested">Requested</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Ordered">Ordered</option>
+                      <option value="Received">Received</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                    <label class="md3-label !bg-white">Update Status</label>
                   </div>
-                  <div class="grid grid-cols-1 md:grid-cols-1 gap-2 mt-2 text-xs">
-                    <div class="flex items-center gap-2">
-                      <span>Status:</span>
-                      <select :value="li.status || 'Requested'" @change="updateItemStatus(h, idx, $event.target.value)" class="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs">
-                        <option v-for="st in ITEM_STATUS" :key="st" :value="st">{{ st }}</option>
-                      </select>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-[16px] border border-slate-200 overflow-hidden shadow-sm mt-2">
+                <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                  <div class="grid grid-cols-[minmax(180px,1fr)_80px_140px] gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[400px]">
+                    <span>Material</span>
+                    <span class="text-right">Qty</span>
+                    <span>Item Status</span>
+                  </div>
+                </div>
+                <div class="overflow-x-auto">
+                  <div v-for="(li, idx) in h.items" :key="idx" class="px-4 py-3 border-b border-slate-50 last:border-b-0">
+                    <div class="grid grid-cols-[minmax(180px,1fr)_80px_140px] gap-3 text-sm text-slate-800 min-w-[400px] items-center">
+                      <span class="font-semibold break-words">{{ li.name }}</span>
+                      <span class="font-bold font-mono text-right text-base">{{ li.qty }}</span>
+                      <div>
+                        <div class="md3-input-container">
+                          <select :value="li.status || 'Requested'" @change="updateItemStatus(h, idx, $event.target.value)" class="md3-input py-2 text-xs font-semibold">
+                            <option v-for="st in ITEM_STATUS" :key="st" :value="st">{{ st }}</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -352,58 +386,106 @@ export default {
         </div>
       </section>
 
-      <div class="fixed bottom-6 left-4 right-4 max-w-4xl mx-auto z-30">
-        <button @click="submit" :disabled="loading" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div><span v-else>{{ S.btnSubmit }}</span>
+
+
+      <!-- Extended FAB for Save -->
+      <div class="fixed bottom-28 right-4 md:bottom-28 z-30">
+        <button @click="submit" :disabled="loading" class="bg-[#EADDFF] text-[#21005D] h-[56px] px-4 min-w-[80px] rounded-[16px] shadow-lg flex items-center justify-center gap-2 hover:bg-[#E8DEF8] transition-colors md3-ripple disabled:opacity-50">
+          <div v-if="loading" class="animate-spin w-5 h-5 border-2 border-[#21005D] border-t-transparent rounded-full"></div>
+          <template v-else>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span class="font-medium pr-2">{{ S.btnSubmit }}</span>
+          </template>
         </button>
       </div>
 
       <teleport to="body">
-        <div v-if="isEditOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" @click="isEditOpen = false"></div>
-          <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 animate-fade-in-up max-h-[90vh] overflow-y-auto">
-            <h3 class="font-bold text-lg mb-4 text-slate-800">Edit Purchase Order</h3>
-            <div class="space-y-3">
-              <div class="grid grid-cols-2 gap-3">
-                <div><label class="label">Date</label><input type="date" v-model="editForm.date" class="input" /></div>
-                <div><label class="label">Need By</label><input type="date" v-model="editForm.needBy" class="input" /></div>
-              </div>
-              <div><label class="label">Project</label><ItemPicker v-model="editForm.project" source="PROJECTS" /></div>
-              <div><label class="label">Sub Project</label><ItemPicker v-model="editForm.subProject" :items="LOOKUPS.PROJECT_META[editForm.project] || []" /></div>
-              <div><label class="label">Contractor</label><ItemPicker v-model="editForm.contractor" source="CONTRACTORS" /></div>
-              <div class="grid grid-cols-2 gap-3">
-                <div><label class="label">Priority</label><select v-model="editForm.priority" class="input"><option>Normal</option><option>Urgent</option><option>Critical</option></select></div>
-                <div><label class="label">Status</label><select v-model="editForm.status" class="input"><option>Requested</option><option>Approved</option><option>Ordered</option><option>Received</option><option>Cancelled</option></select></div>
-              </div>
-              <div><label class="label">Note</label><input v-model="editForm.note" class="input" /></div>
-
-              <div class="pt-2 border-t border-slate-100">
-                <label class="label mb-2">Items</label>
-                <div v-for="(line, idx) in editForm.items" :key="idx" class="space-y-2 mb-2 bg-slate-50 p-2 rounded-lg">
-                  <div class="flex gap-2 items-center">
-                    <div class="flex-1"><ItemPicker v-model="line.name" source="MATERIALS" /></div>
-                    <input type="number" v-model="line.qty" class="w-16 input text-center font-bold" />
-                    <button @click="removeEditLine(idx)" class="text-red-500 font-bold px-2">x</button>
-                  </div>
-                  <div class="grid grid-cols-1 md:grid-cols-1 gap-2">
-                    <select v-model="line.status" class="input"><option v-for="st in ITEM_STATUS" :key="st">{{ st }}</option></select>
-                  </div>
+        <div v-if="isEditOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-[#1D1B20]/40 backdrop-blur-sm" @click="isEditOpen = false"></div>
+          <div class="relative w-full max-w-2xl bg-[#FEF7FF] rounded-[28px] shadow-md3-elevation-3 flex flex-col max-h-[90vh] animate-fade-in-up overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+              <h3 class="font-semibold text-lg text-slate-800">Edit Purchase Order</h3>
+              <button @click="isEditOpen = false" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 md3-ripple">×</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-5 bg-[#FEF7FF]">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md3-input-container">
+                  <input type="date" v-model="editForm.date" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Date</label>
                 </div>
-                <button @click="addEditLine" class="w-full py-2 border border-dashed border-slate-300 rounded-lg text-slate-400 text-sm font-bold hover:bg-slate-50">+ Add Item</button>
+                <div class="md3-input-container">
+                  <input type="date" v-model="editForm.needBy" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Need By</label>
+                </div>
+                
+                <div class="md3-input-container md3-picker">
+                  <ItemPicker v-model="editForm.project" source="PROJECTS" class="md3-input" :class="{'has-val': !!editForm.project}" />
+                  <label class="md3-label !bg-[#FEF7FF]">Project</label>
+                </div>
+                <div class="md3-input-container md3-picker">
+                  <ItemPicker v-model="editForm.subProject" :items="LOOKUPS.PROJECT_META[editForm.project] || []" class="md3-input" :class="{'has-val': !!editForm.subProject}" />
+                  <label class="md3-label !bg-[#FEF7FF]">Sub Project</label>
+                </div>
+
+                <div class="md3-input-container md3-picker">
+                  <ItemPicker v-model="editForm.contractor" source="CONTRACTORS" class="md3-input" :class="{'has-val': !!editForm.contractor}" />
+                  <label class="md3-label !bg-[#FEF7FF]">Contractor</label>
+                </div>
+
+                <div class="md3-input-container">
+                  <select v-model="editForm.priority" class="md3-input">
+                    <option>Normal</option><option>Urgent</option><option>Critical</option>
+                  </select>
+                  <label class="md3-label !bg-[#FEF7FF]">Priority</label>
+                </div>
+                <div class="md3-input-container">
+                  <select v-model="editForm.status" class="md3-input">
+                    <option>Requested</option><option>Approved</option><option>Ordered</option><option>Received</option><option>Cancelled</option>
+                  </select>
+                  <label class="md3-label !bg-[#FEF7FF]">Status</label>
+                </div>
+
+                <div class="md:col-span-2 md3-input-container">
+                  <input v-model="editForm.note" class="md3-input" placeholder=" " />
+                  <label class="md3-label !bg-[#FEF7FF]">Note</label>
+                </div>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200">
+                <h4 class="text-sm font-bold text-slate-800 mb-3">Line Items</h4>
+                <div class="space-y-3">
+                  <div v-for="(line, idx) in editForm.items" :key="idx" class="bg-white border border-slate-200 rounded-2xl p-4 relative group">
+                    <button @click="removeEditLine(idx)" class="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center bg-red-100 text-red-600 rounded-full text-xs font-bold shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                    <div class="flex gap-3 mb-3">
+                      <div class="md3-input-container md3-picker flex-1">
+                        <ItemPicker v-model="line.name" source="MATERIALS" class="md3-input" :class="{'has-val': !!line.name}" />
+                        <label class="md3-label !bg-white">Material</label>
+                      </div>
+                      <div class="md3-input-container w-24">
+                        <input type="number" v-model="line.qty" class="md3-input text-center font-bold" placeholder=" " />
+                        <label class="md3-label !bg-white">Qty</label>
+                      </div>
+                    </div>
+                    <div>
+                      <select v-model="line.status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#6750A4] focus:ring-1 focus:ring-[#6750A4] outline-none transition-colors">
+                        <option v-for="st in ITEM_STATUS" :key="st">{{ st }}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button @click="addEditLine" class="w-full py-3.5 border-2 border-dashed border-slate-200 rounded-2xl text-blue-600 text-sm font-bold hover:bg-blue-50 transition-colors md3-ripple">+ Add Item</button>
+                </div>
               </div>
             </div>
-            <div class="flex gap-2 mt-6">
-              <button @click="isEditOpen = false" class="flex-1 bg-slate-100 font-bold py-3 rounded-xl">Cancel</button>
-              <button @click="saveEdit" class="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg">Save Changes</button>
+
+            <div class="p-4 bg-white border-t border-slate-100 flex gap-3 z-10 shrink-0">
+              <button @click="isEditOpen = false" class="flex-1 py-3.5 rounded-full text-slate-600 font-semibold hover:bg-slate-50 transition-colors md3-ripple">Cancel</button>
+              <button @click="saveEdit" class="flex-1 bg-blue-500 text-white font-semibold py-3.5 rounded-full shadow-md active:scale-95 transition-transform md3-ripple">Save Changes</button>
             </div>
           </div>
         </div>
       </teleport>
     </div>
-  `,
-  styles: `
-    .label { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 0.25rem; }
-    .input { width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; outline: none; }
   `
 };
 

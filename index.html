@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MaterialFlow</title>
   <link rel="icon" type="image/png" href="./favicon.png" />
   <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
@@ -24,10 +24,10 @@
   }
 </script>
 </head>
-<body class="text-slate-800 antialiased min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
+<body class="text-slate-800 antialiased min-h-screen">
 
   <div id="app" v-cloak></div>
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-4 py-2 rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-300"></div>
+  <div id="toast" class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] opacity-0 pointer-events-none"></div>
 
   <script type="module" src="./js/app.js"></script>
 </body>

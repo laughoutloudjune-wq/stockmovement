@@ -102,7 +102,7 @@ export const STR = {
     btnSubmit: "บันทึก", btnAdd: "เพิ่มรายการ", 
     inTitle: "รับเข้าวัสดุ", inDate: "วันที่รับเข้า",
     adjSys: "ในระบบ", adjPhysical: "นับจริง", adjHint: "นับสต็อกจริง ระบบจะปรับเป็นตัวเลขนี้และบันทึกผลต่างในรายงาน",
-    outTitle: "เบิกจ่ายวัสดุ", outDate: "วันที่เบิก", proj: "โครงการ", contractor: "ผู้รับเหมา", requester: "ผู้เบิก", note: "หมายเหตุ",
+    outTitle: "เบิกจ่ายวัสดุ", outDate: "วันที่เบิก", proj: "โครงการ", subProj: "โครงการย่อย", contractor: "ผู้รับเหมา", requester: "ผู้เบิก", note: "หมายเหตุ", lineNote: "หมายเหตุรายตัว...", history: "ประวัติ",
     purProj: "โครงการ", purNeedBy: "วันที่ต้องการ", purContractor: "ผู้รับเหมา", purPriority: "ความเร่งด่วน", purNote: "หมายเหตุ", purOlder: "ประวัติการขอซื้อ",
     reportTitle: "รายงาน", reportGen: "สร้างรายงาน"
   },
@@ -114,7 +114,7 @@ export const STR = {
     btnSubmit: "Submit", btnAdd: "Add Line",
     inTitle: "Stock In", inDate: "Date Received",
     adjSys: "System", adjPhysical: "Physical count", adjHint: "Enter the quantity you counted. Stock will be set to this value; the report shows system → counted and the difference.",
-    outTitle: "Stock Out", outDate: "Date Issued", proj: "Project", contractor: "Contractor", requester: "Requester", note: "Note",
+    outTitle: "Stock Out", outDate: "Date Issued", proj: "Project", subProj: "Sub Project", contractor: "Contractor", requester: "Requester", note: "Note", lineNote: "Line note...", history: "History",
     purProj: "Project", purNeedBy: "Need By", purContractor: "Contractor", purPriority: "Priority", purNote: "Note", purOlder: "History",
     reportTitle: "Report", reportGen: "Generate"
   }

@@ -1,7 +1,7 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { toast, preloadLookups } from '../shared.js';
+import { toast } from '../shared.js';
 import Migrate from './Migrate.js';
 
 export default {
@@ -99,7 +99,7 @@ export default {
 
         isModalOpen.value = false;
         await loadData();
-        await preloadLookups(true);
+
       } catch (e) {
         console.error(e);
         toast('Failed to save');
@@ -115,7 +115,7 @@ export default {
         await deleteDoc(doc(db, currentConfig.value.col, id));
         toast('Deleted');
         await loadData();
-        await preloadLookups(true);
+
       } catch (e) {
         console.error(e);
         toast('Failed to delete');

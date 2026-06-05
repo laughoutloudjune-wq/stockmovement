@@ -1,5 +1,5 @@
 import { createApp, ref, computed, onMounted } from 'vue';
-import { STR, currentLang, preloadLookups } from './shared.js';
+import { STR, currentLang, setupRealtimeLookups } from './shared.js';
 import { auth, googleProvider } from './firebase.js';
 import {
   signInWithPopup,
@@ -77,7 +77,7 @@ const App = {
         user.value = u;
         loadingAuth.value = false;
         if (u) {
-          preloadLookups();
+          setupRealtimeLookups();
         }
       });
 

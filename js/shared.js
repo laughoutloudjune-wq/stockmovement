@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import { db } from './firebase.js';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 export const todayStr = () => new Date().toISOString().split("T")[0];
 
@@ -27,26 +27,26 @@ export const LOOKUPS = reactive({
   REQUESTERS: [] 
 });
 
-// 4. Data Loading Logic (NOW USING FIREBASE)
-export async function preloadLookups(force = false) {
-  try {
-    // Parallel Fetch from Firestore
-    const [m, p, c, r] = await Promise.all([
-      getDocs(collection(db, 'materials')),
-      getDocs(collection(db, 'projects')),
-      getDocs(collection(db, 'contractors')),
-      getDocs(collection(db, 'requesters'))
-    ]);
+// 4. Data Loading Logic (REALTIME)
+export let lookupsUnsubscribers = [];
 
-    // Map Materials to Object {name, stock, min}
-    const matList = m.docs.map(d => ({ 
+export function setupRealtimeLookups() {
+  // Clear old listeners if any
+  lookupsUnsubscribers.forEach(unsub => unsub());
+  lookupsUnsubscribers = [];
+
+  const unsubM = onSnapshot(collection(db, 'materials'), (snap) => {
+    const matList = snap.docs.map(d => ({ 
         name: d.data().name, 
         stock: Number(d.data().stock || 0),
         min: Number(d.data().min || 0)
     })).sort((a,b) => a.name.localeCompare(b.name));
+    LOOKUPS.MATERIALS.splice(0, LOOKUPS.MATERIALS.length, ...matList);
+  }, e => console.error("Materials sync error:", e));
 
+  const unsubP = onSnapshot(collection(db, 'projects'), (snap) => {
     const projMeta = {};
-    const projList = p.docs
+    const projList = snap.docs
       .map(d => d.data())
       .filter(x => x && x.name)
       .map(x => {
@@ -57,21 +57,27 @@ export async function preloadLookups(force = false) {
         return x.name;
       })
       .sort();
-    const contList = c.docs.map(d => d.data().name).sort();
-    const reqList  = r.docs.map(d => d.data().name).sort();
-
-    // Update Reactive State
-    LOOKUPS.MATERIALS.splice(0, LOOKUPS.MATERIALS.length, ...matList);
     LOOKUPS.PROJECTS.splice(0, LOOKUPS.PROJECTS.length, ...projList);
     Object.keys(LOOKUPS.PROJECT_META).forEach(k => delete LOOKUPS.PROJECT_META[k]);
     Object.entries(projMeta).forEach(([k, v]) => LOOKUPS.PROJECT_META[k] = v);
-    LOOKUPS.CONTRACTORS.splice(0, LOOKUPS.CONTRACTORS.length, ...contList);
-    LOOKUPS.REQUESTERS.splice(0, LOOKUPS.REQUESTERS.length, ...reqList);
+  }, e => console.error("Projects sync error:", e));
 
-    console.log("✅ Lookups refreshed from Firebase");
-  } catch (e) {
-    console.error("❌ Failed to load lookups from Firebase:", e);
-  }
+  const unsubC = onSnapshot(collection(db, 'contractors'), (snap) => {
+    const contList = snap.docs.map(d => d.data().name).sort();
+    LOOKUPS.CONTRACTORS.splice(0, LOOKUPS.CONTRACTORS.length, ...contList);
+  }, e => console.error("Contractors sync error:", e));
+
+  const unsubR = onSnapshot(collection(db, 'requesters'), (snap) => {
+    const reqList = snap.docs.map(d => d.data().name).sort();
+    LOOKUPS.REQUESTERS.splice(0, LOOKUPS.REQUESTERS.length, ...reqList);
+  }, e => console.error("Requesters sync error:", e));
+
+  lookupsUnsubscribers.push(unsubM, unsubP, unsubC, unsubR);
+  console.log("✅ Realtime lookups initialized");
+}
+
+export async function preloadLookups(force = false) {
+  // No-op for backward compatibility
 }
 
 // 5. Utilities

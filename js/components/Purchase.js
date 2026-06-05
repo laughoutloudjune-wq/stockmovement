@@ -60,7 +60,7 @@ export default {
 
       loading.value = true;
       try {
-        const docNo = 'PUR-' + Date.now().toString().slice(-6);
+        const docNo = 'PUR-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
         await addDoc(collection(db, 'orders'), {
           type: 'PURCHASE',
           docNo,

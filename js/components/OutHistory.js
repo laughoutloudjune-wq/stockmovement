@@ -1,7 +1,7 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { db } from '../firebase.js';
 import { toast } from '../shared.js';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 export default {
   props: ['lang'],
@@ -10,10 +10,11 @@ export default {
     const loading = ref(true);
     const search = ref('');
 
-    const load = async () => {
+    let unsub = null;
+
+    const load = () => {
       loading.value = true;
-      try {
-        const snap = await getDocs(query(collection(db, 'orders'), where('type', '==', 'OUT')));
+      unsub = onSnapshot(query(collection(db, 'orders'), where('type', '==', 'OUT')), (snap) => {
         const rows = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || ''))
@@ -34,8 +35,12 @@ export default {
           groups[d].push(r);
         });
         list.value = Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(d => ({ date: d, items: groups[d] }));
-      } catch { toast('Failed to load history'); }
-      finally { loading.value = false; }
+        loading.value = false;
+      }, (error) => {
+        console.error(error);
+        toast('Failed to load history');
+        loading.value = false;
+      });
     };
 
     const filteredList = computed(() => {
@@ -56,6 +61,10 @@ export default {
     });
 
     onMounted(load);
+
+    onUnmounted(() => {
+      if (unsub) unsub();
+    });
 
     return { list, filteredList, loading, search, load };
   },

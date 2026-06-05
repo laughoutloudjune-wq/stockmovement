@@ -11,42 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,600;0,800;1,400&display=swap" rel="stylesheet">
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Sarabun', 'sans-serif'] },
-          colors: { primary: '#0a84ff', accent: '#eef1f6' },
-          keyframes: {
-            'fade-in-up': {
-              '0%': { opacity: '0', transform: 'translateY(10px)' },
-              '100%': { opacity: '1', transform: 'translateY(0)' },
-            }
-          },
-          animation: {
-            'fade-in-up': 'fade-in-up 0.3s ease-out'
-          }
-        }
-      }
-    }
-  </script>
-
-  <style>
-    body { background: #f0f4f8; }
-    .glass {
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.4);
-    }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-    .fade-enter-from, .fade-leave-to { opacity: 0; }
-    
-    [v-cloak] { display: none; }
-  </style>
+  <link rel="stylesheet" href="./css/output.css" />
 
 <script type="importmap">
   {

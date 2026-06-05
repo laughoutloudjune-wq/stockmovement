@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, doc, runTransaction, getDoc } from 'firebase/firestore'; 
-import { STR, LOOKUPS, toast, todayStr, materialStockStyle, preloadLookups } from '../shared.js';
+import { STR, LOOKUPS, toast, todayStr, materialStockStyle } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
@@ -68,7 +68,7 @@ export default {
           updates.forEach(u => transaction.update(u.ref, { stock: u.newStock }));
 
           const newOrderRef = doc(collection(db, 'orders'));
-          const docNo = 'OUT-' + Date.now().toString().slice(-6); 
+          const docNo = 'OUT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
           
           transaction.set(newOrderRef, {
             type: 'OUT',
@@ -89,7 +89,7 @@ export default {
         toast((props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved'));
         lines.value = [{ name: '', qty: '', note: '', stock: null, stockLoading: false }];
         form.value.note = ''; form.value.project = ''; form.value.subProject = ''; form.value.contractor = '';
-        await preloadLookups(true);
+
 
       } catch (e) {
         console.error(e);

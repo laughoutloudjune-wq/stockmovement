@@ -1,5 +1,5 @@
 import { ref, computed, nextTick } from 'vue';
-import { LOOKUPS, toast, preloadLookups, materialStockBadgeClass } from '../shared.js';
+import { LOOKUPS, toast, materialStockBadgeClass } from '../shared.js';
 import { db } from '../firebase.js';
 import { doc, setDoc } from 'firebase/firestore';
 
@@ -44,9 +44,7 @@ export default {
     const open = async () => {
       search.value = '';
       isOpen.value = true;
-      if (listKey.value === 'MATERIALS') {
-        await preloadLookups(true);
-      }
+
       await nextTick();
       if (searchInput.value) searchInput.value.focus();
     };
@@ -69,8 +67,8 @@ export default {
       saving.value = true;
       try {
         const safeId = name.replace(/\//g, '_');
-        await setDoc(doc(db, 'materials', safeId), { name, stock: 0, min: 5 });
-        await preloadLookups(true);
+        await setDoc(doc(db, 'materials', safeId), { name, stock: 0, min: 5 }, { merge: true });
+
 
         select(name);
         toast(`Added "${name}"`);

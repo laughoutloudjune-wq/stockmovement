@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
 import { collection, doc, runTransaction, getDoc } from 'firebase/firestore';
-import { STR, toast, materialStockStyle, preloadLookups } from '../shared.js';
+import { STR, toast, materialStockStyle } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
 export default {
@@ -90,7 +90,7 @@ export default {
             });
           }
 
-          const docNo = 'ADJ-' + Date.now().toString().slice(-6);
+          const docNo = 'ADJ-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
           const newOrderRef = doc(collection(db, 'orders'));
           transaction.set(newOrderRef, {
             type: 'ADJUST',
@@ -104,7 +104,7 @@ export default {
 
         toast(props.lang === 'th' ? 'บันทึกแล้ว' : 'Saved');
         lines.value = [{ name: '', physical: '', sysStock: null, stockLoading: false }];
-        await preloadLookups(true);
+
       } catch (e) {
         console.error(e);
         toast('Failed to submit: ' + e.message);

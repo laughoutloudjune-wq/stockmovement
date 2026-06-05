@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 import { db } from '../firebase.js';
-import { collection, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 import { toast, todayStr, STR } from '../shared.js';
 import ItemPicker from './ItemPicker.js';
 
@@ -63,14 +63,16 @@ export default {
       loading.value = true;
       results.value = [];
       try {
-        const snap = await getDocs(collection(db, 'orders'));
-        let data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        data = data.filter(r => inDateRange(orderDate(r)));
-
+        let q = query(collection(db, 'orders'), 
+          where('date', '>=', filters.value.start), 
+          where('date', '<=', filters.value.end)
+        );
         if (filters.value.type !== 'ALL') {
-          data = data.filter(r => r.type === filters.value.type);
+          q = query(q, where('type', '==', filters.value.type));
         }
+        
+        const snap = await getDocs(q);
+        let data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
         if (filters.value.material) {
           data = data.filter(r => (r.items || []).some(i => i.name === filters.value.material));

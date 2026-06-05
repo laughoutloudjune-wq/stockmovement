@@ -1,43 +1,40 @@
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { db } from '../firebase.js';
-import { STR } from '../shared.js';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { STR, LOOKUPS } from '../shared.js';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 export default {
   props: ['lang'],
   setup(props) {
-    const lowStock = ref([]);
     const topItems = ref([]);
     const loading = ref(true);
     const S = computed(() => STR[props.lang]);
 
-    onMounted(async () => {
-      try {
-        const cutoff = (() => {
-          const d = new Date();
-          d.setDate(d.getDate() - 30);
-          return d.toISOString().split('T')[0];
-        })();
+    const lowStock = computed(() => {
+      return LOOKUPS.MATERIALS
+        .filter(x => Number(x.stock || 0) <= Number(x.min || 0))
+        .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
+        .slice(0, 10)
+        .map(x => ({
+          name: x.name,
+          stock: Number(x.stock || 0),
+          min: Number(x.min || 0)
+        }));
+    });
 
-        const [matSnap, outSnap] = await Promise.all([
-          getDocs(collection(db, 'materials')),
-          getDocs(query(collection(db, 'orders'), where('type', '==', 'OUT')))
-        ]);
+    let unsubOrders = null;
 
-        const mats = matSnap.docs.map(d => d.data()).filter(x => x && x.name);
-        lowStock.value = mats
-          .filter(x => Number(x.stock || 0) <= Number(x.min || 0))
-          .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
-          .slice(0, 10)
-          .map(x => ({
-            name: x.name,
-            stock: Number(x.stock || 0),
-            min: Number(x.min || 0)
-          }));
+    onMounted(() => {
+      loading.value = true;
+      const cutoff = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        return d.toISOString().split('T')[0];
+      })();
 
+      unsubOrders = onSnapshot(query(collection(db, 'orders'), where('type', '==', 'OUT'), where('date', '>=', cutoff)), (outSnap) => {
         const usage = {};
         outSnap.docs
-          .filter(d => (d.data().date || '') >= cutoff)
           .forEach(d => {
             const data = d.data();
             (data.items || []).forEach(i => {
@@ -49,11 +46,15 @@ export default {
           .map(([name, qty]) => ({ name, qty }))
           .sort((a, b) => b.qty - a.qty)
           .slice(0, 10);
-      } catch (e) {
-        console.error(e);
-      } finally {
         loading.value = false;
-      }
+      }, (e) => {
+        console.error(e);
+        loading.value = false;
+      });
+    });
+
+    onUnmounted(() => {
+      if (unsubOrders) unsubOrders();
     });
 
     return { lowStock, topItems, loading, S };

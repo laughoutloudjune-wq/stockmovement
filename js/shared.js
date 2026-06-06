@@ -8,9 +8,10 @@ export const todayStr = () => new Date().toISOString().split("T")[0];
 export function materialStockStyle(stock, min) {
   const s = Number(stock || 0);
   const m = Number(min ?? 0);
-  let color = 'bg-green-100 text-green-700';
-  if (s <= 0 || s <= m) color = 'bg-red-100 text-red-700';
-  else if (s <= 2 * m) color = 'bg-yellow-100 text-yellow-700';
+  // MD3 semantic colors: error-container | tertiary-container | tonal green
+  let color = 'bg-[#C8E6C9] text-[#1B5E20]';                // OK — tonal green
+  if (s <= 0 || s <= m) color = 'bg-[#F9DEDC] text-[#410E0B]'; // error-container
+  else if (s <= 2 * m)  color = 'bg-[#FFD8E4] text-[#31111D]'; // tertiary-container
   return { val: s, color };
 }
 

@@ -95,13 +95,13 @@ export default {
 
           <div class="grid grid-cols-12 gap-3 mt-2">
             <div class="col-span-8 min-w-0">
-              <div class="md3-input-container md3-picker">
-                <div class="md3-input min-h-[56px] flex items-center" @click="$refs['inPicker_'+idx] && $refs['inPicker_'+idx][0] && $refs['inPicker_'+idx][0].open()">
-                  <ItemPicker :ref="'inPicker_'+idx" v-model="line.name" source="MATERIALS"
+              <div class="md3-input-container md3-picker" :class="{'has-value': !!line.name}">
+                <div class="picker-field">
+                  <ItemPicker v-model="line.name" source="MATERIALS"
                     :placeholder="lang === 'th' ? 'ค้นหาวัสดุ...' : 'Search material...'"
                     :allow-add="true" @change="onMaterialSelect(line)" class="w-full" />
                 </div>
-                <label class="md3-label" :class="line.name ? 'text-[12px] -translate-y-[10px]' : ''">{{ lang === 'th' ? 'รายการวัสดุ' : 'Material' }}</label>
+                <label class="md3-label">{{ lang === 'th' ? 'รายการวัสดุ' : 'Material' }}</label>
               </div>
             </div>
             <div class="col-span-4 min-w-0">

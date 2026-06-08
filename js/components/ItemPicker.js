@@ -43,7 +43,17 @@ export default {
       search.value = '';
       isOpen.value = true;
       await nextTick();
-      if (searchInput.value) searchInput.value.focus();
+      // Use a short timeout so the DOM is painted and iOS/Android
+      // keyboard starts animating before we call focus — this prevents
+      // the viewport-resize overshoot and ensures the input is active.
+      setTimeout(() => {
+        if (searchInput.value) {
+          searchInput.value.focus();
+          // Force caret to end on Android
+          const len = searchInput.value.value.length;
+          searchInput.value.setSelectionRange(len, len);
+        }
+      }, 120);
     };
 
     const select = (val) => {
@@ -97,17 +107,27 @@ export default {
       </button>
 
       <teleport to="body">
-        <div v-if="isOpen" class="fixed inset-0 z-[100] flex items-end sm:items-start justify-center sm:pt-20 px-0 sm:px-4">
+        <!--
+          On mobile, a bottom-sheet that uses vh collapses under the soft keyboard
+          because vh = full screen height (keyboard included on most browsers).
+          Fix: anchor the modal at the TOP, full-width, and use dvh (dynamic viewport
+          height) so the container always fits the visible area above the keyboard.
+          On desktop (sm+) it keeps the centred-dialog look.
+        -->
+        <div v-if="isOpen"
+          class="picker-overlay fixed inset-0 z-[100] flex flex-col sm:items-center sm:justify-center sm:p-4"
+          @click.self="isOpen = false">
+
           <!-- Scrim -->
           <div class="md3-scrim animate-fade-in absolute inset-0" @click="isOpen = false"></div>
 
-          <!-- Bottom sheet / dialog -->
-          <div class="relative w-full sm:max-w-md md3-bottom-sheet sm:rounded-[28px] flex flex-col animate-slide-up sm:animate-scale-in overflow-hidden"
-            style="max-height: 70vh">
+          <!-- Sheet — fills visible viewport on mobile, dialog on desktop -->
+          <div class="picker-sheet relative w-full sm:max-w-md md3-bottom-sheet sm:rounded-[28px] flex flex-col overflow-hidden"
+            style="border-radius: 0 0 28px 28px; margin-top: auto;">
 
             <!-- Search header -->
             <div class="flex items-center gap-3 px-4 py-3 bg-[#F3EDF7] border-b border-[#CAC4D0] shrink-0">
-              <!-- Handle pill (mobile only) -->
+              <!-- Handle pill -->
               <div class="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#CAC4D0] rounded-full sm:hidden"></div>
 
               <span class="material-symbols-outlined text-[#6750A4] shrink-0">search</span>
@@ -115,6 +135,10 @@ export default {
                 v-model="search"
                 ref="searchInput"
                 placeholder="Type to search…"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
                 class="flex-1 bg-transparent border-none outline-none text-[16px] font-medium text-[#1D1B20] placeholder:text-[#79747E]"
               />
               <button @click="isOpen = false"
@@ -123,8 +147,8 @@ export default {
               </button>
             </div>
 
-            <!-- Results list -->
-            <div class="flex-1 overflow-y-auto overscroll-contain bg-[#F7F2FA]">
+            <!-- Results list — scrollable, fills remaining visible space -->
+            <div class="picker-list flex-1 overflow-y-auto overscroll-contain bg-[#F7F2FA]">
 
               <div v-if="filtered.length === 0 && !showAddButton"
                 class="p-10 text-center text-[#49454F] text-[14px] flex flex-col items-center gap-2">

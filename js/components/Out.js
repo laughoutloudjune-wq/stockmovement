@@ -94,28 +94,28 @@ export default {
           </div>
 
           <!-- Project -->
-          <div class="md3-input-container md3-picker">
-            <div class="md3-input min-h-[56px] flex items-center" @click="$refs.projPicker.open()">
+          <div class="md3-input-container md3-picker" :class="{'has-value': !!form.project}">
+            <div class="picker-field" @click="$refs.projPicker.open()">
               <ItemPicker ref="projPicker" v-model="form.project" source="PROJECTS" placeholder=" "
                 @change="onProjectChange" />
             </div>
-            <label class="md3-label" :class="form.project ? 'text-[12px] -translate-y-[10px]' : ''">{{ S.proj }}</label>
+            <label class="md3-label">{{ S.proj }}</label>
           </div>
 
           <!-- Sub-Project (always in DOM, shown/hidden via v-show) -->
-          <div class="md3-input-container md3-picker sm:col-span-1" v-show="subProjects.length > 0">
-            <div class="md3-input min-h-[56px] flex items-center" @click="$refs.subProjPicker.open()">
+          <div class="md3-input-container md3-picker sm:col-span-1" :class="{'has-value': !!form.subProject}" v-show="subProjects.length > 0">
+            <div class="picker-field" @click="$refs.subProjPicker.open()">
               <ItemPicker ref="subProjPicker" v-model="form.subProject" :items="subProjects" placeholder=" " />
             </div>
-            <label class="md3-label" :class="form.subProject ? 'text-[12px] -translate-y-[10px]' : ''">{{ S.subProj }}</label>
+            <label class="md3-label">{{ S.subProj }}</label>
           </div>
 
           <!-- Contractor -->
-          <div class="md3-input-container md3-picker" :class="subProjects.length > 0 ? '' : 'sm:col-span-1'">
-            <div class="md3-input min-h-[56px] flex items-center" @click="$refs.contractorPicker.open()">
+          <div class="md3-input-container md3-picker" :class="[subProjects.length > 0 ? '' : 'sm:col-span-1', {'has-value': !!form.contractor}]">
+            <div class="picker-field" @click="$refs.contractorPicker.open()">
               <ItemPicker ref="contractorPicker" v-model="form.contractor" source="CONTRACTORS" :placeholder="S.pick" />
             </div>
-            <label class="md3-label" :class="form.contractor ? 'text-[12px] -translate-y-[10px]' : ''">{{ S.contractor }}</label>
+            <label class="md3-label">{{ S.contractor }}</label>
           </div>
 
           <!-- Note -->
@@ -141,10 +141,12 @@ export default {
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-8 min-w-0">
                 <div class="md3-input-container md3-picker" :class="{'has-value': !!line.name}">
-                  <ItemPicker v-model="line.name" source="MATERIALS"
-                    :placeholder="lang==='th'?'ระบุวัสดุ...':'Select material...'"
-                    :allow-add="true" @change="onMaterialSelect(line)"
-                    class="md3-input" :class="{'has-val': !!line.name}" />
+                  <div class="picker-field">
+                    <ItemPicker v-model="line.name" source="MATERIALS"
+                      :placeholder="lang==='th'?'ระบุวัสดุ...':'Select material...'"
+                      :allow-add="true" @change="onMaterialSelect(line)"
+                      class="w-full" />
+                  </div>
                   <label class="md3-label">{{ lang === 'th' ? 'รายการวัสดุ' : 'Material' }}</label>
                 </div>
               </div>

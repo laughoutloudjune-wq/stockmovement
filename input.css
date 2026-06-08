@@ -146,6 +146,40 @@ body {
   font-size: 12px;
 }
 
+/* ── Unified picker wrapper ───────────────────────────────────────
+   Use .picker-field on the div that wraps <ItemPicker>.
+   It mirrors md3-input exactly: same bg, border, border-radius,
+   padding and min-height — ensuring every picker field is
+   pixel-identical to every regular text input.
+──────────────────────────────────────────────────────────────── */
+.picker-field {
+  width: 100%;
+  box-sizing: border-box;
+  background: #E6E0E9;
+  border: none;
+  border-bottom: 1px solid #79747E;
+  border-radius: 4px 4px 0 0;
+  /* Top padding = 24px so the floating label has room to float up;
+     left/right match md3-input; bottom = 8px */
+  padding: 24px 16px 8px;
+  min-height: 56px;            /* same as md3-input rendered height */
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition:
+    background var(--md-dur-short2) var(--md-easing-standard),
+    border-color var(--md-dur-short2) var(--md-easing-standard);
+}
+.picker-field:hover {
+  background: #D9D3E2;
+}
+
+/* Float the label when the container has a selected value */
+.md3-input-container.has-value > .md3-label {
+  transform: translateY(-10px);
+  font-size: 12px;
+}
+
 /* ══════════════════════════════════════════════
    Legacy md3-input compatibility shim
    (keeps old classes working during migration)
@@ -345,6 +379,36 @@ select.md3-input ~ .md3-label,
   background: #F7F2FA;
   border-radius: 28px 28px 0 0;
   box-shadow: 0 4px 8px 3px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* ══════════════════════════════════════════════
+   ItemPicker modal — keyboard-aware layout
+   dvh = dynamic viewport height (excludes soft keyboard),
+   so the sheet never extends under the keyboard and
+   the list never collapses.
+══════════════════════════════════════════════ */
+.picker-overlay {
+  /* Anchor to real visible area, not the full-screen vh */
+  height: 100dvh;
+}
+/* Mobile: sheet slides up from the bottom, capped to 60% of visible viewport */
+@media (max-width: 639px) {
+  .picker-sheet {
+    max-height: 60dvh;
+    border-radius: 28px 28px 0 0 !important;
+  }
+  /* Scrollable list fills whatever space remains after the search header */
+  .picker-list {
+    min-height: 0;   /* required for flex children to shrink correctly */
+  }
+}
+/* Desktop: dialog in the centre, fixed max-height */
+@media (min-width: 640px) {
+  .picker-sheet {
+    max-height: 75vh;
+    border-radius: 28px !important;
+    margin-top: 0 !important;
+  }
 }
 
 /* ══════════════════════════════════════════════

@@ -31,11 +31,16 @@ export default {
       loading.value = true;
       try {
         await runTransaction(db, async (transaction) => {
-          const orderItems = [];
-          for (const line of validLines) {
+          // Phase 1: ALL reads first (Firestore requires reads before writes)
+          const reads = await Promise.all(validLines.map(line => {
             const safeId = line.name.replace(/\//g, '_');
             const matRef = doc(db, 'materials', safeId);
-            const matDoc = await transaction.get(matRef);
+            return transaction.get(matRef).then(matDoc => ({ line, matRef, matDoc }));
+          }));
+
+          // Phase 2: Process results and perform ALL writes
+          const orderItems = [];
+          for (const { line, matRef, matDoc } of reads) {
             if (!matDoc.exists()) throw new Error(props.lang === 'th' ? `ไม่มีวัสดุ: ${line.name}` : `Unknown material: ${line.name}`);
             const prev = Number(matDoc.data().stock || 0);
             const counted = Math.round(Number(line.physical));
@@ -44,6 +49,7 @@ export default {
             transaction.update(matRef, { stock: counted });
             orderItems.push({ name: line.name, qty: delta, prevStock: prev, newStock: counted });
           }
+
           const docNo = 'ADJ-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
           const newOrderRef = doc(collection(db, 'orders'));
           transaction.set(newOrderRef, {
@@ -89,9 +95,11 @@ export default {
           <div class="grid grid-cols-12 gap-3 mt-2">
             <div class="col-span-12 sm:col-span-7">
               <div class="md3-input-container md3-picker" :class="{'has-value': !!line.name}">
-                <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="S.pick"
-                  :allow-add="true" @change="onMaterialSelect(line)"
-                  class="md3-input" :class="{'has-val': !!line.name}" />
+                <div class="picker-field">
+                  <ItemPicker v-model="line.name" source="MATERIALS" :placeholder="S.pick"
+                    :allow-add="true" @change="onMaterialSelect(line)"
+                    class="w-full" />
+                </div>
                 <label class="md3-label">{{ lang === 'th' ? 'รายการวัสดุ' : 'Material' }}</label>
               </div>
             </div>

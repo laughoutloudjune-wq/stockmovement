@@ -1,4 +1,4 @@
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, onUnmounted } from 'vue';
 import { LOOKUPS, toast, materialStockBadgeClass } from '../shared.js';
 import { db } from '../firebase.js';
 import { doc, setDoc } from 'firebase/firestore';
@@ -43,17 +43,15 @@ export default {
       search.value = '';
       isOpen.value = true;
       await nextTick();
-      // Use a short timeout so the DOM is painted and iOS/Android
-      // keyboard starts animating before we call focus — this prevents
-      // the viewport-resize overshoot and ensures the input is active.
       setTimeout(() => {
         if (searchInput.value) {
           searchInput.value.focus();
-          // Force caret to end on Android
           const len = searchInput.value.value.length;
           searchInput.value.setSelectionRange(len, len);
         }
-      }, 120);
+        // Start pinning AFTER focus so the keyboard resize has fired
+        startVpListener();
+      }, 150);
     };
 
     const select = (val) => {
@@ -61,6 +59,7 @@ export default {
       emit('update:modelValue', v);
       emit('change', v);
       isOpen.value = false;
+      stopVpListener();
     };
 
     const clear = () => {
@@ -83,7 +82,44 @@ export default {
       } finally { saving.value = false; }
     };
 
-    return { isOpen, search, filtered, showAddButton, saving, open, select, clear, addNew, searchInput, materialStockBadgeClass };
+    // ── visualViewport pinning ──────────────────────────────────────
+    // On mobile the soft keyboard resizes the visual viewport but NOT
+    // window.innerHeight / 100dvh on many browsers. We listen to
+    // visualViewport and pin the sheet to the bottom of the visible area.
+    const sheetStyle = ref({});
+
+    const updateSheetPosition = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      // top offset of the visible area inside the full-page layout
+      const offsetTop = vv.offsetTop + vv.pageTop;
+      sheetStyle.value = {
+        position: 'fixed',
+        left: '0',
+        right: '0',
+        bottom: `${window.innerHeight - (offsetTop + vv.height)}px`,
+      };
+    };
+
+    let vpCleanup = null;
+    const startVpListener = () => {
+      if (!window.visualViewport) return;
+      window.visualViewport.addEventListener('resize', updateSheetPosition);
+      window.visualViewport.addEventListener('scroll', updateSheetPosition);
+      updateSheetPosition();
+      vpCleanup = () => {
+        window.visualViewport.removeEventListener('resize', updateSheetPosition);
+        window.visualViewport.removeEventListener('scroll', updateSheetPosition);
+      };
+    };
+    const stopVpListener = () => { if (vpCleanup) { vpCleanup(); vpCleanup = null; } };
+
+    onUnmounted(stopVpListener);
+    // ────────────────────────────────────────────────────────────────
+
+    return { isOpen, search, filtered, showAddButton, saving,
+             sheetStyle, open, select, clear, addNew, searchInput,
+             materialStockBadgeClass, startVpListener, stopVpListener };
   },
   template: `
     <div class="relative w-full h-full flex items-center gap-2">
@@ -107,23 +143,22 @@ export default {
       </button>
 
       <teleport to="body">
-        <!--
-          On mobile, a bottom-sheet that uses vh collapses under the soft keyboard
-          because vh = full screen height (keyboard included on most browsers).
-          Fix: anchor the modal at the TOP, full-width, and use dvh (dynamic viewport
-          height) so the container always fits the visible area above the keyboard.
-          On desktop (sm+) it keeps the centred-dialog look.
-        -->
         <div v-if="isOpen"
-          class="picker-overlay fixed inset-0 z-[100] flex flex-col sm:items-center sm:justify-center sm:p-4"
-          @click.self="isOpen = false">
+          class="picker-overlay fixed inset-0 z-[100]"
+          @click.self="isOpen = false; stopVpListener()">
 
           <!-- Scrim -->
-          <div class="md3-scrim animate-fade-in absolute inset-0" @click="isOpen = false"></div>
+          <div class="md3-scrim animate-fade-in absolute inset-0" @click="isOpen = false; stopVpListener()"></div>
 
-          <!-- Sheet — fills visible viewport on mobile, dialog on desktop -->
-          <div class="picker-sheet relative w-full sm:max-w-md md3-bottom-sheet sm:rounded-[28px] flex flex-col overflow-hidden"
-            style="border-radius: 0 0 28px 28px; margin-top: auto;">
+          <!--
+            Sheet is pinned to the BOTTOM of the visual viewport via
+            sheetStyle (set by the visualViewport JS listener).
+            max-height is capped so it never taller than ~60% of the
+            visible area. The list has a min-height so it stays visible
+            even when only 1-2 results are shown.
+          -->
+          <div class="picker-sheet relative w-full sm:max-w-md sm:left-1/2 sm:-translate-x-1/2 md3-bottom-sheet sm:rounded-[28px] flex flex-col overflow-hidden"
+            :style="sheetStyle">
 
             <!-- Search header -->
             <div class="flex items-center gap-3 px-4 py-3 bg-[#F3EDF7] border-b border-[#CAC4D0] shrink-0">
@@ -141,14 +176,14 @@ export default {
                 spellcheck="false"
                 class="flex-1 bg-transparent border-none outline-none text-[16px] font-medium text-[#1D1B20] placeholder:text-[#79747E]"
               />
-              <button @click="isOpen = false"
+              <button @click="isOpen = false; stopVpListener()"
                 class="md3-btn-text md3-ripple h-9 px-3 text-[14px] shrink-0">
                 Cancel
               </button>
             </div>
 
-            <!-- Results list — scrollable, fills remaining visible space -->
-            <div class="picker-list flex-1 overflow-y-auto overscroll-contain bg-[#F7F2FA]">
+            <!-- Results list -->
+            <div class="picker-list overflow-y-auto overscroll-contain bg-[#F7F2FA]">
 
               <div v-if="filtered.length === 0 && !showAddButton"
                 class="p-10 text-center text-[#49454F] text-[14px] flex flex-col items-center gap-2">

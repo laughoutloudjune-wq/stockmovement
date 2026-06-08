@@ -383,31 +383,42 @@ select.md3-input ~ .md3-label,
 
 /* ══════════════════════════════════════════════
    ItemPicker modal — keyboard-aware layout
-   dvh = dynamic viewport height (excludes soft keyboard),
-   so the sheet never extends under the keyboard and
-   the list never collapses.
+   Position is driven by the visualViewport JS API
+   (see ItemPicker.js updateSheetPosition).
+   CSS only handles max-height cap and list min-height.
 ══════════════════════════════════════════════ */
 .picker-overlay {
-  /* Anchor to real visible area, not the full-screen vh */
-  height: 100dvh;
+  /* Overlay covers the full page coordinate space */
+  position: fixed;
+  inset: 0;
 }
-/* Mobile: sheet slides up from the bottom, capped to 60% of visible viewport */
+
+/* Mobile: sheet is bottom-pinned by JS; cap its height so it
+   never covers more than ~65% of the visible area            */
 @media (max-width: 639px) {
   .picker-sheet {
-    max-height: 60dvh;
+    max-height: 65dvh;
     border-radius: 28px 28px 0 0 !important;
   }
-  /* Scrollable list fills whatever space remains after the search header */
+  /* List always shows at least 3 rows' worth of space (3×56px)
+     so a short result list never collapses into the keyboard  */
   .picker-list {
-    min-height: 0;   /* required for flex children to shrink correctly */
+    min-height: 168px;
+    max-height: 45dvh;
   }
 }
-/* Desktop: dialog in the centre, fixed max-height */
+
+/* Desktop: centered dialog, no JS positioning needed */
 @media (min-width: 640px) {
   .picker-sheet {
+    position: static !important;   /* override any inline style from JS */
     max-height: 75vh;
     border-radius: 28px !important;
-    margin-top: 0 !important;
+    margin: auto;
+  }
+  .picker-list {
+    min-height: 0;
+    max-height: 55vh;
   }
 }
 

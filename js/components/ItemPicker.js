@@ -91,25 +91,30 @@ export default {
     const updateSheetPosition = () => {
       const vv = window.visualViewport;
       if (!vv) return;
-      // top offset of the visible area inside the full-page layout
-      const offsetTop = vv.offsetTop + vv.pageTop;
+      // For position:fixed elements, coordinates are relative to the VIEWPORT,
+      // not the document — so we must NOT include vv.pageTop (scroll offset).
+      // The only thing that matters is how much the keyboard is eating into the
+      // bottom of the viewport:
+      //   keyboard height = full window height − visible-area height − browser-chrome offset
+      const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       sheetStyle.value = {
         position: 'fixed',
         left: '0',
         right: '0',
-        bottom: `${window.innerHeight - (offsetTop + vv.height)}px`,
+        bottom: `${keyboardHeight}px`,
       };
     };
 
     let vpCleanup = null;
     const startVpListener = () => {
       if (!window.visualViewport) return;
+      // Only listen to 'resize' — keyboard open/close fires this.
+      // Do NOT listen to 'scroll': page scroll is irrelevant for fixed elements
+      // and was causing the sheet to drift off-screen when scrolling.
       window.visualViewport.addEventListener('resize', updateSheetPosition);
-      window.visualViewport.addEventListener('scroll', updateSheetPosition);
       updateSheetPosition();
       vpCleanup = () => {
         window.visualViewport.removeEventListener('resize', updateSheetPosition);
-        window.visualViewport.removeEventListener('scroll', updateSheetPosition);
       };
     };
     const stopVpListener = () => { if (vpCleanup) { vpCleanup(); vpCleanup = null; } };

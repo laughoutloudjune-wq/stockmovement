@@ -317,6 +317,11 @@ select.input-field { cursor: pointer; }
 }
 .search-field input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 14px; }
 
+/* iOS Safari auto-zooms on focus when a field's font-size is under 16px */
+@media (max-width: 767px) {
+  .input-field, .search-field input, textarea.input-field { font-size: 16px; }
+}
+
 .main-wrapper { padding: 24px; }
 @media (min-width: 768px) {
   .main-wrapper { margin-left: calc(var(--sidebar-w) + 28px); padding: 24px 24px 24px 0; max-width: 1280px; }
@@ -418,6 +423,12 @@ tr.row-closing td { font-weight: 700; border-top: 2px solid var(--divider); }
   border-radius: 28px 28px 0 0;
   box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
   animation: slideUpSheet 0.3s var(--ease-spring) forwards;
+}
+@media (max-width: 767px) {
+  /* Keep the sheet's footer clear of the floating bottom nav bar instead of
+     sliding underneath it, where its translucent background lets the nav
+     bleed through. */
+  .sheet { margin-bottom: calc(var(--nav-h) + 12px); max-height: calc(85vh - var(--nav-h) - 12px); border-radius: 28px; }
 }
 @media (min-width: 768px) {
   .sheet { max-width: 640px; border-radius: 28px; animation: scaleIn 0.2s var(--ease-spring) forwards; }

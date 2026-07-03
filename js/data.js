@@ -12,14 +12,13 @@ export function categorize(name) {
   return hit ? hit.label : 'อื่นๆ';
 }
 
-// Categories are user-defined (stored per-material). This is just the seed
-// list offered before any custom ones exist.
-export const DEFAULT_CATEGORIES = [...CATEGORY_KEYWORDS.map(c => c.label), 'อื่นๆ'];
-
-export function distinctCategories(materials) {
-  const set = new Set(DEFAULT_CATEGORIES);
-  materials.forEach(m => { if (m.category) set.add(m.category); });
-  return Array.from(set).sort();
+// Categories live in their own table so a name persists even if no material
+// currently uses it (e.g. right after creating it, or after the last
+// material using it is deleted).
+export async function fetchCategories() {
+  const { data, error } = await supabase.from('categories').select('*').order('name');
+  if (error) throw error;
+  return (data || []).map(c => c.name);
 }
 
 export async function fetchMaterials() {

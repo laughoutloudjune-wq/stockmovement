@@ -1,6 +1,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { supabase } from '../supabase.js';
 import { fetchProjects, fetchContractors, fetchRequesters, docNo } from '../data.js';
+import { toast, toastError } from '../toast.js';
 import ItemPickerModal from './ItemPickerModal.js';
 import QuickAddSelect from './QuickAddSelect.js';
 
@@ -57,38 +58,53 @@ export default {
         }).select().single();
         if (error) throw error;
         for (const l of lines.value) {
-          await supabase.from('purchase_request_items').insert({ purchase_request_id: pr.id, material_id: l.material.id, qty: l.qty });
+          const { error: itemErr } = await supabase.from('purchase_request_items').insert({ purchase_request_id: pr.id, material_id: l.material.id, qty: l.qty });
+          if (itemErr) throw itemErr;
         }
+        toast('ส่งใบขอซื้อแล้ว');
         lines.value = []; note.value = ''; urgency.value = 'ปกติ';
         previewDocNo.value = docNo('PR');
         await load();
+      } catch (e) {
+        toastError(e, 'ส่งใบขอซื้อไม่สำเร็จ');
       } finally { submitting.value = false; }
     };
 
     const pendingQueue = computed(() => requests.value.filter(r => r.status === 'รออนุมัติ'));
 
     const decide = async (pr, approve) => {
-      await supabase.from('purchase_requests').update({ status: approve ? 'อนุมัติแล้ว' : 'ปฏิเสธ', updated_at: new Date().toISOString() }).eq('id', pr.id);
+      const { error } = await supabase.from('purchase_requests').update({ status: approve ? 'อนุมัติแล้ว' : 'ปฏิเสธ', updated_at: new Date().toISOString() }).eq('id', pr.id);
+      if (error) return toastError(error, 'บันทึกไม่สำเร็จ');
+      toast(approve ? 'อนุมัติแล้ว' : 'ปฏิเสธแล้ว');
       await load();
     };
 
     const advance = async (pr) => {
       const next = NEXT_STATUS[pr.status];
       if (!next) return;
-      if (next === 'รับของครบ') {
-        for (const item of pr.purchase_request_items) {
-          const { data: mat } = await supabase.from('materials').select('stock,name').eq('id', item.material_id).single();
-          const newStock = Number(mat.stock || 0) + Number(item.qty);
-          await supabase.from('materials').update({ stock: newStock }).eq('id', item.material_id);
-          await supabase.from('movements').insert({
-            type: 'IN', doc_no: pr.doc_no, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
-            material_id: item.material_id, material_name: mat.name, qty: item.qty, prev_stock: mat.stock, new_stock: newStock,
-            status: 'บันทึกแล้ว'
-          });
+      try {
+        if (next === 'รับของครบ') {
+          for (const item of pr.purchase_request_items) {
+            const { data: mat, error: readErr } = await supabase.from('materials').select('stock,name').eq('id', item.material_id).single();
+            if (readErr) throw readErr;
+            const newStock = Number(mat.stock || 0) + Number(item.qty);
+            const { error: updErr } = await supabase.from('materials').update({ stock: newStock }).eq('id', item.material_id);
+            if (updErr) throw updErr;
+            const { error: insErr } = await supabase.from('movements').insert({
+              type: 'IN', doc_no: pr.doc_no, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
+              material_id: item.material_id, material_name: mat.name, qty: item.qty, prev_stock: mat.stock, new_stock: newStock,
+              status: 'บันทึกแล้ว'
+            });
+            if (insErr) throw insErr;
+          }
         }
+        const { error } = await supabase.from('purchase_requests').update({ status: next, updated_at: new Date().toISOString() }).eq('id', pr.id);
+        if (error) throw error;
+        toast('อัปเดตสถานะแล้ว');
+        await load();
+      } catch (e) {
+        toastError(e, 'อัปเดตไม่สำเร็จ');
       }
-      await supabase.from('purchase_requests').update({ status: next, updated_at: new Date().toISOString() }).eq('id', pr.id);
-      await load();
     };
 
     const urgencyPill = (u) => u === 'ด่วนมาก' ? 'pill-danger' : (u === 'ด่วน' ? 'pill-warning' : 'pill-neutral');

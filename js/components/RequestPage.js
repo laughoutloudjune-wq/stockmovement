@@ -1,6 +1,7 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { supabase } from '../supabase.js';
 import { fetchProjects, fetchContractors, fetchRequesters, docNo } from '../data.js';
+import { toast, toastError } from '../toast.js';
 import ItemPickerModal from './ItemPickerModal.js';
 import QuickAddSelect from './QuickAddSelect.js';
 
@@ -12,6 +13,7 @@ export default {
     const contractors = ref([]);
     const requesters = ref([]);
     const projectId = ref('');
+    const subProject = ref('');
     const contractorId = ref('');
     const requesterId = ref('');
     const note = ref('');
@@ -40,6 +42,8 @@ export default {
     const projectName = computed(() => projects.value.find(p => p.id === projectId.value)?.name || '');
     const contractorName = computed(() => contractors.value.find(c => c.id === contractorId.value)?.name || '');
     const requesterName = computed(() => requesters.value.find(r => r.id === requesterId.value)?.name || '');
+    const subProjectOptions = computed(() => projects.value.find(p => p.id === projectId.value)?.sub_projects || []);
+    watch(projectId, () => { subProject.value = ''; });
 
     const submit = async () => {
       if (lines.value.length === 0) return;
@@ -47,22 +51,28 @@ export default {
       try {
         const no = docNo('REQ');
         for (const l of lines.value) {
-          const { data: mat } = await supabase.from('materials').select('stock').eq('id', l.material.id).single();
+          const { data: mat, error: readErr } = await supabase.from('materials').select('stock').eq('id', l.material.id).single();
+          if (readErr) throw readErr;
           const newStock = Number(mat.stock || 0) - Number(l.qty);
-          await supabase.from('materials').update({ stock: newStock }).eq('id', l.material.id);
-          await supabase.from('movements').insert({
+          const { error: updErr } = await supabase.from('materials').update({ stock: newStock }).eq('id', l.material.id);
+          if (updErr) throw updErr;
+          const { error: insErr } = await supabase.from('movements').insert({
             type: 'OUT', doc_no: no, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
             material_id: l.material.id, material_name: l.material.name, qty: l.qty,
             prev_stock: mat.stock, new_stock: newStock,
-            project: projectName.value || null, contractor: contractorName.value || null,
+            project: projectName.value || null, sub_project: subProject.value || null, contractor: contractorName.value || null,
             requester: requesterName.value || null, note: note.value || null, status: 'บันทึกแล้ว'
           });
+          if (insErr) throw insErr;
         }
-        lines.value = []; note.value = '';
+        toast('บันทึกใบเบิกแล้ว');
+        lines.value = []; note.value = ''; subProject.value = '';
+      } catch (e) {
+        toastError(e, 'บันทึกไม่สำเร็จ');
       } finally { submitting.value = false; }
     };
 
-    return { projects, contractors, requesters, projectId, contractorId, requesterId, note,
+    return { projects, contractors, requesters, projectId, subProject, subProjectOptions, contractorId, requesterId, note,
              lines, pickerOpen, submitting, excludeIds, addLines, removeLine, inc, dec, submit,
              onProjectCreated, onContractorCreated };
   },
@@ -85,6 +95,13 @@ export default {
         <div class="input-group">
           <label class="input-label">โครงการ</label>
           <QuickAddSelect v-model="projectId" :options="projects" placeholder="เลือกโครงการ" new-label="โครงการ" table="projects" @created="onProjectCreated" />
+        </div>
+        <div class="input-group" v-if="subProjectOptions.length">
+          <label class="input-label">โครงการย่อย</label>
+          <select v-model="subProject" class="input-field">
+            <option value="">เลือกโครงการย่อย</option>
+            <option v-for="s in subProjectOptions" :key="s" :value="s">{{ s }}</option>
+          </select>
         </div>
         <div class="input-group">
           <label class="input-label">ผู้รับเหมา</label>

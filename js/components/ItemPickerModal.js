@@ -1,6 +1,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { supabase } from '../supabase.js';
-import { fetchMaterials, distinctCategories } from '../data.js';
+import { fetchMaterials, fetchCategories } from '../data.js';
+import { toast, toastError } from '../toast.js';
 
 export default {
   props: {
@@ -15,13 +16,15 @@ export default {
     const search = ref('');
     const category = ref('ทั้งหมด');
     const selected = ref(new Map());
+    const categoryChips = ref(['ทั้งหมด']);
 
     onMounted(async () => {
-      try { materials.value = await fetchMaterials(); }
-      finally { loading.value = false; }
+      try {
+        const [mats, cats] = await Promise.all([fetchMaterials(), fetchCategories()]);
+        materials.value = mats;
+        categoryChips.value = ['ทั้งหมด', ...cats];
+      } finally { loading.value = false; }
     });
-
-    const categoryChips = computed(() => ['ทั้งหมด', ...distinctCategories(materials.value)]);
 
     const results = computed(() => {
       const q = search.value.trim().toLowerCase();
@@ -56,12 +59,15 @@ export default {
       if (!name) return;
       creating.value = true;
       try {
-        const { data, error } = await supabase.from('materials').insert({ name, stock: 0, min: 5 }).select().single();
+        const { data, error } = await supabase.from('materials').insert({ name, category: 'อื่นๆ', stock: 0, min: 5 }).select().single();
         if (error) throw error;
-        const newMat = { ...data, category: 'อื่นๆ' };
+        toast('เพิ่มวัสดุแล้ว');
+        const newMat = { ...data, category: data.category || 'อื่นๆ' };
         materials.value = [...materials.value, newMat];
         search.value = '';
         toggle(newMat);
+      } catch (e) {
+        toastError(e, 'เพิ่มวัสดุไม่สำเร็จ');
       } finally { creating.value = false; }
     };
 
@@ -100,11 +106,11 @@ export default {
               </div>
               <div class="flex-1 min-w-0">
                 <div class="font-semibold text-primary truncate">{{ m.name }}</div>
-                <div class="text-xs" :class="isLow(m) ? 'text-danger' : 'text-secondary'">
+                <div class="text-xs truncate" :class="isLow(m) ? 'text-danger' : 'text-secondary'">
                   หมวด: {{ m.category }} · คงเหลือ {{ m.stock }}<span v-if="isLow(m)"> (ใกล้หมด)</span>
                 </div>
               </div>
-              <button class="btn-icon" :style="isSelected(m) ? 'background:var(--success);color:#fff;' : 'background:var(--accent);color:#fff;'">
+              <button class="btn-icon" style="flex-shrink:0;" :style="isSelected(m) ? 'background:var(--success);color:#fff;' : 'background:var(--accent);color:#fff;'">
                 <span class="icon icon-sm">{{ isSelected(m) ? 'check' : 'add' }}</span>
               </button>
             </div>

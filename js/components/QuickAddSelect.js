@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { findOrCreateByName } from '../data.js';
+import { toastError } from '../toast.js';
 
 export default {
   props: {
@@ -26,19 +27,25 @@ export default {
 
     const confirmAdd = async () => {
       const name = newName.value.trim();
-      if (!name) return;
+      if (!name) { adding.value = false; return; }
       saving.value = true;
       try {
         const row = await findOrCreateByName(props.table, name);
         emit('created', row);
         emit('update:modelValue', row.id);
         adding.value = false;
+      } catch (e) {
+        toastError(e, 'บันทึกไม่สำเร็จ');
       } finally { saving.value = false; }
     };
+    // Commits automatically if focus leaves the field without an explicit
+    // confirm/cancel click (e.g. clicking straight to an outer submit button) —
+    // otherwise the typed name silently gets lost and the field stays empty.
+    const onBlur = () => { if (adding.value) confirmAdd(); };
 
     const cancelAdd = () => { adding.value = false; };
 
-    return { adding, newName, saving, onChange, confirmAdd, cancelAdd };
+    return { adding, newName, saving, onChange, confirmAdd, cancelAdd, onBlur };
   },
   template: `
     <div v-if="!adding" >
@@ -48,10 +55,12 @@ export default {
         <option value="__new__">+ เพิ่ม{{ newLabel }}ใหม่...</option>
       </select>
     </div>
-    <div v-else class="flex gap-2">
-      <input v-model="newName" class="input-field" :placeholder="'ชื่อ' + newLabel + 'ใหม่'" @keyup.enter="confirmAdd" autofocus />
-      <button class="btn-icon" style="background:var(--success);color:#fff;flex-shrink:0;" :disabled="saving" @click="confirmAdd"><span class="icon icon-sm">check</span></button>
-      <button class="btn-icon" style="flex-shrink:0;" @click="cancelAdd"><span class="icon icon-sm">close</span></button>
+    <div v-else style="position:relative;">
+      <input v-model="newName" class="input-field" style="padding-right:64px;" :placeholder="'ชื่อ' + newLabel + 'ใหม่'" @keyup.enter="confirmAdd" @blur="onBlur" autofocus />
+      <div style="position:absolute; right:4px; top:50%; transform:translateY(-50%); display:flex; gap:2px;">
+        <button class="btn-icon" style="width:28px;height:28px;background:var(--success);color:#fff;" :disabled="saving" @mousedown.prevent @click="confirmAdd"><span class="icon" style="font-size:16px;">check</span></button>
+        <button class="btn-icon" style="width:28px;height:28px;" @mousedown.prevent @click="cancelAdd"><span class="icon" style="font-size:16px;">close</span></button>
+      </div>
     </div>
   `
 };

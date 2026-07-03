@@ -1,6 +1,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { supabase } from '../supabase.js';
 import { fetchMaterials, docNo } from '../data.js';
+import { toast, toastError } from '../toast.js';
 
 export default {
   props: ['requester'],
@@ -36,15 +37,20 @@ export default {
         for (const m of changedList.value) {
           const newStock = Number(counted.value[m.id]);
           const d = newStock - Number(m.stock || 0);
-          await supabase.from('materials').update({ stock: newStock }).eq('id', m.id);
-          await supabase.from('movements').insert({
+          const { error: updErr } = await supabase.from('materials').update({ stock: newStock }).eq('id', m.id);
+          if (updErr) throw updErr;
+          const { error: insErr } = await supabase.from('movements').insert({
             type: 'ADJUST', doc_no: no, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
             material_id: m.id, material_name: m.name, qty: d, prev_stock: m.stock, new_stock: newStock,
             requester: props.requester?.name || null, status: 'บันทึกแล้ว'
           });
+          if (insErr) throw insErr;
         }
+        toast('บันทึกการปรับปรุงแล้ว');
         materials.value = await fetchMaterials();
         counted.value = {};
+      } catch (e) {
+        toastError(e, 'บันทึกไม่สำเร็จ');
       } finally { saving.value = false; }
     };
 

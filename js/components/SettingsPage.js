@@ -31,13 +31,13 @@ export default {
     const newMat = reactive({ name: '', category: 'อื่นๆ', min: 5 });
     const addMaterial = async () => {
       if (!newMat.name.trim()) return;
-      const { error } = await supabase.from('materials').insert({
+      const { data, error } = await supabase.from('materials').insert({
         name: newMat.name.trim(), category: newMat.category.trim() || 'อื่นๆ', min: Number(newMat.min) || 0, stock: 0
-      });
+      }).select().single();
       if (error) return toastError(error, 'เพิ่มวัสดุไม่สำเร็จ');
       toast('เพิ่มวัสดุแล้ว');
+      materials.value = [...materials.value, data].sort((a, b) => a.name.localeCompare(b.name));
       newMat.name = ''; newMat.category = 'อื่นๆ'; newMat.min = 5;
-      await load();
     };
     const updateMaterial = async (m) => {
       const { error } = await supabase.from('materials')
@@ -51,7 +51,7 @@ export default {
       const { error } = await supabase.from('materials').delete().eq('id', m.id);
       if (error) return toastError(error, 'ลบไม่สำเร็จ');
       toast('ลบแล้ว');
-      await load();
+      materials.value = materials.value.filter(x => x.id !== m.id);
     };
     const filteredMaterials = computed(() => {
       const q = search.value.trim().toLowerCase();
@@ -64,18 +64,18 @@ export default {
     const subInput = reactive({});
     const addProject = async () => {
       if (!newProjectName.value.trim()) return;
-      const { error } = await supabase.from('projects').insert({ name: newProjectName.value.trim(), sub_projects: [] });
+      const { data, error } = await supabase.from('projects').insert({ name: newProjectName.value.trim(), sub_projects: [] }).select().single();
       if (error) return toastError(error, 'เพิ่มโครงการไม่สำเร็จ');
       toast('เพิ่มโครงการแล้ว');
+      projects.value = [...projects.value, data];
       newProjectName.value = '';
-      await load();
     };
     const deleteProject = async (p) => {
       if (!confirm('ลบโครงการนี้?')) return;
       const { error } = await supabase.from('projects').delete().eq('id', p.id);
       if (error) return toastError(error, 'ลบไม่สำเร็จ');
       toast('ลบแล้ว');
-      await load();
+      projects.value = projects.value.filter(x => x.id !== p.id);
     };
     const addSubProject = async (p) => {
       const text = (subInput[p.id] || '').trim();
@@ -84,33 +84,33 @@ export default {
       const { error } = await supabase.from('projects').update({ sub_projects: updated }).eq('id', p.id);
       if (error) return toastError(error, 'เพิ่มโครงการย่อยไม่สำเร็จ');
       toast('เพิ่มโครงการย่อยแล้ว');
+      p.sub_projects = updated;
       subInput[p.id] = '';
-      await load();
     };
     const removeSubProject = async (p, idx) => {
       const updated = (p.sub_projects || []).filter((_, i) => i !== idx);
       const { error } = await supabase.from('projects').update({ sub_projects: updated }).eq('id', p.id);
       if (error) return toastError(error, 'ลบไม่สำเร็จ');
       toast('ลบแล้ว');
-      await load();
+      p.sub_projects = updated;
     };
 
     // Contractors
     const newContractorName = ref('');
     const addContractor = async () => {
       if (!newContractorName.value.trim()) return;
-      const { error } = await supabase.from('contractors').insert({ name: newContractorName.value.trim() });
+      const { data, error } = await supabase.from('contractors').insert({ name: newContractorName.value.trim() }).select().single();
       if (error) return toastError(error, 'เพิ่มผู้รับเหมาไม่สำเร็จ');
       toast('เพิ่มผู้รับเหมาแล้ว');
+      contractors.value = [...contractors.value, data];
       newContractorName.value = '';
-      await load();
     };
     const deleteContractor = async (c) => {
       if (!confirm('ลบผู้รับเหมานี้?')) return;
       const { error } = await supabase.from('contractors').delete().eq('id', c.id);
       if (error) return toastError(error, 'ลบไม่สำเร็จ');
       toast('ลบแล้ว');
-      await load();
+      contractors.value = contractors.value.filter(x => x.id !== c.id);
     };
 
     // Users (requesters) — editable name, since accounts created directly in

@@ -58,7 +58,9 @@ export default {
         }).select().single();
         if (error) throw error;
         for (const l of lines.value) {
-          const { error: itemErr } = await supabase.from('purchase_request_items').insert({ purchase_request_id: pr.id, material_id: l.material.id, qty: l.qty });
+          const { error: itemErr } = await supabase.from('purchase_request_items').insert({
+            purchase_request_id: pr.id, material_id: l.material.id, material_name: l.material.name, qty: l.qty
+          });
           if (itemErr) throw itemErr;
         }
         toast('ส่งใบขอซื้อแล้ว');
@@ -84,7 +86,9 @@ export default {
       if (!next) return;
       try {
         if (next === 'รับของครบ') {
+          let skipped = 0;
           for (const item of pr.purchase_request_items) {
+            if (!item.material_id) { skipped++; continue; } // material was deleted since this PR was created
             const { data: mat, error: readErr } = await supabase.from('materials').select('stock,name').eq('id', item.material_id).single();
             if (readErr) throw readErr;
             const newStock = Number(mat.stock || 0) + Number(item.qty);
@@ -97,6 +101,7 @@ export default {
             });
             if (insErr) throw insErr;
           }
+          if (skipped > 0) toast(`ข้าม ${skipped} รายการที่วัสดุถูกลบไปแล้ว`, 'error');
         }
         const { error } = await supabase.from('purchase_requests').update({ status: next, updated_at: new Date().toISOString() }).eq('id', pr.id);
         if (error) throw error;

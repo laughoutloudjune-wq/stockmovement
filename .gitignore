@@ -1,2 +1,7 @@
 node_modules/
 .DS_Store
+serviceAccountKey.json
+migration-output/
+.claude/
+Construction Material Stock WebApp/
+Construction Material Stock WebApp.zip

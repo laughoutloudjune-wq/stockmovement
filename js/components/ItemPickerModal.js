@@ -2,6 +2,7 @@ import { ref, computed, onMounted } from 'vue';
 import { supabase } from '../supabase.js';
 import { fetchMaterials, fetchCategories } from '../data.js';
 import { toast, toastError } from '../toast.js';
+import { useModalOpenState } from '../modalState.js';
 
 export default {
   props: {
@@ -11,6 +12,7 @@ export default {
   },
   emits: ['close', 'confirm', 'select'],
   setup(props, { emit }) {
+    useModalOpenState();
     const materials = ref([]);
     const loading = ref(true);
     const search = ref('');

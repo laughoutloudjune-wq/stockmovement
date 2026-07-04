@@ -419,16 +419,13 @@ tr.row-closing td { font-weight: 700; border-top: 2px solid var(--divider); }
 .sheet {
   background: var(--panel); border: 1px solid var(--panel-border);
   backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
-  width: 100%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;
+  /* Fixed height (not max-height) so the sheet doesn't reflow/reposition when
+     a search narrows the result count — it always occupies the same frame,
+     with the results list scrolling inside it. */
+  width: 100%; height: 85vh; display: flex; flex-direction: column; overflow: hidden;
   border-radius: 28px 28px 0 0;
   box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
   animation: slideUpSheet 0.3s var(--ease-spring) forwards;
-}
-@media (max-width: 767px) {
-  /* Keep the sheet's footer clear of the floating bottom nav bar instead of
-     sliding underneath it, where its translucent background lets the nav
-     bleed through. */
-  .sheet { margin-bottom: calc(var(--nav-h) + 12px); max-height: calc(85vh - var(--nav-h) - 12px); border-radius: 28px; }
 }
 @media (min-width: 768px) {
   .sheet { max-width: 640px; border-radius: 28px; animation: scaleIn 0.2s var(--ease-spring) forwards; }

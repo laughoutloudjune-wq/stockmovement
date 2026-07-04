@@ -1,5 +1,6 @@
 import { createApp, ref, computed, onMounted } from 'vue';
 import { supabase } from './supabase.js';
+import { openModalCount } from './modalState.js';
 import Login from './components/Login.js';
 import DashboardPage from './components/DashboardPage.js';
 import RequestPage from './components/RequestPage.js';
@@ -66,7 +67,7 @@ const App = {
     const initials = computed(() => (requester.value?.name || '?').trim().charAt(0).toUpperCase());
 
     return { session, requester, loadingAuth, theme, currentTab, NAV, SETTINGS_TAB,
-             logout, toggleTheme, navigate, activeComponent, initials };
+             logout, toggleTheme, navigate, activeComponent, initials, openModalCount };
   },
   template: `
     <div class="app-bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -123,8 +124,8 @@ const App = {
         <component :is="activeComponent" :requester="requester" :key="currentTab" />
       </main>
 
-      <!-- Mobile bottom nav -->
-      <nav class="mobile-nav mobile-only">
+      <!-- Mobile bottom nav (hidden while a modal/sheet is open, e.g. the item picker) -->
+      <nav v-if="openModalCount===0" class="mobile-nav mobile-only">
         <button v-for="t in NAV" :key="t.key" class="mobile-tab" :class="{active: currentTab===t.key}" @click="navigate(t.key)">
           <span class="icon icon-sm">{{ t.icon }}</span>
           <span class="mobile-tab-label">{{ t.label }}</span>

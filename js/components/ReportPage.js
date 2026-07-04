@@ -50,8 +50,29 @@ export default {
           if (c) rows = rows.filter(r => r.contractor === c.name);
         }
         recentRows.value = rows;
+        expandedDocs.value = {};
       } finally { loading.value = false; }
     };
+
+    // Group every line item that shares a doc_no into one "invoice" card —
+    // a single request/purchase/adjustment can cover several materials.
+    const expandedDocs = ref({});
+    const toggleDoc = (key) => { expandedDocs.value[key] = !expandedDocs.value[key]; };
+    const groupedRecent = computed(() => {
+      const map = new Map();
+      for (const r of recentRows.value) {
+        const key = r.doc_no || r.id;
+        if (!map.has(key)) {
+          map.set(key, {
+            key, doc_no: r.doc_no, type: r.type, date: r.date, timestamp: r.timestamp,
+            project: r.project, sub_project: r.sub_project, contractor: r.contractor,
+            requester: r.requester, note: r.note, items: []
+          });
+        }
+        map.get(key).items.push({ material_name: r.material_name, qty: r.qty });
+      }
+      return Array.from(map.values()).sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+    });
 
     const search = async () => {
       if (!material.value) return;
@@ -137,7 +158,7 @@ export default {
     const typePill = (t) => ({ IN: 'pill-success', OUT: 'pill-danger', ADJUST: 'pill-warning' }[t] || 'pill-neutral');
 
     return { projects, contractors, start, end, projectFilter, contractorFilter, material, pickerOpen,
-             loading, ledgerRows, recentRows, search, selectMaterial, clearMaterial, runSearch,
+             loading, ledgerRows, recentRows, groupedRecent, expandedDocs, toggleDoc, search, selectMaterial, clearMaterial, runSearch,
              totalIn, totalOut, totalAdj, opening, closing, exportExcel, typePill };
   },
   template: `
@@ -229,40 +250,52 @@ export default {
       <div v-else class="text-center text-secondary text-sm p-8">ไม่มีข้อมูลในช่วงเวลาที่เลือก</div>
     </template>
 
-    <!-- Default: latest movement history (all materials) -->
+    <!-- Default: latest movement history (all materials), grouped into one card per document -->
     <template v-else>
-      <div class="glass-card desktop-only">
-        <div class="table-wrapper">
-          <table>
-            <thead><tr><th>วันที่</th><th>เอกสาร</th><th>ประเภท</th><th>วัสดุ</th><th>โครงการ</th><th>จำนวน</th></tr></thead>
-            <tbody>
-              <tr v-for="r in recentRows" :key="r.id">
-                <td>{{ r.date }}</td>
-                <td class="mono text-accent">{{ r.doc_no || '—' }}</td>
-                <td><span class="pill" :class="typePill(r.type)">{{ r.type }}</span></td>
-                <td>{{ r.material_name }}</td>
-                <td>{{ r.project || '—' }}</td>
-                <td :class="r.type==='OUT' ? 'text-danger' : 'text-success'" class="font-bold">{{ r.type==='OUT' ? '-' : '+' }}{{ r.qty }}</td>
-              </tr>
-              <tr v-if="recentRows.length===0"><td colspan="6" class="text-center text-secondary">ไม่มีรายการในช่วงเวลาที่เลือก</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <div class="flex flex-col gap-3">
+        <div v-for="g in groupedRecent" :key="g.key" class="glass-card" style="padding:0; overflow:hidden;">
+          <div class="p-4 cursor-pointer select-none" @click="toggleDoc(g.key)">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-3">
+                <span class="mono text-sm font-semibold text-accent">{{ g.doc_no || '—' }}</span>
+                <span class="pill" :class="typePill(g.type)">{{ g.type }}</span>
+              </div>
+              <span class="text-xs text-tertiary">{{ g.date }}</span>
+            </div>
+            <div class="flex items-center justify-between mt-2 gap-3">
+              <div class="text-sm text-secondary truncate">
+                <span class="text-primary font-medium">{{ g.items[0].material_name }}</span>
+                <span v-if="g.items.length>1"> + อีก {{ g.items.length-1 }} รายการ</span>
+              </div>
+              <span class="icon icon-sm text-tertiary" style="flex-shrink:0; transition: transform .2s;" :style="expandedDocs[g.key] ? 'transform:rotate(180deg);' : ''">expand_more</span>
+            </div>
+          </div>
 
-      <div class="mobile-only flex flex-col gap-2">
-        <div v-for="r in recentRows" :key="r.id" class="glass-panel" style="padding:12px;">
-          <div class="flex justify-between text-sm">
-            <span class="mono text-accent">{{ r.doc_no || '—' }}</span>
-            <span class="text-tertiary">{{ r.date }}</span>
-          </div>
-          <div class="text-sm text-primary mt-1">{{ r.material_name }}</div>
-          <div class="flex justify-between items-center mt-1">
-            <span class="pill" :class="typePill(r.type)">{{ r.type }}</span>
-            <span :class="r.type==='OUT' ? 'text-danger' : 'text-success'" class="font-bold">{{ r.type==='OUT' ? '-' : '+' }}{{ r.qty }}</span>
+          <div v-if="expandedDocs[g.key]" class="animate-fade" style="border-top:1px solid var(--divider); background:var(--field);">
+            <div class="p-4 grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(140px,1fr));">
+              <div>
+                <div class="text-xs text-tertiary mb-1">ผู้ขอ/ผู้ทำรายการ</div>
+                <div class="text-sm font-medium text-primary">{{ g.requester || '—' }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">โครงการ</div>
+                <div class="text-sm font-medium text-primary">{{ [g.project, g.sub_project].filter(Boolean).join(' › ') || '—' }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">ผู้รับเหมา</div>
+                <div class="text-sm font-medium text-primary">{{ g.contractor || '—' }}</div>
+              </div>
+            </div>
+            <div v-if="g.note" class="px-4 pb-3 text-xs text-secondary">หมายเหตุ: {{ g.note }}</div>
+            <div class="px-4 pb-4 flex flex-col gap-2">
+              <div v-for="(item,idx) in g.items" :key="idx" class="flex items-center justify-between" style="padding:8px 12px; background:var(--panel); border-radius:12px;">
+                <span class="text-sm text-primary">{{ item.material_name }}</span>
+                <span :class="g.type==='OUT' ? 'text-danger' : (g.type==='IN' ? 'text-success' : (item.qty > 0 ? 'text-success' : (item.qty < 0 ? 'text-danger' : 'text-secondary')))" class="font-bold text-sm">{{ g.type==='OUT' ? '-'+item.qty : (g.type==='IN' ? '+'+item.qty : (item.qty > 0 ? '+'+item.qty : item.qty)) }}</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div v-if="recentRows.length===0" class="text-center text-secondary text-sm p-8">ไม่มีรายการในช่วงเวลาที่เลือก</div>
+        <div v-if="groupedRecent.length===0" class="text-center text-secondary text-sm p-8">ไม่มีรายการในช่วงเวลาที่เลือก</div>
       </div>
     </template>
 

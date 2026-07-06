@@ -115,10 +115,14 @@ export default {
     const urgencyPill = (u) => u === 'ด่วนมาก' ? 'pill-danger' : (u === 'ด่วน' ? 'pill-warning' : 'pill-neutral');
     const statusPill = (s) => ({ 'รออนุมัติ': 'pill-warning', 'อนุมัติแล้ว': 'pill-accent', 'สั่งซื้อแล้ว': 'pill-purple', 'รับของครบ': 'pill-success', 'ปฏิเสธ': 'pill-danger' }[s] || 'pill-neutral');
 
+    const expandedRequests = ref({});
+    const toggleRequest = (id) => { expandedRequests.value[id] = !expandedRequests.value[id]; };
+    const nameOf = (list, id) => list.find(x => x.id === id)?.name || '—';
+
     return { projects, contractors, requesters, requests, projectId, contractorId, requesterId, urgency, note,
              lines, pickerOpen, submitting, previewDocNo, excludeIds, addLines, removeLine, submit,
              pendingQueue, decide, advance, urgencyPill, statusPill, STEPS, STEP_LABELS, NEXT_LABEL,
-             onProjectCreated, onContractorCreated };
+             onProjectCreated, onContractorCreated, expandedRequests, toggleRequest, nameOf };
   },
   template: `
   <div class="flex flex-col gap-5 animate-fade">
@@ -232,16 +236,48 @@ export default {
       </div>
     </div>
 
-    <div class="glass-card">
-      <h3 class="card-title mb-3">ประวัติใบขอซื้อ</h3>
-      <div class="flex flex-col gap-2">
-        <div v-for="pr in requests" :key="pr.id" class="flex items-center justify-between gap-3 flex-wrap" style="padding:10px 0;border-bottom:1px solid var(--divider);">
-          <div class="flex items-center gap-3">
-            <span class="mono text-sm font-semibold">{{ pr.doc_no }}</span>
-            <span class="pill" :class="statusPill(pr.status)">{{ pr.status }}</span>
-            <span class="pill" :class="urgencyPill(pr.urgency)">{{ pr.urgency }}</span>
+    <div class="glass-card" style="padding:0; overflow:hidden;">
+      <h3 class="card-title p-4" style="padding-bottom:0;">ประวัติใบขอซื้อ</h3>
+      <div class="flex flex-col">
+        <div v-for="pr in requests" :key="pr.id" style="border-top:1px solid var(--divider);">
+          <div class="p-4 cursor-pointer select-none" @click="toggleRequest(pr.id)">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-3">
+                <span class="mono text-sm font-semibold text-accent">{{ pr.doc_no }}</span>
+                <span class="pill" :class="statusPill(pr.status)">{{ pr.status }}</span>
+                <span class="pill" :class="urgencyPill(pr.urgency)">{{ pr.urgency }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button v-if="NEXT_LABEL[pr.status]" class="btn btn-surface" style="height:36px;" @click.stop="advance(pr)">{{ NEXT_LABEL[pr.status] }}</button>
+                <span class="icon icon-sm text-tertiary" style="transition: transform .2s;" :style="expandedRequests[pr.id] ? 'transform:rotate(180deg);' : ''">expand_more</span>
+              </div>
+            </div>
+            <div class="text-xs text-secondary mt-1">{{ pr.purchase_request_items.length }} รายการ</div>
           </div>
-          <button v-if="NEXT_LABEL[pr.status]" class="btn btn-surface" style="height:36px;" @click="advance(pr)">{{ NEXT_LABEL[pr.status] }}</button>
+
+          <div v-if="expandedRequests[pr.id]" class="animate-fade" style="border-top:1px solid var(--divider); background:var(--field);">
+            <div class="p-4 grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(140px,1fr));">
+              <div>
+                <div class="text-xs text-tertiary mb-1">ผู้ขอซื้อ</div>
+                <div class="text-sm font-medium text-primary">{{ nameOf(requesters, pr.requester_id) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">โครงการ</div>
+                <div class="text-sm font-medium text-primary">{{ nameOf(projects, pr.project_id) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">ผู้รับเหมา</div>
+                <div class="text-sm font-medium text-primary">{{ nameOf(contractors, pr.contractor_id) }}</div>
+              </div>
+            </div>
+            <div v-if="pr.note" class="px-4 pb-3 text-xs text-secondary">หมายเหตุ: {{ pr.note }}</div>
+            <div class="px-4 pb-4 flex flex-col gap-2">
+              <div v-for="item in pr.purchase_request_items" :key="item.id" class="flex items-center justify-between" style="padding:8px 12px; background:var(--panel); border-radius:12px;">
+                <span class="text-sm text-primary">{{ item.material_name }}</span>
+                <span class="font-bold text-sm text-primary">{{ item.qty }}</span>
+              </div>
+            </div>
+          </div>
         </div>
         <div v-if="requests.length===0" class="text-center text-secondary text-sm p-4">ยังไม่มีใบขอซื้อ</div>
       </div>

@@ -1,7 +1,5 @@
 import { ref, computed, onMounted } from 'vue';
-import { supabase } from '../supabase.js';
 import { fetchMaterials, fetchCategories } from '../data.js';
-import { toast, toastError } from '../toast.js';
 import { useModalOpenState } from '../modalState.js';
 
 export default {
@@ -55,25 +53,7 @@ export default {
       emit('close');
     };
 
-    const creating = ref(false);
-    const createMaterial = async () => {
-      const name = search.value.trim();
-      if (!name) return;
-      creating.value = true;
-      try {
-        const { data, error } = await supabase.from('materials').insert({ name, category: 'อื่นๆ', stock: 0, min: 5 }).select().single();
-        if (error) throw error;
-        toast('เพิ่มวัสดุแล้ว');
-        const newMat = { ...data, category: data.category || 'อื่นๆ' };
-        materials.value = [...materials.value, newMat];
-        search.value = '';
-        toggle(newMat);
-      } catch (e) {
-        toastError(e, 'เพิ่มวัสดุไม่สำเร็จ');
-      } finally { creating.value = false; }
-    };
-
-    return { materials, loading, search, category, categoryChips, results, isLow, isSelected, toggle, confirm, selected, creating, createMaterial };
+    return { materials, loading, search, category, categoryChips, results, isLow, isSelected, toggle, confirm, selected };
   },
   template: `
     <div class="scrim" @click.self="$emit('close')">
@@ -96,10 +76,6 @@ export default {
           <div v-if="loading" class="flex justify-center p-6"><span class="icon animate-spin text-secondary">refresh</span></div>
           <div v-else-if="results.length===0" class="flex flex-col items-center gap-3 text-center text-secondary text-sm p-6">
             <span>ไม่พบวัสดุ</span>
-            <button v-if="search.trim()" class="btn btn-surface" :disabled="creating" @click="createMaterial">
-              <span v-if="creating" class="icon animate-spin icon-sm">refresh</span>
-              <span class="icon icon-sm">add</span>เพิ่ม "{{ search.trim() }}" เป็นวัสดุใหม่
-            </button>
           </div>
           <div v-else class="flex flex-col gap-2" style="padding-bottom:12px;">
             <div v-for="m in results" :key="m.id" class="flex items-center gap-3 p-3" style="border-radius:14px; background:var(--field); cursor:pointer;" @click="toggle(m)">

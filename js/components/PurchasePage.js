@@ -7,8 +7,7 @@ import QuickAddSelect from './QuickAddSelect.js';
 
 const STEPS = ['ร่าง', 'รออนุมัติ', 'อนุมัติแล้ว', 'สั่งซื้อแล้ว', 'รับของครบ'];
 const STEP_LABELS = { 'ร่าง': 'ร่าง / สร้างคำขอ', 'รออนุมัติ': 'รออนุมัติ', 'อนุมัติแล้ว': 'อนุมัติแล้ว', 'สั่งซื้อแล้ว': 'สั่งซื้อแล้ว', 'รับของครบ': 'รับของครบ' };
-const NEXT_STATUS = { 'อนุมัติแล้ว': 'สั่งซื้อแล้ว', 'สั่งซื้อแล้ว': 'รับของครบ' };
-const NEXT_LABEL = { 'อนุมัติแล้ว': 'ทำเครื่องหมายว่าสั่งซื้อแล้ว', 'สั่งซื้อแล้ว': 'รับของครบแล้ว' };
+const STATUS_OPTIONS = [...STEPS, 'ปฏิเสธ'];
 
 export default {
   props: ['requester'],
@@ -81,11 +80,10 @@ export default {
       await load();
     };
 
-    const advance = async (pr) => {
-      const next = NEXT_STATUS[pr.status];
-      if (!next) return;
+    const changeStatus = async (pr, newStatus) => {
+      if (!newStatus || newStatus === pr.status) return;
       try {
-        if (next === 'รับของครบ') {
+        if (newStatus === 'รับของครบ' && pr.status !== 'รับของครบ') {
           let skipped = 0;
           for (const item of pr.purchase_request_items) {
             if (!item.material_id) { skipped++; continue; } // material was deleted since this PR was created
@@ -103,7 +101,7 @@ export default {
           }
           if (skipped > 0) toast(`ข้าม ${skipped} รายการที่วัสดุถูกลบไปแล้ว`, 'error');
         }
-        const { error } = await supabase.from('purchase_requests').update({ status: next, updated_at: new Date().toISOString() }).eq('id', pr.id);
+        const { error } = await supabase.from('purchase_requests').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', pr.id);
         if (error) throw error;
         toast('อัปเดตสถานะแล้ว');
         await load();
@@ -121,7 +119,7 @@ export default {
 
     return { projects, contractors, requesters, requests, projectId, contractorId, requesterId, urgency, note,
              lines, pickerOpen, submitting, previewDocNo, excludeIds, addLines, removeLine, submit,
-             pendingQueue, decide, advance, urgencyPill, statusPill, STEPS, STEP_LABELS, NEXT_LABEL,
+             pendingQueue, decide, changeStatus, urgencyPill, statusPill, STEPS, STEP_LABELS, STATUS_OPTIONS,
              onProjectCreated, onContractorCreated, expandedRequests, toggleRequest, nameOf };
   },
   template: `
@@ -248,7 +246,9 @@ export default {
                 <span class="pill" :class="urgencyPill(pr.urgency)">{{ pr.urgency }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <button v-if="NEXT_LABEL[pr.status]" class="btn btn-surface" style="height:36px;" @click.stop="advance(pr)">{{ NEXT_LABEL[pr.status] }}</button>
+                <select class="input-field" style="height:36px; width:auto; padding:0 10px;" :value="pr.status" @click.stop @change="changeStatus(pr, $event.target.value)">
+                  <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
+                </select>
                 <span class="icon icon-sm text-tertiary" style="transition: transform .2s;" :style="expandedRequests[pr.id] ? 'transform:rotate(180deg);' : ''">expand_more</span>
               </div>
             </div>

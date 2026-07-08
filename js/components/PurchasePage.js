@@ -80,26 +80,53 @@ export default {
       await load();
     };
 
+    const receiveOne = async (item, docNoForMovement) => {
+      const { data: mat, error: readErr } = await supabase.from('materials').select('stock,name').eq('id', item.material_id).single();
+      if (readErr) throw readErr;
+      const newStock = Number(mat.stock || 0) + Number(item.qty);
+      const { error: updErr } = await supabase.from('materials').update({ stock: newStock }).eq('id', item.material_id);
+      if (updErr) throw updErr;
+      const { error: insErr } = await supabase.from('movements').insert({
+        type: 'IN', doc_no: docNoForMovement, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
+        material_id: item.material_id, material_name: mat.name, qty: item.qty, prev_stock: mat.stock, new_stock: newStock,
+        status: 'บันทึกแล้ว'
+      });
+      if (insErr) throw insErr;
+    };
+
+    const canReceive = (pr) => ['อนุมัติแล้ว', 'สั่งซื้อแล้ว'].includes(pr.status);
+
+    const receiveItem = async (pr, item) => {
+      if (item.received || !item.material_id) return;
+      try {
+        await receiveOne(item, pr.doc_no);
+        const { error } = await supabase.from('purchase_request_items').update({ received: true }).eq('id', item.id);
+        if (error) throw error;
+        toast(`รับ ${item.material_name} แล้ว`);
+        const allReceived = pr.purchase_request_items.every(it => it.id === item.id || it.received || !it.material_id);
+        if (allReceived && pr.status !== 'รับของครบ') {
+          const { error: statusErr } = await supabase.from('purchase_requests').update({ status: 'รับของครบ', updated_at: new Date().toISOString() }).eq('id', pr.id);
+          if (statusErr) throw statusErr;
+        }
+        await load();
+      } catch (e) {
+        toastError(e, 'รับของไม่สำเร็จ');
+      }
+    };
+
     const changeStatus = async (pr, newStatus) => {
       if (!newStatus || newStatus === pr.status) return;
       try {
         if (newStatus === 'รับของครบ' && pr.status !== 'รับของครบ') {
           let skipped = 0;
           for (const item of pr.purchase_request_items) {
+            if (item.received) continue;
             if (!item.material_id) { skipped++; continue; } // material was deleted since this PR was created
-            const { data: mat, error: readErr } = await supabase.from('materials').select('stock,name').eq('id', item.material_id).single();
-            if (readErr) throw readErr;
-            const newStock = Number(mat.stock || 0) + Number(item.qty);
-            const { error: updErr } = await supabase.from('materials').update({ stock: newStock }).eq('id', item.material_id);
-            if (updErr) throw updErr;
-            const { error: insErr } = await supabase.from('movements').insert({
-              type: 'IN', doc_no: pr.doc_no, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
-              material_id: item.material_id, material_name: mat.name, qty: item.qty, prev_stock: mat.stock, new_stock: newStock,
-              status: 'บันทึกแล้ว'
-            });
-            if (insErr) throw insErr;
+            await receiveOne(item, pr.doc_no);
           }
           if (skipped > 0) toast(`ข้าม ${skipped} รายการที่วัสดุถูกลบไปแล้ว`, 'error');
+          const { error: itemsErr } = await supabase.from('purchase_request_items').update({ received: true }).eq('purchase_request_id', pr.id);
+          if (itemsErr) throw itemsErr;
         }
         const { error } = await supabase.from('purchase_requests').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', pr.id);
         if (error) throw error;
@@ -119,7 +146,7 @@ export default {
 
     return { projects, contractors, requesters, requests, projectId, contractorId, requesterId, urgency, note,
              lines, pickerOpen, submitting, previewDocNo, excludeIds, addLines, removeLine, submit,
-             pendingQueue, decide, changeStatus, urgencyPill, statusPill, STEPS, STEP_LABELS, STATUS_OPTIONS,
+             pendingQueue, decide, changeStatus, canReceive, receiveItem, urgencyPill, statusPill, STEPS, STEP_LABELS, STATUS_OPTIONS,
              onProjectCreated, onContractorCreated, expandedRequests, toggleRequest, nameOf };
   },
   template: `
@@ -271,10 +298,33 @@ export default {
               </div>
             </div>
             <div v-if="pr.note" class="px-4 pb-3 text-xs text-secondary">หมายเหตุ: {{ pr.note }}</div>
-            <div class="px-4 pb-4 flex flex-col gap-2">
-              <div v-for="item in pr.purchase_request_items" :key="item.id" class="flex items-center justify-between" style="padding:8px 12px; background:var(--panel); border-radius:12px;">
-                <span class="text-sm text-primary">{{ item.material_name }}</span>
-                <span class="font-bold text-sm text-primary">{{ item.qty }}</span>
+            <div class="px-4 pb-4 flex flex-col gap-4">
+              <div v-if="pr.purchase_request_items.some(i => !i.received)">
+                <div class="text-xs text-tertiary mb-2">รอรับของ</div>
+                <div class="flex flex-col gap-2">
+                  <div v-for="item in pr.purchase_request_items.filter(i => !i.received)" :key="item.id" class="flex items-center justify-between gap-3" style="padding:8px 12px; background:var(--panel); border-radius:12px;">
+                    <span class="text-sm text-primary">{{ item.material_name }}</span>
+                    <div class="flex items-center gap-3">
+                      <span class="font-bold text-sm text-primary">{{ item.qty }}</span>
+                      <button v-if="canReceive(pr) && item.material_id" class="btn btn-surface" style="height:32px; padding:0 10px;" @click.stop="receiveItem(pr, item)">
+                        <span class="icon icon-sm">inventory</span>รับของ
+                      </button>
+                      <span v-else-if="!item.material_id" class="text-xs text-danger">วัสดุถูกลบ</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="pr.purchase_request_items.some(i => i.received)">
+                <div class="text-xs text-tertiary mb-2">รับของแล้ว</div>
+                <div class="flex flex-col gap-2">
+                  <div v-for="item in pr.purchase_request_items.filter(i => i.received)" :key="item.id" class="flex items-center justify-between" style="padding:8px 12px; background:var(--panel); border-radius:12px; opacity:.7;">
+                    <span class="text-sm text-primary">{{ item.material_name }}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-sm text-primary">{{ item.qty }}</span>
+                      <span class="icon icon-sm text-success">check_circle</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

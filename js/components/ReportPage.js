@@ -110,7 +110,10 @@ export default {
           date: m.date, docNo: m.doc_no, type: m.type, description: description(m),
           in: m.type !== 'OUT' && signedQty(m) > 0 ? signedQty(m) : 0,
           out: m.type === 'OUT' ? Math.abs(signedQty(m)) : (signedQty(m) < 0 ? Math.abs(signedQty(m)) : 0),
-          balance: m.balance
+          balance: m.balance,
+          requester: m.requester || null,
+          contractor: m.contractor || null,
+          project: [m.project, m.sub_project].filter(Boolean).join(' › ') || null
         }));
         result.push({ isClosing: true, date: end.value, balance: closingBalance });
         ledgerRows.value = result;
@@ -131,10 +134,10 @@ export default {
     const exportExcel = () => {
       if (material.value) {
         if (!ledgerRows.value.length) return;
-        let csv = '﻿วันที่,เอกสาร,รายการ,รับเข้า,จ่ายออก,คงเหลือ\n';
+        let csv = '﻿วันที่,เอกสาร,รายการ,ผู้ทำรายการ,โครงการ,ผู้รับเหมา,รับเข้า,จ่ายออก,คงเหลือ\n';
         ledgerRows.value.forEach(r => {
           const label = r.isOpening ? 'ยอดยกมา (Opening Balance)' : (r.isClosing ? 'คงเหลือปลายงวด (Closing)' : r.description);
-          csv += [r.date, r.docNo || '', label, r.in || '', r.out || '', r.balance].join(',') + '\n';
+          csv += [r.date, r.docNo || '', label, r.requester || '', r.project || '', r.contractor || '', r.in || '', r.out || '', r.balance].join(',') + '\n';
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -218,12 +221,15 @@ export default {
         <div class="glass-card desktop-only">
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>วันที่</th><th>เอกสาร</th><th>รายการ</th><th>รับเข้า</th><th>จ่ายออก</th><th>คงเหลือ</th></tr></thead>
+              <thead><tr><th>วันที่</th><th>เอกสาร</th><th>รายการ</th><th>ผู้ทำรายการ</th><th>โครงการ</th><th>ผู้รับเหมา</th><th>รับเข้า</th><th>จ่ายออก</th><th>คงเหลือ</th></tr></thead>
               <tbody>
                 <tr v-for="(r,i) in ledgerRows" :key="i" :class="r.isClosing ? 'row-closing' : ''">
                   <td>{{ r.date }}</td>
                   <td class="mono text-accent">{{ r.docNo || '—' }}</td>
                   <td>{{ r.isOpening ? 'ยอดยกมา (Opening Balance)' : (r.isClosing ? 'คงเหลือปลายงวด (Closing)' : r.description) }}</td>
+                  <td>{{ r.requester || '—' }}</td>
+                  <td>{{ r.project || '—' }}</td>
+                  <td>{{ r.contractor || '—' }}</td>
                   <td class="text-success">{{ r.in ? '+'+r.in : '' }}</td>
                   <td class="text-danger">{{ r.out ? '-'+r.out : '' }}</td>
                   <td class="font-bold">{{ r.balance }}</td>
@@ -240,6 +246,11 @@ export default {
               <span class="text-tertiary">{{ r.date }}</span>
             </div>
             <div class="text-sm text-primary mt-1">{{ r.isOpening ? 'ยอดยกมา' : (r.isClosing ? 'คงเหลือปลายงวด' : r.description) }}</div>
+            <div v-if="r.requester || r.project || r.contractor" class="text-xs text-secondary mt-1">
+              <span v-if="r.requester">{{ r.requester }}</span>
+              <span v-if="r.project"> · {{ r.project }}</span>
+              <span v-if="r.contractor"> · {{ r.contractor }}</span>
+            </div>
             <div class="flex justify-between items-center mt-1">
               <span :class="r.in ? 'text-success' : (r.out ? 'text-danger' : 'text-tertiary')">{{ r.in ? '+'+r.in : (r.out ? '-'+r.out : '—') }}</span>
               <span class="font-bold">คงเหลือ {{ r.balance }}</span>

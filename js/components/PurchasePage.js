@@ -84,15 +84,17 @@ export default {
       await load();
     };
 
-    const receiveOne = async (item, docNoForMovement, qty) => {
+    const receiveOne = async (item, pr, qty) => {
       const { data: mat, error: readErr } = await supabase.from('materials').select('stock,name').eq('id', item.material_id).single();
       if (readErr) throw readErr;
       const newStock = Number(mat.stock || 0) + Number(qty);
       const { error: updErr } = await supabase.from('materials').update({ stock: newStock }).eq('id', item.material_id);
       if (updErr) throw updErr;
       const { error: insErr } = await supabase.from('movements').insert({
-        type: 'IN', doc_no: docNoForMovement, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
+        type: 'IN', doc_no: pr.doc_no, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
         material_id: item.material_id, material_name: mat.name, qty, prev_stock: mat.stock, new_stock: newStock,
+        project: lookupName(projects.value, pr.project_id), sub_project: pr.sub_project || null,
+        contractor: lookupName(contractors.value, pr.contractor_id), requester: lookupName(requesters.value, pr.requester_id),
         status: 'บันทึกแล้ว'
       });
       if (insErr) throw insErr;
@@ -109,7 +111,7 @@ export default {
       const qty = Number(qtyOf(item));
       if (!qty || qty <= 0) return toastError(new Error('invalid qty'), 'กรุณาระบุจำนวนที่ถูกต้อง');
       try {
-        await receiveOne(item, pr.doc_no, qty);
+        await receiveOne(item, pr, qty);
         const { error } = await supabase.from('purchase_request_items').update({ received: true }).eq('id', item.id);
         if (error) throw error;
         toast(`รับ ${item.material_name} แล้ว`);
@@ -132,7 +134,7 @@ export default {
           for (const item of pr.purchase_request_items) {
             if (item.received) continue;
             if (!item.material_id) { skipped++; continue; } // material was deleted since this PR was created
-            await receiveOne(item, pr.doc_no, item.qty);
+            await receiveOne(item, pr, item.qty);
           }
           if (skipped > 0) toast(`ข้าม ${skipped} รายการที่วัสดุถูกลบไปแล้ว`, 'error');
           const { error: itemsErr } = await supabase.from('purchase_request_items').update({ received: true }).eq('purchase_request_id', pr.id);
@@ -153,6 +155,7 @@ export default {
     const expandedRequests = ref({});
     const toggleRequest = (id) => { expandedRequests.value[id] = !expandedRequests.value[id]; };
     const nameOf = (list, id) => list.find(x => x.id === id)?.name || '—';
+    const lookupName = (list, id) => list.find(x => x.id === id)?.name || null;
 
     return { projects, contractors, requesters, requests, projectId, subProject, subProjectOptions, contractorId, requesterId, urgency, note,
              lines, pickerOpen, submitting, previewDocNo, excludeIds, addLines, removeLine, submit,

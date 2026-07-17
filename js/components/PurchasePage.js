@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { supabase } from '../supabase.js';
 import { fetchProjects, fetchContractors, fetchRequesters, docNo } from '../data.js';
 import { toast, toastError } from '../toast.js';
@@ -19,6 +19,7 @@ export default {
     const requests = ref([]);
 
     const projectId = ref('');
+    const subProject = ref('');
     const contractorId = ref('');
     const requesterId = ref('');
     const urgency = ref('ปกติ');
@@ -46,13 +47,16 @@ export default {
     const projectName = computed(() => projects.value.find(p => p.id === projectId.value)?.name || '');
     const contractorName = computed(() => contractors.value.find(c => c.id === contractorId.value)?.name || '');
     const requesterName = computed(() => requesters.value.find(r => r.id === requesterId.value)?.name || '');
+    const subProjectOptions = computed(() => projects.value.find(p => p.id === projectId.value)?.sub_projects || []);
+    watch(projectId, () => { subProject.value = ''; });
 
     const submit = async () => {
       if (lines.value.length === 0) return;
       submitting.value = true;
       try {
         const { data: pr, error } = await supabase.from('purchase_requests').insert({
-          doc_no: previewDocNo.value, project_id: projectId.value || null, contractor_id: contractorId.value || null,
+          doc_no: previewDocNo.value, project_id: projectId.value || null, sub_project: subProject.value || null,
+          contractor_id: contractorId.value || null,
           requester_id: requesterId.value || null, urgency: urgency.value, note: note.value || null, status: 'รออนุมัติ'
         }).select().single();
         if (error) throw error;
@@ -63,7 +67,7 @@ export default {
           if (itemErr) throw itemErr;
         }
         toast('ส่งใบขอซื้อแล้ว');
-        lines.value = []; note.value = ''; urgency.value = 'ปกติ';
+        lines.value = []; note.value = ''; urgency.value = 'ปกติ'; subProject.value = '';
         previewDocNo.value = docNo('PR');
         await load();
       } catch (e) {
@@ -80,15 +84,15 @@ export default {
       await load();
     };
 
-    const receiveOne = async (item, docNoForMovement) => {
+    const receiveOne = async (item, docNoForMovement, qty) => {
       const { data: mat, error: readErr } = await supabase.from('materials').select('stock,name').eq('id', item.material_id).single();
       if (readErr) throw readErr;
-      const newStock = Number(mat.stock || 0) + Number(item.qty);
+      const newStock = Number(mat.stock || 0) + Number(qty);
       const { error: updErr } = await supabase.from('materials').update({ stock: newStock }).eq('id', item.material_id);
       if (updErr) throw updErr;
       const { error: insErr } = await supabase.from('movements').insert({
         type: 'IN', doc_no: docNoForMovement, date: new Date().toISOString().slice(0, 10), timestamp: new Date().toISOString(),
-        material_id: item.material_id, material_name: mat.name, qty: item.qty, prev_stock: mat.stock, new_stock: newStock,
+        material_id: item.material_id, material_name: mat.name, qty, prev_stock: mat.stock, new_stock: newStock,
         status: 'บันทึกแล้ว'
       });
       if (insErr) throw insErr;
@@ -96,10 +100,16 @@ export default {
 
     const canReceive = (pr) => ['อนุมัติแล้ว', 'สั่งซื้อแล้ว'].includes(pr.status);
 
+    const receiveQty = ref({});
+    const qtyOf = (item) => receiveQty.value[item.id] ?? item.qty;
+    const setQty = (item, val) => { receiveQty.value[item.id] = val; };
+
     const receiveItem = async (pr, item) => {
       if (item.received || !item.material_id) return;
+      const qty = Number(qtyOf(item));
+      if (!qty || qty <= 0) return toastError(new Error('invalid qty'), 'กรุณาระบุจำนวนที่ถูกต้อง');
       try {
-        await receiveOne(item, pr.doc_no);
+        await receiveOne(item, pr.doc_no, qty);
         const { error } = await supabase.from('purchase_request_items').update({ received: true }).eq('id', item.id);
         if (error) throw error;
         toast(`รับ ${item.material_name} แล้ว`);
@@ -122,7 +132,7 @@ export default {
           for (const item of pr.purchase_request_items) {
             if (item.received) continue;
             if (!item.material_id) { skipped++; continue; } // material was deleted since this PR was created
-            await receiveOne(item, pr.doc_no);
+            await receiveOne(item, pr.doc_no, item.qty);
           }
           if (skipped > 0) toast(`ข้าม ${skipped} รายการที่วัสดุถูกลบไปแล้ว`, 'error');
           const { error: itemsErr } = await supabase.from('purchase_request_items').update({ received: true }).eq('purchase_request_id', pr.id);
@@ -144,9 +154,9 @@ export default {
     const toggleRequest = (id) => { expandedRequests.value[id] = !expandedRequests.value[id]; };
     const nameOf = (list, id) => list.find(x => x.id === id)?.name || '—';
 
-    return { projects, contractors, requesters, requests, projectId, contractorId, requesterId, urgency, note,
+    return { projects, contractors, requesters, requests, projectId, subProject, subProjectOptions, contractorId, requesterId, urgency, note,
              lines, pickerOpen, submitting, previewDocNo, excludeIds, addLines, removeLine, submit,
-             pendingQueue, decide, changeStatus, canReceive, receiveItem, urgencyPill, statusPill, STEPS, STEP_LABELS, STATUS_OPTIONS,
+             pendingQueue, decide, changeStatus, canReceive, receiveItem, qtyOf, setQty, urgencyPill, statusPill, STEPS, STEP_LABELS, STATUS_OPTIONS,
              onProjectCreated, onContractorCreated, expandedRequests, toggleRequest, nameOf };
   },
   template: `
@@ -170,6 +180,13 @@ export default {
             <div class="input-group">
               <label class="input-label">โครงการ</label>
               <QuickAddSelect v-model="projectId" :options="projects" placeholder="เลือก" new-label="โครงการ" table="projects" @created="onProjectCreated" />
+            </div>
+            <div class="input-group" v-if="subProjectOptions.length">
+              <label class="input-label">โครงการย่อย</label>
+              <select v-model="subProject" class="input-field">
+                <option value="">เลือกโครงการย่อย</option>
+                <option v-for="s in subProjectOptions" :key="s" :value="s">{{ s }}</option>
+              </select>
             </div>
             <div class="input-group">
               <label class="input-label">ผู้รับเหมา</label>
@@ -292,6 +309,10 @@ export default {
                 <div class="text-xs text-tertiary mb-1">โครงการ</div>
                 <div class="text-sm font-medium text-primary">{{ nameOf(projects, pr.project_id) }}</div>
               </div>
+              <div v-if="pr.sub_project">
+                <div class="text-xs text-tertiary mb-1">โครงการย่อย</div>
+                <div class="text-sm font-medium text-primary">{{ pr.sub_project }}</div>
+              </div>
               <div>
                 <div class="text-xs text-tertiary mb-1">ผู้รับเหมา</div>
                 <div class="text-sm font-medium text-primary">{{ nameOf(contractors, pr.contractor_id) }}</div>
@@ -303,13 +324,21 @@ export default {
                 <div class="text-xs text-tertiary mb-2">รอรับของ</div>
                 <div class="flex flex-col gap-2">
                   <div v-for="item in pr.purchase_request_items.filter(i => !i.received)" :key="item.id" class="flex items-center justify-between gap-3" style="padding:8px 12px; background:var(--panel); border-radius:12px;">
-                    <span class="text-sm text-primary">{{ item.material_name }}</span>
-                    <div class="flex items-center gap-3">
-                      <span class="font-bold text-sm text-primary">{{ item.qty }}</span>
-                      <button v-if="canReceive(pr) && item.material_id" class="btn btn-surface" style="height:32px; padding:0 10px;" @click.stop="receiveItem(pr, item)">
-                        <span class="icon icon-sm">inventory</span>รับของ
-                      </button>
-                      <span v-else-if="!item.material_id" class="text-xs text-danger">วัสดุถูกลบ</span>
+                    <div class="min-w-0">
+                      <span class="text-sm text-primary">{{ item.material_name }}</span>
+                      <div class="text-xs text-tertiary">สั่ง {{ item.qty }}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <template v-if="canReceive(pr) && item.material_id">
+                        <input type="number" min="0" step="any" class="input-field" style="width:70px;height:32px;padding:0 8px;" :value="qtyOf(item)" @click.stop @input="setQty(item, $event.target.value)" />
+                        <button class="btn btn-surface" style="height:32px; padding:0 10px;" @click.stop="receiveItem(pr, item)">
+                          <span class="icon icon-sm">inventory</span>รับของ
+                        </button>
+                      </template>
+                      <template v-else>
+                        <span class="font-bold text-sm text-primary">{{ item.qty }}</span>
+                        <span v-if="!item.material_id" class="text-xs text-danger">วัสดุถูกลบ</span>
+                      </template>
                     </div>
                   </div>
                 </div>
